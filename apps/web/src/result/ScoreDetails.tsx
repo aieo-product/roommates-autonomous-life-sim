@@ -74,9 +74,9 @@ export function ScoreDetails({ producer }: { producer: ResultProducer }) {
     <section className="result-score-details" aria-labelledby="result-score-title">
       <div className="result-section-heading result-score-heading">
         <div>
-          <p className="result-section-label">PRODUCER SCORE</p>
+          <p className="result-section-label">DEKOPIN SUPPORT SCORE</p>
           <h2 id="result-score-title">{Math.round(producer.overallScore)}点・ランク{producer.rank}</h2>
-          <p>Producerタイプ：{STYLE_LABELS[producer.producerStyle] ?? producer.producerStyle}</p>
+          <p>サポートタイプ：{STYLE_LABELS[producer.producerStyle] ?? producer.producerStyle}</p>
         </div>
         <div className="result-score-version">
           <span>採点ルール</span><strong>{producer.scoringVersion}</strong>
@@ -108,7 +108,7 @@ export function ScoreDetails({ producer }: { producer: ResultProducer }) {
 
       <div className="result-evidence-columns">
         <section>
-          <h3>よかったプロデュース</h3>
+          <h3>よかったサポート</h3>
           <EvidenceList items={producer.topStrengths} empty="特定の加点根拠はありません。" />
         </section>
         <section>
@@ -119,7 +119,7 @@ export function ScoreDetails({ producer }: { producer: ResultProducer }) {
 
       <section className="result-journey-section">
         <h3>二人の状態の旅</h3>
-        <p>恋愛意識の増減は結末の記録であり、Producer Scoreへの直接加点ではありません。</p>
+        <p>恋愛意識の増減は結末の記録であり、デコピンのサポート評価への直接加点ではありません。</p>
         <StatJourney producer={producer} />
       </section>
 

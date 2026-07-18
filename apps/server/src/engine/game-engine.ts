@@ -10,6 +10,8 @@ import type {
   GameResult,
   GameSnapshot,
   GameState,
+  NavigatorAgentOutput,
+  NavigatorInput,
   Phase,
   PublicCharacterDecision,
   RelationshipLabel,
@@ -23,7 +25,11 @@ import {
   createInitialGameState,
   mutableStatKeys,
 } from "@roommates/shared";
-import type { AgentCoordinator } from "../agents/coordinator.js";
+import type { AgentCoordinator, AgentResult } from "../agents/coordinator.js";
+import {
+  buildNavigatorResponse,
+  fallbackNavigatorOutput,
+} from "../agents/navigator.js";
 import {
   buildAgentReflectionInput,
   fallbackAgentReflection,
@@ -114,13 +120,6 @@ function resolutionBranch(
   if (haruParticipates && aoiParticipates) return "both_participated";
   if (haruParticipates || aoiParticipates) return "one_participated";
   return "both_declined";
-}
-
-function cueOutcome(suggestion: ReturnType<typeof resolveSuggestion>): CueResolutionOutcome {
-  if (suggestion.lock) return "locked_fallback";
-  if (suggestion.kind === "observe") return "observed";
-  if (suggestion.cue.transformed) return "transformed";
-  return "selected";
 }
 
 function errorMessage(error: unknown): string {
@@ -218,6 +217,56 @@ export class GameEngine {
 
     let turnCommitted = false;
     try {
+      const navigatorInput = deepFreeze<NavigatorInput>({
+        turnId,
+        rawInput: rawSuggestion.slice(0, 500),
+        day: before.shared.day,
+        phase: before.shared.phase,
+        resolvedSuggestion: suggestion,
+      });
+      emit({
+        type: "navigator.thinking",
+        agent: "navigator",
+        message: "デコピンが指示を確認しています…",
+      });
+      let navigator: AgentResult<NavigatorAgentOutput>;
+      if (inputMethod === "fast_forward") {
+        navigator = {
+          value: fallbackNavigatorOutput(navigatorInput),
+          runtime: { source: "mock", latencyMs: 0 },
+        };
+      } else if (!this.agents.navigate) {
+        navigator = {
+          value: fallbackNavigatorOutput(navigatorInput),
+          runtime: {
+            source: "fallback",
+            error: "Navigator agent is unavailable",
+          },
+        };
+      } else {
+        try {
+          navigator = await this.agents.navigate(navigatorInput);
+        } catch (error) {
+          navigator = {
+            value: fallbackNavigatorOutput(navigatorInput),
+            runtime: {
+              source: "fallback",
+              error: errorMessage(error).slice(0, 180),
+            },
+          };
+        }
+      }
+      const navigatorResponse = buildNavigatorResponse(navigatorInput, navigator.value);
+      emit({
+        type: "navigator.completed",
+        agent: "navigator",
+        message: navigatorResponse.message,
+        data: {
+          ...navigatorResponse,
+          navigatorMessage: navigatorResponse.message,
+        },
+      });
+
       const buildInput = (id: CharacterId): CharacterDecisionInput => {
         const other = id === "haru" ? "aoi" : "haru";
         const recent = snapshot.shared.sharedMemories.slice(-5);
@@ -269,16 +318,19 @@ export class GameEngine {
         haruDecision: haru.value,
         aoiDecision: aoi.value,
       });
-      let resolved = constrainResolvedEvent(
-        eventDefinition,
-        director.value,
-        { haru: haru.value, aoi: aoi.value },
-        before.shared.unresolvedConflicts,
-        {
-          suppressRelationshipEffects:
-            suggestion.cue.transformed && eventDefinition.category === "rest",
-        },
-      );
+      let resolved = {
+        ...constrainResolvedEvent(
+          eventDefinition,
+          director.value,
+          { haru: haru.value, aoi: aoi.value },
+          before.shared.unresolvedConflicts,
+          {
+            suppressRelationshipEffects:
+              suggestion.cue.transformed && eventDefinition.category === "rest",
+          },
+        ),
+        navigatorMessage: navigatorResponse.message,
+      };
       emit({ type: "director.completed", agent: "director", message: resolved.eventTitle, data: resolved });
 
       const nextCharacters = {
@@ -328,6 +380,7 @@ export class GameEngine {
         conflicts,
         [...before.shared.sharedMemories.map((item) => item.id), memory.id],
       );
+      const cueOutcome: CueResolutionOutcome = navigatorResponse.outcome;
       const nextState: GameState = {
         ...before,
         revision: before.revision + 1,
@@ -344,6 +397,7 @@ export class GameEngine {
           sharedMemories: [...before.shared.sharedMemories, memory].slice(-40),
         },
         lastEvent: resolved,
+        navigator: navigatorResponse,
         eventLog: [
           ...before.eventLog,
           {
@@ -379,7 +433,9 @@ export class GameEngine {
             requestedEventId: suggestion.lock?.requestedEventId,
             alternativesShown: suggestion.alternatives,
             lock: suggestion.lock,
-            cueOutcome: cueOutcome(suggestion),
+            cueOutcome,
+            navigatorMessage: navigatorResponse.message,
+            navigatorResponse,
             decisions: { haru: haruPublicDecision, aoi: aoiPublicDecision },
             resolutionBranch: resolutionBranch(haru.value, aoi.value),
             before: beforeSnapshot,
@@ -393,6 +449,7 @@ export class GameEngine {
             runtimeSources: {
               haru: haru.runtime.source,
               aoi: aoi.runtime.source,
+              navigator: navigator.runtime.source,
               director: director.runtime.source,
             },
             eventTitle: resolved.eventTitle,
@@ -402,7 +459,12 @@ export class GameEngine {
             createdAt: new Date().toISOString(),
           },
         ].slice(-50),
-        runtime: { haru: haru.runtime, aoi: aoi.runtime, director: director.runtime },
+        runtime: {
+          haru: haru.runtime,
+          aoi: aoi.runtime,
+          navigator: navigator.runtime,
+          director: director.runtime,
+        },
         ending: isLastTurn ? endingFor(relationship, nextCharacters) : undefined,
       };
 

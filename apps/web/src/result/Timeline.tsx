@@ -67,7 +67,8 @@ function TimelineEvent({ event }: { event: ResultEventLogEntry }) {
         </span>
       </summary>
       <div className="result-timeline-event-body">
-        <p><strong>Producer</strong>{suggestionFor(event)}</p>
+        <p><strong>デコピンへの指示</strong>{suggestionFor(event)}</p>
+        {event.navigatorMessage && <p><strong>デコピンの応答</strong>{event.navigatorMessage}</p>}
         <p><strong>出来事</strong>{event.narration}</p>
         <div className="result-timeline-decisions">
           <EventDecision person="haru" event={event} />

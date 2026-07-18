@@ -280,6 +280,9 @@ const normalizeEvent = (
   const memory = normalizeMemory(merged.memory, index);
   const conflictUpdate = record(merged.conflictUpdate);
   const cue = record(first(merged.cue, record(merged.cueResolution).cue));
+  const navigatorResponse = record(
+    first(merged.navigatorResponse, merged.navigator_response, merged.navigator),
+  );
   const selectedEvent = record(record(merged.cueResolution).selectedEvent);
   const lock = record(first(merged.lock, record(merged.cueResolution).lock));
   const cueSafetyFlags = stringArray(first(merged.cueSafetyFlags, cue.safetyFlags));
@@ -301,6 +304,15 @@ const normalizeEvent = (
     eventTitle: eventTitle || "ふたりの時間",
     narration,
     suggestion: optionalText(first(merged.suggestion, cue.text, merged.proposal)),
+    navigatorMessage: optionalText(
+      first(
+        merged.navigatorMessage,
+        merged.navigator_message,
+        merged.dekopinMessage,
+        merged.dekopin_message,
+        navigatorResponse.message,
+      ),
+    ),
     cueSafetyFlags,
     ...(haruDecision || aoiDecision
       ? {
@@ -767,6 +779,18 @@ export const normalizeGameState = (
         .map((event: unknown, index: number) => normalizeEvent(event, day, phase, index))
         .filter((event): event is GameEvent => event !== undefined)
     : previous.eventLog;
+  const rootNavigator = record(
+    first(root.navigator, root.navigatorResponse, root.navigator_response),
+  );
+  const rootNavigatorMessage = optionalText(
+    first(
+      rootNavigator.message,
+      root.navigatorMessage,
+      root.navigator_message,
+      root.dekopinMessage,
+      root.dekopin_message,
+    ),
+  );
   const lastLogged = normalizedEvents.at(-1);
   const rawCurrentEvent = first(root.currentEvent, root.lastEvent, root.directorResult);
   const currentDetail = normalizeEvent(
@@ -782,6 +806,8 @@ export const normalizeGameState = (
         id: lastLogged.id,
         eventDefinitionId: currentDetail.eventDefinitionId ?? lastLogged.eventDefinitionId,
         suggestion: currentDetail.suggestion ?? lastLogged.suggestion,
+        navigatorMessage:
+          currentDetail.navigatorMessage ?? rootNavigatorMessage ?? lastLogged.navigatorMessage,
         cueSafetyFlags: currentDetail.cueSafetyFlags?.length
           ? currentDetail.cueSafetyFlags
           : lastLogged.cueSafetyFlags,
@@ -806,7 +832,12 @@ export const normalizeGameState = (
         conflictUpdate: currentDetail.conflictUpdate ?? lastLogged.conflictUpdate,
         cueResolution: currentDetail.cueResolution ?? lastLogged.cueResolution,
       }
-    : currentDetail;
+    : currentDetail
+      ? {
+          ...currentDetail,
+          navigatorMessage: currentDetail.navigatorMessage ?? rootNavigatorMessage,
+        }
+      : currentDetail;
 
   const attachDecision = (
     event: GameEvent,
@@ -829,6 +860,13 @@ export const normalizeGameState = (
   };
 
   let eventLog = normalizedEvents;
+  if (rootNavigatorMessage && eventLog.length && !mergedCurrent) {
+    eventLog = eventLog.map((event, index) =>
+      index === eventLog.length - 1
+        ? { ...event, navigatorMessage: event.navigatorMessage ?? rootNavigatorMessage }
+        : event,
+    );
+  }
   if (mergedCurrent && normalizedEvents.length) {
     eventLog = normalizedEvents.map((event, index) =>
       index === normalizedEvents.length - 1 &&

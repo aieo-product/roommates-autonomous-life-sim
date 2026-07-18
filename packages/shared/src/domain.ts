@@ -15,7 +15,8 @@ export type RelationshipLabel = (typeof relationshipLabels)[number];
 export const decisions = ["ACCEPT", "DECLINE", "MODIFY", "IGNORE", "INITIATE"] as const;
 export type DecisionKind = (typeof decisions)[number];
 export type CharacterId = "haru" | "aoi";
-export type AgentId = CharacterId | "director";
+export type CoreAgentId = CharacterId | "director";
+export type AgentId = CoreAgentId | "navigator";
 export type AgentSource = "app_server" | "mock" | "fallback";
 export type GameStatus = "awaiting_suggestion" | "resolving" | "resolved" | "ended";
 
@@ -160,6 +161,32 @@ export type SafeSuggestion = {
   alternatives: EventCandidate[];
 };
 
+/**
+ * The navigator receives an already resolved suggestion. `rawInput` is
+ * untrusted display context only and must never be used to replace
+ * `resolvedSuggestion`.
+ */
+export type NavigatorInput = {
+  turnId: string;
+  rawInput: string;
+  day: number;
+  phase: Phase;
+  resolvedSuggestion: SafeSuggestion;
+};
+
+/** The only field an AI-backed navigator is allowed to author. */
+export type NavigatorAgentOutput = {
+  message: string;
+};
+
+export type NavigatorResponse = NavigatorAgentOutput & {
+  characterId: "navigator";
+  characterName: "デコピン";
+  eventDefinitionId: string;
+  eventTitle: string;
+  outcome: CueResolutionOutcome;
+};
+
 export type CharacterDecision = {
   decision: DecisionKind;
   action: string;
@@ -199,6 +226,8 @@ export type DirectorInput = {
 export type ResolvedEvent = {
   eventTitle: string;
   narration: string;
+  /** Public acknowledgement authored by デコピン for this event. */
+  navigatorMessage?: string;
   haruDialogue: string;
   aoiDialogue: string;
   effects: Record<CharacterId, StatDelta>;
@@ -272,6 +301,8 @@ export type EventLogEntry = {
   alternativesShown?: EventCandidate[];
   lock?: EventLock;
   cueOutcome?: CueResolutionOutcome;
+  navigatorMessage?: string;
+  navigatorResponse?: NavigatorResponse;
   decisions?: Record<CharacterId, PublicCharacterDecision>;
   resolutionBranch?: ResolutionBranch;
   before?: TurnStateSnapshot;
@@ -279,7 +310,8 @@ export type EventLogEntry = {
   appliedEffects?: Record<CharacterId, StatDelta>;
   memory?: Memory;
   conflictUpdate?: { add: string[]; resolve: string[] };
-  runtimeSources?: Record<AgentId, AgentSource>;
+  runtimeSources?: Record<CoreAgentId, AgentSource> &
+    Partial<Record<"navigator", AgentSource>>;
   eventTitle: string;
   narration: string;
   relationshipBefore: RelationshipLabel;
@@ -442,14 +474,19 @@ export type GameState = {
   characters: Record<CharacterId, CharacterRecord>;
   shared: SharedState;
   lastEvent?: ResolvedEvent;
+  /** Last public response from the in-game navigator, デコピン. */
+  navigator?: NavigatorResponse;
   eventLog: EventLogEntry[];
   ending?: Ending;
   result?: GameResult;
-  runtime: Record<AgentId, RuntimeAgentState>;
+  runtime: Record<CoreAgentId, RuntimeAgentState> &
+    Partial<Record<"navigator", RuntimeAgentState>>;
 };
 
 export type StreamEventName =
   | "turn.started"
+  | "navigator.thinking"
+  | "navigator.completed"
   | "agent.thinking"
   | "agent.completed"
   | "director.resolving"

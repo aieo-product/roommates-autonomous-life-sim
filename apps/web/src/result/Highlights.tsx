@@ -121,7 +121,8 @@ function EventOutcome({ event }: { event: ResultEventLogEntry }) {
 
   return (
     <div className="result-highlight-outcome">
-      <p className="result-highlight-proposal"><strong>Producerの提案</strong>{suggestionFor(event)}</p>
+      <p className="result-highlight-proposal"><strong>デコピンへの指示</strong>{suggestionFor(event)}</p>
+      {event.navigatorMessage && <p><strong>デコピンの応答</strong>{event.navigatorMessage}</p>}
       <p><strong>実際に起きたこと</strong>{selectedEventTitleFor(event)} — {event.narration}</p>
       {event.memory && (
         <p><strong>残った記憶</strong>{event.memory.title}{event.memory.summary ? ` — ${event.memory.summary}` : ""}</p>

@@ -37,6 +37,15 @@ const snapshot = {
   },
 };
 
+const navigatorResponse = {
+  characterId: "navigator" as const,
+  characterName: "デコピン" as const,
+  message: "朝の短い会話として二人へ届けるね。",
+  eventDefinitionId: "gentle-talk",
+  eventTitle: "朝の短い会話",
+  outcome: "selected" as const,
+};
+
 const structuredEvent = {
   id: "log-day1-morning",
   turnId: "turn-day1-morning",
@@ -73,6 +82,8 @@ const structuredEvent = {
     { id: "gentle-talk", title: "朝の短い会話", category: "talk" as const, intimacyTier: 1 as const },
   ],
   cueOutcome: "selected" as const,
+  navigatorMessage: navigatorResponse.message,
+  navigatorResponse,
   decisions: {
     haru: publicDecision,
     aoi: {
@@ -107,6 +118,7 @@ const structuredEvent = {
   runtimeSources: {
     haru: "app_server" as const,
     aoi: "app_server" as const,
+    navigator: "app_server" as const,
     director: "app_server" as const,
   },
   eventTitle: "朝の短い会話",
@@ -305,9 +317,12 @@ describe("GameState v2 persistence contracts", () => {
       before: { shared: { relationshipLabel: "friends" } },
       after: { characters: { haru: { trust: 51 } } },
       appliedEffects: { haru: { trust: 3 }, aoi: { trust: 3 } },
+      navigatorMessage: navigatorResponse.message,
+      navigatorResponse,
       runtimeSources: {
         haru: "app_server",
         aoi: "app_server",
+        navigator: "app_server",
         director: "app_server",
       },
     });
@@ -330,6 +345,7 @@ describe("GameState v2 persistence contracts", () => {
       revision: 28,
       status: "ended",
       shared: { ...initial.shared, day: 7, phase: "night" },
+      navigator: navigatorResponse,
       eventLog: [structuredEvent],
       ending,
       result: parsedResult,
@@ -342,6 +358,9 @@ describe("GameState v2 persistence contracts", () => {
     expect(parsedResult.reflections.haru.notableEventComments[0]?.eventLogId).toBe(structuredEvent.id);
     expect(parsedResult.reflections.aoi.characterId).toBe("aoi");
     expect(parsedState.result).toEqual(parsedResult);
+    expect(parsedState.navigator).toEqual(navigatorResponse);
+    expect(parsedState.eventLog[0]?.navigatorResponse).toEqual(navigatorResponse);
+    expect(parsedState.eventLog[0]?.runtimeSources?.navigator).toBe("app_server");
     expect(JSON.stringify(parsedState)).not.toContain("internalSummary");
   });
 

@@ -45,7 +45,7 @@ function ResultWaiting({
         <p>{ending.narration}</p>
         <div className="result-waiting-card">
           <strong>リザルトを準備しています</strong>
-          <p>Endingとイベントログは保存済みです。Producer評価と総集編の到着を待っています。</p>
+          <p>Endingとイベントログは保存済みです。デコピンのサポート評価と総集編の到着を待っています。</p>
           <span className="result-loading-line" aria-hidden="true" />
         </div>
       </section>

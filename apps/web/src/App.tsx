@@ -26,8 +26,15 @@ import {
   type CharacterId,
   type Point,
 } from "./room-layout";
+import { FurnitureSpriteLayer } from "./furniture-assets";
 import { buildMemoryArticle, type MemoryArticle } from "./memory-article";
 import { ResultScreen } from "./result";
+import {
+  DEKOPIN_NAME,
+  getDekopinPresentation,
+  type DekopinPresentation,
+} from "./dekopin";
+import dekopinSpriteUrl from "../../../assets/characters/navigator/walk-cycle.png";
 import type {
   AgentDecision,
   CharacterState,
@@ -47,6 +54,7 @@ type StageStatus = "waiting" | "active" | "complete";
 type LogFilter = "all" | "haru" | "aoi" | "event";
 
 type TurnStages = {
+  navigator: StageStatus;
   haru: StageStatus;
   aoi: StageStatus;
   director: StageStatus;
@@ -116,6 +124,7 @@ const DECISION_LABELS: Record<AgentDecision["decision"], string> = {
 };
 
 const WAITING_STAGES: TurnStages = {
+  navigator: "waiting",
   haru: "waiting",
   aoi: "waiting",
   director: "waiting",
@@ -158,6 +167,23 @@ function RuntimeBadge({ runtime, offline }: { runtime: RuntimeInfo; offline: boo
       <i aria-hidden="true" />
       {content[1]}
     </span>
+  );
+}
+
+function DekopinGuide({ presentation }: { presentation: DekopinPresentation }) {
+  return (
+    <div className={`dekopin-guide is-${presentation.mood}`}>
+      <span className="dekopin-avatar" aria-hidden="true">
+        <span className="dekopin-sprite-window">
+          <img className="dekopin-sprite-sheet" src={dekopinSpriteUrl} alt="" />
+        </span>
+        <i />
+      </span>
+      <span className="dekopin-copy">
+        <span><b id="dekopin-title">{DEKOPIN_NAME}</b><small>{presentation.statusLabel}</small></span>
+        <p aria-live="polite">{presentation.message}</p>
+      </span>
+    </div>
   );
 }
 
@@ -251,28 +277,6 @@ function ResidentChip({
 function FurnitureLayer() {
   return (
     <g className="furniture-layer" aria-hidden="true">
-      <g className="furniture bed bed-haru">
-        <polygon points="520,137 602,178 557,201 475,160" />
-        <polygon className="furniture-side" points="475,160 557,201 557,216 475,175" />
-        <polygon className="linen linen-haru" points="528,148 584,176 558,189 502,161" />
-        <polygon className="pillow" points="500,153 526,166 512,173 486,160" />
-      </g>
-      <g className="furniture desk desk-haru">
-        <polygon points="650,164 695,187 668,201 623,178" />
-        <path d="M635 183v30M678 204v27" />
-        <rect className="screen" x="657" y="154" width="28" height="23" rx="2" />
-      </g>
-      <g className="furniture bed bed-aoi">
-        <polygon points="720,237 802,278 757,301 675,260" />
-        <polygon className="furniture-side" points="675,260 757,301 757,316 675,275" />
-        <polygon className="linen linen-aoi" points="728,248 784,276 758,289 702,261" />
-        <polygon className="pillow" points="700,253 726,266 712,273 686,260" />
-      </g>
-      <g className="furniture easel">
-        <polygon points="872,272 899,285 899,321 872,308" />
-        <path d="M877 309l-10 35M894 320l12 37M883 315v31" />
-        <circle cx="887" cy="293" r="5" />
-      </g>
       <g className="entry-furniture">
         <polygon className="entry-mat" points="929,329 981,355 956,368 904,342" />
         <path className="door-mark" d="M1016 309v60M1016 369l42 21" />
@@ -297,26 +301,8 @@ function FurnitureLayer() {
         <path className="steam" d="M365 273c-8-10 8-12 0-23M381 282c-8-10 8-12 0-23" />
         <g className="fridge"><polygon points="254,231 302,255 302,326 254,302" /><polygon points="302,255 328,242 328,313 302,326" /><path d="M262 272l30 15" /></g>
       </g>
-      <g className="dining-furniture">
-        <polygon className="table-top" points="515,363 629,420 575,447 461,390" />
-        <path d="M480 397v38M568 442v40M613 423v35" />
-        <polygon className="plate" points="518,386 536,395 527,400 509,391" />
-        <polygon className="plate" points="563,408 581,417 572,422 554,413" />
-        <g className="chair"><polygon points="455,411 489,428 470,438 436,421" /><path d="M441 422v27M475 439v27" /></g>
-        <g className="chair"><polygon points="606,391 640,408 621,418 587,401" /><path d="M592 402v27M626 419v27" /></g>
-      </g>
       <g className="living-furniture">
         <polygon className="rug" points="648,423 846,522 768,561 570,462" />
-        <g className="sofa">
-          <polygon className="sofa-seat" points="726,438 853,502 803,527 676,463" />
-          <polygon className="sofa-back" points="726,414 853,478 853,502 726,438" />
-          <polygon className="sofa-front" points="676,463 803,527 803,549 676,485" />
-          <polygon className="sofa-cushion" points="738,439 784,462 765,472 719,449" />
-          <polygon className="sofa-cushion" points="790,465 836,488 817,498 771,475" />
-        </g>
-        <g className="coffee-table"><polygon points="632,463 714,504 678,522 596,481" /><path d="M609 486v23M669 516v24" /><circle cx="656" cy="489" r="7" /></g>
-        <g className="tv"><polygon points="860,448 917,477 917,520 860,491" /><polygon points="917,477 933,469 933,512 917,520" /><path d="M876 504l-12 18M908 520l10 25" /></g>
-        <g className="plant"><path d="M936 498v42" /><ellipse cx="925" cy="505" rx="17" ry="8" transform="rotate(-25 925 505)" /><ellipse cx="946" cy="513" rx="17" ry="8" transform="rotate(25 946 513)" /><polygon points="918,536 958,556 938,570 898,550" /></g>
       </g>
       <g className="balcony-furniture">
         <path className="rail" d="M164 314L752 608M157 329L745 623M164 314v15M260 362v15M356 410v15M452 458v15M548 506v15M644 554v15M752 608v15" />
@@ -324,6 +310,7 @@ function FurnitureLayer() {
         <path className="shirt" d="M585 551l14-5 14 13-9 8 4 25-28-14 9-21-8-9z" />
         <path className="towel" d="M625 573l29 14-8 31-29-15z" />
       </g>
+      <FurnitureSpriteLayer />
     </g>
   );
 }
@@ -496,6 +483,7 @@ function ApartmentStage({
 function ResolutionProgress({ stages, active, message }: { stages: TurnStages; active: boolean; message: string }) {
   if (!active) return null;
   const items = [
+    { key: "navigator" as const, name: DEKOPIN_NAME },
     { key: "haru" as const, name: "Haru" },
     { key: "aoi" as const, name: "Aoi" },
     { key: "director" as const, name: "できごと" },
@@ -513,7 +501,19 @@ function ResolutionProgress({ stages, active, message }: { stages: TurnStages; a
   );
 }
 
-function EventCard({ event, resolving, lastSuggestion }: { event?: GameEvent; resolving: boolean; lastSuggestion: string }) {
+function EventCard({
+  event,
+  resolving,
+  lastSuggestion,
+  navigatorMessage,
+  onOpen,
+}: {
+  event?: GameEvent;
+  resolving: boolean;
+  lastSuggestion: string;
+  navigatorMessage?: string;
+  onOpen?: () => void;
+}) {
   if (!event && !resolving) {
     return (
       <div className="event-card event-welcome">
@@ -526,14 +526,198 @@ function EventCard({ event, resolving, lastSuggestion }: { event?: GameEvent; re
     return (
       <div className="event-card event-live">
         <span className="event-icon">…</span>
-        <div><small>PRODUCER CUE</small><h2>ふたりが考えています</h2><p>{clipText(lastSuggestion, 62)}</p></div>
+        <div><small>DEKOPIN · EVENT UPDATE</small><h2>デコピンが反映しています</h2><p>{clipText(lastSuggestion, 62)}</p></div>
       </div>
     );
   }
   return (
     <div className="event-card">
       <span className="event-icon">★</span>
-      <div><small>いま起きたこと · DAY {event?.day}</small><h2>{event?.eventTitle}</h2><p>{clipText(event?.narration ?? "", 74)}</p></div>
+      <div>
+        <small>デコピンが反映したイベント · DAY {event?.day}</small>
+        <h2>{event?.eventTitle}</h2>
+        <p>{clipText(event?.narration ?? "", 74)}</p>
+        {navigatorMessage && <p className="event-dekopin-message"><b>{DEKOPIN_NAME}</b>「{clipText(navigatorMessage, 64)}」</p>}
+        {event && onOpen && <button type="button" className="event-card-open" onClick={onOpen}>全文を読む <span aria-hidden="true">↗</span></button>}
+      </div>
+    </div>
+  );
+}
+
+function EventAnnouncementModal({
+  event,
+  people,
+  suggestion,
+  navigatorMessage,
+  notice,
+  canAdvance,
+  logLabel = "生活ログで詳しく見る",
+  continueLabel,
+  onClose,
+  onOpenLog,
+  onAdvance,
+}: {
+  event: GameEvent;
+  people: People;
+  suggestion?: string;
+  navigatorMessage?: string;
+  notice?: string;
+  canAdvance: boolean;
+  logLabel?: string;
+  continueLabel?: string;
+  onClose: () => void;
+  onOpenLog: () => void;
+  onAdvance: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const phase = PHASES.find((item) => item.id === event.phase) ?? PHASES[0];
+  const residents = [
+    {
+      id: "haru" as const,
+      decision: event.haruDecision,
+      action: event.haruAction,
+      dialogue: event.haruDialogue,
+      reason: event.haruPublicReason,
+    },
+    {
+      id: "aoi" as const,
+      decision: event.aoiDecision,
+      action: event.aoiAction,
+      dialogue: event.aoiDialogue,
+      reason: event.aoiPublicReason,
+    },
+  ];
+  const safetyFlags = event.cueResolution?.cue?.safetyFlags ?? event.cueSafetyFlags ?? [];
+  const displayedSuggestion = suggestion || event.suggestion;
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+
+    const handleKeyDown = (keyboardEvent: globalThis.KeyboardEvent) => {
+      if (keyboardEvent.key === "Escape") {
+        keyboardEvent.preventDefault();
+        onClose();
+        return;
+      }
+      if (keyboardEvent.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      )).filter((element) => !element.hasAttribute("hidden"));
+      if (!focusable.length) {
+        keyboardEvent.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!dialogRef.current.contains(document.activeElement)) {
+        keyboardEvent.preventDefault();
+        (keyboardEvent.shiftKey ? last : first)?.focus();
+      } else if (keyboardEvent.shiftKey && document.activeElement === first) {
+        keyboardEvent.preventDefault();
+        last?.focus();
+      } else if (!keyboardEvent.shiftKey && document.activeElement === last) {
+        keyboardEvent.preventDefault();
+        first?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="event-announcement-overlay"
+      onMouseDown={(mouseEvent) => {
+        if (mouseEvent.target === mouseEvent.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="event-announcement-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="event-announcement-title"
+        aria-describedby="event-announcement-narration"
+        ref={dialogRef}
+        tabIndex={-1}
+      >
+        <header className="event-announcement-header">
+          <span className="event-announcement-mark" aria-hidden="true">★</span>
+          <div>
+            <small>EVENT RESOLVED · DAY {event.day} · {phase.label} {phase.time}</small>
+            <h2 id="event-announcement-title">{event.eventTitle}</h2>
+            <p>デコピンが指示をイベントへ反映しました</p>
+          </div>
+          <button ref={closeRef} type="button" className="event-announcement-close" onClick={onClose} aria-label="イベント通知を閉じる">×</button>
+        </header>
+
+        <div className="event-announcement-scroll">
+          {notice && <aside className="event-announcement-notice" role="status"><span aria-hidden="true">!</span><p>{notice}</p></aside>}
+
+          {navigatorMessage && (
+            <section className="event-announcement-dekopin" aria-label="デコピンの応答">
+              <div className="event-announcement-mini-avatar" aria-hidden="true">
+                <span><img src={dekopinSpriteUrl} alt="" /></span>
+              </div>
+              <div><small>{DEKOPIN_NAME} · EVENT NAVIGATOR</small><p>「{navigatorMessage}」</p></div>
+            </section>
+          )}
+
+          {displayedSuggestion && (
+            <section className="event-announcement-cue">
+              <small>あなたからデコピンへの指示</small>
+              <p>{displayedSuggestion}</p>
+            </section>
+          )}
+
+          <section className="event-announcement-story">
+            <small>起きたこと</small>
+            <p id="event-announcement-narration">{event.narration}</p>
+          </section>
+
+          <section className="event-announcement-actions" aria-label="ふたりの選択">
+            {residents.map((resident) => (
+              <article className={`event-announcement-person person-${resident.id}`} key={resident.id}>
+                <header>
+                  <PixelPortrait person={resident.id} />
+                  <div><small>{people[resident.id].job.toUpperCase()}</small><h3>{people[resident.id].name}</h3></div>
+                  {resident.decision && <span className={`decision-chip chip-${resident.decision.toLowerCase()}`}>{DECISION_LABELS[resident.decision]}</span>}
+                </header>
+                <strong>{resident.action || "自分のペースで過ごしました"}</strong>
+                {resident.dialogue && <blockquote>「{resident.dialogue}」</blockquote>}
+                {resident.reason && <p><small>そうした理由</small>{resident.reason}</p>}
+              </article>
+            ))}
+          </section>
+
+          {(event.cueResolution?.outcome || event.cueResolution?.lock?.reason || safetyFlags.length > 0 || event.memory?.title) && (
+            <dl className="event-announcement-details">
+              {event.cueResolution?.outcome && <div><dt>指示の扱い</dt><dd>{event.cueResolution.outcome}</dd></div>}
+              {event.cueResolution?.lock?.reason && <div><dt>調整した理由</dt><dd>{event.cueResolution.lock.reason}</dd></div>}
+              {safetyFlags.length > 0 && <div><dt>安全確認</dt><dd>{safetyFlags.join("・")}</dd></div>}
+              {event.memory?.title && <div><dt>残った思い出</dt><dd>{event.memory.title}</dd></div>}
+            </dl>
+          )}
+        </div>
+
+        <footer className="event-announcement-footer">
+          <button type="button" className="event-announcement-log" onClick={onOpenLog}>{logLabel}</button>
+          <button type="button" className="event-announcement-continue" onClick={canAdvance ? onAdvance : onClose}>
+            {continueLabel ?? (canAdvance ? "次の時間帯へ" : "ゲームに戻る")}<span aria-hidden="true">›</span>
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -741,7 +925,7 @@ function MemoryArticleModal({
             <p className="memory-kicker">MEMORY STORY</p>
             <h3>{article.event?.eventTitle ?? article.memory.title}</h3>
             <p>{article.event?.narration || article.memory.summary}</p>
-            {article.event?.suggestion && <p className="memory-producer-cue"><strong>Producerのきっかけ</strong>{article.event.suggestion}</p>}
+            {article.event?.suggestion && <p className="memory-producer-cue"><strong>デコピンへの指示</strong>{article.event.suggestion}</p>}
           </section>
           <div className="memory-character-columns">
             {characterStory("haru")}
@@ -777,11 +961,13 @@ function DebugDetails({ game }: { game: GameState }) {
 
 function LogDrawer({
   events,
+  navigatorResponses,
   filter,
   onFilter,
   onClose,
 }: {
   events: GameEvent[];
+  navigatorResponses: Record<string, string>;
   filter: LogFilter;
   onFilter: (filter: LogFilter) => void;
   onClose: () => void;
@@ -805,18 +991,24 @@ function LogDrawer({
         <button type="button" className="drawer-close" onClick={onClose} aria-label="ログを閉じる">×</button>
       </header>
       <div className="log-list">
-        {visible.length ? visible.map((event) => (
+        {visible.length ? visible.map((event) => {
+          const navigatorMessage = event.navigatorMessage
+            ?? navigatorResponses[event.id]
+            ?? navigatorResponses[event.eventTitle];
+          return (
           <article className="log-entry" key={event.id}>
             <div className="log-time"><b>DAY {event.day}</b><span>{PHASES.find((phase) => phase.id === event.phase)?.label ?? event.phase}</span></div>
             <div className="log-copy">
               <small>★ できごと</small><h3>{event.eventTitle}</h3>
-              {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>きっかけ</b>{event.suggestion}</p>}
+              {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>デコピンへの指示</b>{event.suggestion}</p>}
               {filter !== "haru" && filter !== "aoi" && <p>{event.narration}</p>}
+              {filter !== "haru" && filter !== "aoi" && navigatorMessage && <blockquote className="quote-dekopin"><b>{DEKOPIN_NAME}</b>「{navigatorMessage}」</blockquote>}
               {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>Haru</b>「{event.haruDialogue}」</blockquote>}
               {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>Aoi</b>「{event.aoiDialogue}」</blockquote>}
             </div>
           </article>
-        )) : <div className="empty-log"><span>⌁</span><h3>まだ記録はありません</h3><p>生活が進むと、ここから出来事を振り返れます。</p></div>}
+          );
+        }) : <div className="empty-log"><span>⌁</span><h3>まだ記録はありません</h3><p>生活が進むと、ここから出来事を振り返れます。</p></div>}
       </div>
     </section>
   );
@@ -845,15 +1037,21 @@ export default function App() {
   const [offline, setOffline] = useState(false);
   const [actionBusy, setActionBusy] = useState<"advance" | "reset" | "fast" | null>(null);
   const [streamMessage, setStreamMessage] = useState("");
+  const [navigatorMessage, setNavigatorMessage] = useState("");
+  const [navigatorResponses, setNavigatorResponses] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [selectedPerson, setSelectedPerson] = useState<CharacterId>("haru");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("status");
   const [logOpen, setLogOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
+  const [eventAnnouncementId, setEventAnnouncementId] = useState<string | null>(null);
+  const [eventSuggestionFallbacks, setEventSuggestionFallbacks] = useState<Record<string, string>>({});
   const [activeMemory, setActiveMemory] = useState<Memory>();
   const [personalityOpen, setPersonalityOpen] = useState(false);
   const personalityButtonRef = useRef<HTMLButtonElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
+  const presentedEventIdRef = useRef<string | null | undefined>(undefined);
+  const submittedSuggestionRef = useRef<string | null>(null);
 
   const closePersonality = useCallback(() => {
     setPersonalityOpen(false);
@@ -915,7 +1113,8 @@ export default function App() {
     }
 
     if (normalizedType === "turn.started") {
-      setStages({ haru: "active", aoi: "waiting", director: "waiting" });
+      setNavigatorMessage("");
+      setStages({ navigator: "active", haru: "waiting", aoi: "waiting", director: "waiting" });
       const safeSuggestion = record(payload);
       const lock = record(safeSuggestion.lock);
       const cue = record(safeSuggestion.cue);
@@ -933,9 +1132,16 @@ export default function App() {
     if (normalizedType === "agent.thinking") {
       setStages((previous) => ({
         ...previous,
-        ...(agent === "haru" ? { haru: "active" as const } : {}),
-        ...(agent === "aoi" ? { haru: previous.haru === "waiting" ? "active" as const : previous.haru, aoi: "active" as const } : {}),
+        ...(agent === "haru" ? { navigator: "complete" as const, haru: "active" as const } : {}),
+        ...(agent === "aoi" ? { navigator: "complete" as const, haru: previous.haru === "waiting" ? "active" as const : previous.haru, aoi: "active" as const } : {}),
       }));
+    }
+    if (
+      normalizedType === "navigator.thinking"
+      || (normalizedType === "agent.thinking" && agent === "navigator")
+    ) {
+      setNavigatorMessage(displayMessage || "指示を受け取ったよ。ふたりの意思を確認しているところ…");
+      setStages((previous) => ({ ...previous, navigator: "active" }));
     }
     if (normalizedType === "agent.completed") {
       setStages((previous) => ({
@@ -949,10 +1155,35 @@ export default function App() {
         setGame((previous) => normalizeGameState({ characters: { [agent]: { lastDecision: maybeDecision } } }, previous));
       }
     }
-    if (normalizedType === "director.resolving" || normalizedType === "director.completed") {
-      setStages({ haru: "complete", aoi: "complete", director: normalizedType === "director.completed" ? "complete" : "active" });
+    if (
+      normalizedType === "navigator.completed"
+      || (normalizedType === "agent.completed" && agent === "navigator")
+    ) {
+      const response = displayMessage || stringValue(
+        record(payload).navigatorMessage,
+        record(payload).navigator_message,
+        record(payload).response,
+      );
+      const eventTitle = stringValue(
+        record(payload).eventTitle,
+        record(payload).event_title,
+        envelope.eventTitle,
+      );
+      const eventId = stringValue(record(payload).eventId, record(payload).event_id, envelope.eventId);
+      if (response) {
+        setNavigatorMessage(response);
+        setNavigatorResponses((previous) => ({
+          ...previous,
+          ...(eventTitle ? { [eventTitle]: response } : {}),
+          ...(eventId ? { [eventId]: response } : {}),
+        }));
+      }
+      setStages((previous) => ({ ...previous, navigator: "complete" }));
     }
-    if (normalizedType === "turn.completed") setStages({ haru: "complete", aoi: "complete", director: "complete" });
+    if (normalizedType === "director.resolving" || normalizedType === "director.completed") {
+      setStages({ navigator: "complete", haru: "complete", aoi: "complete", director: normalizedType === "director.completed" ? "complete" : "active" });
+    }
+    if (normalizedType === "turn.completed") setStages({ navigator: "complete", haru: "complete", aoi: "complete", director: "complete" });
     if (normalizedType === "warning") setNotice(displayMessage || "一部のエージェントがモックへ切り替わりました");
     if (normalizedType === "error") setNotice(displayMessage || "ターン処理でエラーが発生しました");
     if (Object.keys(record(payload)).length) setGame((previous) => normalizeGameState(payload, previous));
@@ -967,9 +1198,11 @@ export default function App() {
     }
     setNotice("");
     setLastSuggestion(cue);
+    submittedSuggestionRef.current = cue;
+    setNavigatorMessage("");
     setResolving(true);
     setStreamMessage("同じ瞬間のスナップショットを準備しています…");
-    setStages({ haru: "active", aoi: "waiting", director: "waiting" });
+    setStages({ navigator: "active", haru: "waiting", aoi: "waiting", director: "waiting" });
     turnAbortRef.current = new AbortController();
     try {
       await runTurn(
@@ -1007,6 +1240,8 @@ export default function App() {
     resetSeed = game.seed,
   ) => {
     if (resolving || actionBusy) return;
+    submittedSuggestionRef.current = null;
+    if (kind === "fast") setNavigatorMessage("");
     setActionBusy(kind);
     setNotice("");
     try {
@@ -1020,10 +1255,15 @@ export default function App() {
       if (kind === "reset") {
         setSuggestion("");
         setLastSuggestion("");
+        setNavigatorMessage("");
+        setNavigatorResponses({});
         setStages(WAITING_STAGES);
         setSelectedPerson("haru");
         setInspectorTab("status");
         setLogOpen(false);
+        setEventAnnouncementId(null);
+        setEventSuggestionFallbacks({});
+        presentedEventIdRef.current = null;
         setActiveMemory(undefined);
       }
       setOffline(false);
@@ -1043,8 +1283,70 @@ export default function App() {
     [activeMemory, eventLog],
   );
   const latestEvent = game.currentEvent ?? eventLog[eventLog.length - 1];
+  const latestNavigatorMessage = latestEvent
+    ? latestEvent.navigatorMessage
+      ?? navigatorResponses[latestEvent.id]
+      ?? navigatorResponses[latestEvent.eventTitle]
+      ?? navigatorMessage
+    : navigatorMessage;
+  const dekopinPresentation = useMemo(
+    () => getDekopinPresentation({
+      resolving,
+      offline,
+      draft: suggestion,
+      streamMessage: navigatorMessage || streamMessage,
+      event: latestEvent
+        ? {
+            eventTitle: latestEvent.eventTitle,
+            narration: latestEvent.narration,
+            navigatorMessage: latestNavigatorMessage || undefined,
+          }
+        : undefined,
+      sessionMessage: latestNavigatorMessage,
+    }),
+    [
+      latestEvent,
+      latestNavigatorMessage,
+      navigatorMessage,
+      offline,
+      resolving,
+      streamMessage,
+      suggestion,
+    ],
+  );
   const canAdvance = !resolving && !actionBusy && !offline && game.status !== "awaiting_suggestion" && !game.completed;
   const activePhase = PHASES.find((phase) => phase.id === game.shared.phase) ?? PHASES[0];
+  const eventAnnouncement = eventAnnouncementId
+    ? eventLog.find((event) => event.id === eventAnnouncementId)
+      ?? (latestEvent?.id === eventAnnouncementId ? latestEvent : undefined)
+    : undefined;
+
+  useEffect(() => {
+    if (initialLoading) return;
+    const latestId = latestEvent?.id ?? null;
+    if (presentedEventIdRef.current === undefined) {
+      // Existing saves should not reopen their latest historical event on load.
+      presentedEventIdRef.current = latestId;
+      return;
+    }
+    if (!latestId) {
+      if (game.status === "awaiting_suggestion") presentedEventIdRef.current = null;
+      return;
+    }
+    // Navigator acknowledgement can arrive before the event is committed.
+    if (resolving || (game.status !== "resolved" && game.status !== "ended")) return;
+    if (presentedEventIdRef.current === latestId) return;
+    presentedEventIdRef.current = latestId;
+    if (submittedSuggestionRef.current) {
+      const submittedSuggestion = submittedSuggestionRef.current;
+      setEventSuggestionFallbacks((previous) => ({ ...previous, [latestId]: submittedSuggestion }));
+      submittedSuggestionRef.current = null;
+    }
+    setLogOpen(false);
+    setActiveMemory(undefined);
+    setPersonalityOpen(false);
+    setEventAnnouncementId(latestId);
+  }, [game.status, initialLoading, latestEvent?.id, resolving]);
 
   const selectCharacter = (person: CharacterId) => {
     setSelectedPerson(person);
@@ -1056,6 +1358,20 @@ export default function App() {
     setNotice("予定から「きっかけ」を作りました。送る前に編集できます。");
   };
 
+  const closeEventAnnouncement = useCallback(() => {
+    setEventAnnouncementId(null);
+    setNotice("");
+  }, []);
+  const openEventLogFromAnnouncement = useCallback(() => {
+    setEventAnnouncementId(null);
+    setNotice("");
+    setLogOpen(true);
+  }, []);
+  const advanceFromAnnouncement = () => {
+    closeEventAnnouncement();
+    void runAction("advance");
+  };
+
   const restartSameSeed = () => runAction("reset", game.seed);
   const restartNewSeed = () => runAction("reset", createRunSeed());
   const showResult = game.status === "ended" || (game.completed && Boolean(game.ending));
@@ -1063,32 +1379,49 @@ export default function App() {
   if (showResult) {
     return (
       <div className="result-app-shell">
-        {notice && <div className="notice result-notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
-        {!game.result && (
-          <aside className="legacy-result-guide" role="status" aria-labelledby="legacy-result-title">
-            <div>
-              <small>LEGACY SAVE</small>
-              <h2 id="legacy-result-title">この7日間は旧形式で保存されています</h2>
-              <p>結末と生活ログは残っていますが、Producer評価と二人の振り返りに必要な構造化データがありません。新しいrunから完全なリザルトを作れます。</p>
-            </div>
-            <div>
-              <button type="button" onClick={() => void restartSameSeed()} disabled={Boolean(actionBusy)}>同じseedで始め直す</button>
-              <button type="button" className="is-primary" onClick={() => void restartNewSeed()} disabled={Boolean(actionBusy)}>新しいseedで始める</button>
-            </div>
-          </aside>
+        <div aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
+          {notice && <div className="notice result-notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+          {!game.result && (
+            <aside className="legacy-result-guide" role="status" aria-labelledby="legacy-result-title">
+              <div>
+                <small>LEGACY SAVE</small>
+                <h2 id="legacy-result-title">この7日間は旧形式で保存されています</h2>
+                <p>結末と生活ログは残っていますが、デコピンのサポート評価と二人の振り返りに必要な構造化データがありません。新しいrunから完全なリザルトを作れます。</p>
+              </div>
+              <div>
+                <button type="button" onClick={() => void restartSameSeed()} disabled={Boolean(actionBusy)}>同じseedで始め直す</button>
+                <button type="button" className="is-primary" onClick={() => void restartNewSeed()} disabled={Boolean(actionBusy)}>新しいseedで始める</button>
+              </div>
+            </aside>
+          )}
+          <ResultScreen
+            game={game}
+            onRestartSameSeed={restartSameSeed}
+            onRestartNewSeed={restartNewSeed}
+          />
+        </div>
+        {eventAnnouncement && (
+          <EventAnnouncementModal
+            event={eventAnnouncement}
+            people={people}
+            suggestion={eventSuggestionFallbacks[eventAnnouncement.id] || eventAnnouncement.suggestion}
+            navigatorMessage={eventAnnouncement.navigatorMessage ?? (latestNavigatorMessage || undefined)}
+            notice={notice || undefined}
+            canAdvance={false}
+            logLabel="総集編で詳しく見る"
+            continueLabel="結果を見る"
+            onClose={closeEventAnnouncement}
+            onOpenLog={closeEventAnnouncement}
+            onAdvance={closeEventAnnouncement}
+          />
         )}
-        <ResultScreen
-          game={game}
-          onRestartSameSeed={restartSameSeed}
-          onRestartNewSeed={restartNewSeed}
-        />
       </div>
     );
   }
 
   return (
     <div className={`app phase-theme-${game.shared.phase}`}>
-      <header className="topbar">
+      <header className="topbar" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark"><i /><i /><b>♡</b></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
         <PhaseRail game={game} />
         <div className="header-stat relationship-status"><small>RELATIONSHIP</small><strong><span aria-hidden="true">♥</span>{RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div>
@@ -1101,13 +1434,13 @@ export default function App() {
         </div>
       </header>
 
-      {notice && <div className="notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+      {notice && <div className="notice" role="alert" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
       {initialLoading && <div className="loading-banner"><span /><p>ふたりの生活を読み込んでいます…</p></div>}
 
       {personalityOpen && <PersonalityStudio controller={characterSettings} onClose={closePersonality} />}
       {memoryArticle && <MemoryArticleModal article={memoryArticle} people={people} onClose={() => setActiveMemory(undefined)} />}
 
-      <main id="game" className="game-layout">
+      <main id="game" className="game-layout" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
           <div className="world-stage-wrap">
             <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} resolving={resolving} onSelectPerson={selectCharacter} />
@@ -1116,28 +1449,33 @@ export default function App() {
               <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
             </div>
             <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
-            <EventCard event={latestEvent} resolving={resolving} lastSuggestion={lastSuggestion} />
+            <EventCard event={latestEvent} resolving={resolving} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
+              setLogOpen(false);
+              setActiveMemory(undefined);
+              setPersonalityOpen(false);
+              setEventAnnouncementId(latestEvent.id);
+            } : undefined} />
           </div>
 
-          <section className="interaction-dock" aria-labelledby="producer-title">
+          <section className="interaction-dock" aria-labelledby="dekopin-title">
             <button type="button" className="latest-log-strip" onClick={() => setLogOpen(true)}>
               <span className="log-clock">{activePhase.time}</span><span className="log-star">★</span>
               <span className="latest-log-copy"><small>最新の生活ログ</small><b>{latestEvent?.eventTitle ?? "共同生活がはじまりました"}</b><em>{latestEvent?.haruDialogue ? `「${clipText(latestEvent.haruDialogue, 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
               <span className="open-log-label">振り返る <b>⌃</b></span>
             </button>
             <div className="producer-row">
-              <div className="producer-label"><span>PRODUCER'S CUE</span><h2 id="producer-title">ふたりへのきっかけ</h2></div>
+              <DekopinGuide presentation={dekopinPresentation} />
               <div className="preset-menu">
-                <label htmlFor="preset-select">提案例</label>
+                <label htmlFor="preset-select">指示例</label>
                 <select id="preset-select" value="" onChange={(event) => setSuggestion(event.target.value)} disabled={resolving || game.completed}>
                   <option value="">選ぶ…</option>{PRESETS.map((preset) => <option value={preset} key={preset}>{preset}</option>)}
                 </select>
               </div>
               <form className="suggestion-form" onSubmit={handleSubmit}>
-                <label htmlFor="suggestion" className="sr-only">ふたりへの提案</label>
+                <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
                 <textarea id="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={resolving || game.completed || offline} placeholder="例：今日は一緒に夕食を作ってみたら？" />
                 <span className="character-count">{suggestion.length}/240</span>
-                <button className="submit-cue" type="submit" disabled={resolving || game.completed || offline || !suggestion.trim()}><span>{resolving ? "考え中…" : "きっかけを届ける"}</span><b aria-hidden="true">▶</b></button>
+                <button className="submit-cue" type="submit" disabled={resolving || game.completed || offline || !suggestion.trim()}><span>{resolving ? "反映中…" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
               </form>
               <div className="dock-actions">
                 <button className="watch-button" type="button" onClick={() => void submitSuggestion("何も提案せず見守る")} disabled={resolving || game.completed || offline}><span aria-hidden="true">◉</span>見守る</button>
@@ -1147,7 +1485,7 @@ export default function App() {
             </div>
           </section>
 
-          {logOpen && <LogDrawer events={eventLog} filter={logFilter} onFilter={setLogFilter} onClose={() => setLogOpen(false)} />}
+          {logOpen && <LogDrawer events={eventLog} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={() => setLogOpen(false)} />}
         </section>
 
         <aside className="inspector-panel">
@@ -1166,6 +1504,19 @@ export default function App() {
           <DebugDetails game={game} />
         </aside>
       </main>
+      {eventAnnouncement && (
+        <EventAnnouncementModal
+          event={eventAnnouncement}
+          people={people}
+          suggestion={eventSuggestionFallbacks[eventAnnouncement.id] || eventAnnouncement.suggestion}
+          navigatorMessage={eventAnnouncement.navigatorMessage ?? (latestNavigatorMessage || undefined)}
+          notice={notice || undefined}
+          canAdvance={canAdvance}
+          onClose={closeEventAnnouncement}
+          onOpenLog={openEventLogFromAnnouncement}
+          onAdvance={advanceFromAnnouncement}
+        />
+      )}
     </div>
   );
 }

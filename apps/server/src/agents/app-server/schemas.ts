@@ -53,6 +53,15 @@ export const reflectionOutputSchema = {
 
 const statDelta = { type: "object", properties: statProperties, additionalProperties: false };
 
+export const navigatorOutputSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string", minLength: 1, maxLength: 240 },
+  },
+  required: ["message"],
+  additionalProperties: false,
+};
+
 export const characterOutputSchema = {
   type: "object",
   properties: {

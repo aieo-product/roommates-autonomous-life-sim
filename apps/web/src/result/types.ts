@@ -72,6 +72,7 @@ export type ResultEventLogEntry = {
   narration: string;
   eventDefinitionId?: string;
   suggestion?: string;
+  navigatorMessage?: string;
   cueSafetyFlags?: string[];
   /** Resolved room labels used to reconstruct the event capture. */
   scene?: Partial<Record<ResultCharacterId, string>>;

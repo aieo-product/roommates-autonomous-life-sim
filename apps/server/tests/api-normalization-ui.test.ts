@@ -66,4 +66,45 @@ describe("web game-state normalization", () => {
       scene: { haru: "キッチン", aoi: "ダイニング" },
     });
   });
+
+  it("keeps structured and top-level navigator responses on the public event", () => {
+    const state = normalizeGameState({
+      revision: 1,
+      status: "resolved",
+      shared: {
+        day: 1,
+        phase: "morning",
+        relationshipLabel: "roommates",
+        unresolvedConflicts: [],
+        sharedMemories: [],
+      },
+      navigator: {
+        characterId: "navigator",
+        characterName: "デコピン",
+        eventDefinitionId: "cook-together",
+        eventTitle: "ふたりの朝食",
+        outcome: "selected",
+        message: "朝食づくりのイベントに反映したよ！",
+      },
+      eventLog: [
+        {
+          id: "log-navigator",
+          day: 1,
+          phase: "morning",
+          eventTitle: "ふたりの朝食",
+          narration: "ふたりは朝食を作った。",
+          navigatorResponse: {
+            message: "朝食づくりのイベントに反映したよ！",
+          },
+        },
+      ],
+      lastEvent: {
+        eventTitle: "ふたりの朝食",
+        narration: "ふたりは朝食を作った。",
+      },
+    });
+
+    expect(state.currentEvent?.navigatorMessage).toBe("朝食づくりのイベントに反映したよ！");
+    expect(state.eventLog[0]?.navigatorMessage).toBe("朝食づくりのイベントに反映したよ！");
+  });
 });

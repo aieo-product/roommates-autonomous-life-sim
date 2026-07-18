@@ -45,7 +45,7 @@ function ReflectionCard({
         </div>
       </dl>
       <div className="result-producer-message">
-        <strong>Producerへ</strong>
+        <strong>デコピンへ</strong>
         <p>「{reflection.messageToProducer}」</p>
       </div>
     </article>

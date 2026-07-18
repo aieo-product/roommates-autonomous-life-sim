@@ -40,8 +40,8 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
             </p>
           </div>
 
-          <aside className="result-score-stamp" aria-label={`Producer評価 ${producer.overallScore}点、ランク${producer.rank}`}>
-            <span>PRODUCER SCORE</span>
+          <aside className="result-score-stamp" aria-label={`デコピンのサポート評価 ${producer.overallScore}点、ランク${producer.rank}`}>
+            <span>DEKOPIN SCORE</span>
             <div className="result-rank-line">
               <strong aria-label={`ランク ${producer.rank}`}>{producer.rank}</strong>
               <b><em>{Math.round(producer.overallScore)}</em><small>/ 100</small></b>
@@ -50,7 +50,7 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
           </aside>
         </div>
         <p className="result-separation-note">
-          二人の結末とProducer評価は別のものです。この点数は恋愛の成立ではなく、二人の主体性と安全を守りながら7日間を支えた過程を評価しています。
+          二人の結末とデコピンのサポート評価は別のものです。この点数は恋愛の成立ではなく、二人の主体性と安全を守りながら7日間を支えた過程を評価しています。
         </p>
       </header>
     );
