@@ -6,9 +6,10 @@ Issue #6 向けに作成した、生活シミュレーションゲーム用の2D
 
 - オータニ ハル（`otani-haru`）
 - ミズハラ アオイ（`mizuhara-aoi`）
-- プレイヤー／プロデューサー（`player-producer`）
+- プロデューサー（`producer`）: プレイヤーから指示を受け、ゲーム内で行動する
+- ナビゲーター（`navigator`）: ゲーム進行を支援する小型の浮遊キャラクター
 
-各キャラクターには、論理4方向 × 3コマの歩行パターンを用意しています。
+プレイヤー自身は画面用キャラクターとして描画せず、プロデューサーへ指示を出す操作主体として扱います。4体すべてに論理4方向 × 3コマの移動パターンを用意しています。
 
 ## 画像仕様
 
@@ -18,9 +19,11 @@ Issue #6 向けに作成した、生活シミュレーションゲーム用の2D
 - 足元ピボット: `(64, 118)`（フレーム左上原点）
 - 足元の論理占有: 1 × 1タイル
 - 配置時に確保する余白: 2 × 2タイル
-- 列順: `step-left`、`idle`、`step-right`
+- 歩行キャラの列順: `step-left`、`idle`、`step-right`
+- ナビゲーターの列順: `float-a`、`idle`、`float-b`
 - 行順: `south`、`east`、`north`、`west`
 - 推奨歩行ループ: `step-left → idle → step-right → idle`
+- 推奨浮遊ループ: `float-a → idle → float-b → idle`
 - 推奨フレーム時間: 170 ms
 
 各キャラクターのディレクトリには、以下を格納しています。
@@ -28,15 +31,16 @@ Issue #6 向けに作成した、生活シミュレーションゲーム用の2D
 ```text
 <character>/
 ├── frames/
-│   ├── south-step-left.png
+│   ├── south-step-left.png（歩行キャラ）
+│   ├── south-float-a.png（ナビゲーター）
 │   ├── south-idle.png
-│   ├── south-step-right.png
+│   ├── south-step-right.png / south-float-b.png
 │   └── ...（論理4方向 × 3コマ）
 ├── walk-cycle.png
 └── walk-cycle-preview.gif
 ```
 
-`preview-64px.png` は、ゲーム内基準の64px表示で各キャラクターと4方向を確認するための画像です。列順は `south`、`east`、`north`、`west` です。
+`preview-64px.png` は、ゲーム内基準の64px表示で4キャラクターと4方向を確認するための画像です。行順はハル、アオイ、プロデューサー、ナビゲーター、列順は `south`、`east`、`north`、`west` です。ナビゲーターはほかの3体の約85%の高さに抑えています。
 
 ## 間取り座標との対応
 
