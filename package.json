@@ -1,0 +1,25 @@
+{
+  "name": "roommates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c magenta,cyan \"npm run dev -w @roommates/server\" \"npm run dev -w @roommates/web\"",
+    "build": "npm run build -w @roommates/shared && npm run build -w @roommates/server && npm run build -w @roommates/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run typecheck && npm test && npm run build",
+    "start": "npm run start -w @roommates/server"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}

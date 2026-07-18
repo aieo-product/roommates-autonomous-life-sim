@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.vite/
+.DS_Store
+*.log
+.env
+.env.local
+coverage/
+apps/server/data/game-state.json
+apps/server/data/*.tmp
+**/data/game-state.json
+*.tsbuildinfo
+playwright-report/
+test-results/
