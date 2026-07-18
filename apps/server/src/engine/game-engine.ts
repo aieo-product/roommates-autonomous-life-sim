@@ -234,44 +234,6 @@ export class GameEngine {
         agent: "navigator",
         message: "デコピンが指示を確認しています…",
       });
-      let navigator: AgentResult<NavigatorAgentOutput>;
-      if (inputMethod === "fast_forward") {
-        navigator = {
-          value: fallbackNavigatorOutput(navigatorInput),
-          runtime: { source: "mock", latencyMs: 0 },
-        };
-      } else if (!this.agents.navigate) {
-        navigator = {
-          value: fallbackNavigatorOutput(navigatorInput),
-          runtime: {
-            source: "fallback",
-            error: "Navigator agent is unavailable",
-          },
-        };
-      } else {
-        try {
-          navigator = await this.agents.navigate(navigatorInput);
-        } catch (error) {
-          navigator = {
-            value: fallbackNavigatorOutput(navigatorInput),
-            runtime: {
-              source: "fallback",
-              error: errorMessage(error).slice(0, 180),
-            },
-          };
-        }
-      }
-      const navigatorResponse = buildNavigatorResponse(navigatorInput, navigator.value);
-      emit({
-        type: "navigator.completed",
-        agent: "navigator",
-        message: navigatorResponse.message,
-        data: {
-          ...navigatorResponse,
-          navigatorMessage: navigatorResponse.message,
-        },
-      });
-
       const buildInput = (id: CharacterId): CharacterDecisionInput => {
         const other = id === "haru" ? "aoi" : "haru";
         const recent = snapshot.shared.sharedMemories.slice(-5);
@@ -295,22 +257,68 @@ export class GameEngine {
 
       emit({ type: "agent.thinking", agent: "haru", message: "Haru is thinking…" });
       emit({ type: "agent.thinking", agent: "aoi", message: "Aoi is thinking…" });
-      const [haru, aoi] = await Promise.all([
-        this.agents.decide("haru", buildInput("haru")),
-        this.agents.decide("aoi", buildInput("aoi")),
+      const navigatorTask = async (): Promise<AgentResult<NavigatorAgentOutput>> => {
+        if (inputMethod === "fast_forward") {
+          return {
+            value: fallbackNavigatorOutput(navigatorInput),
+            runtime: { source: "mock", latencyMs: 0 },
+          };
+        }
+        if (!this.agents.navigate) {
+          return {
+            value: fallbackNavigatorOutput(navigatorInput),
+            runtime: {
+              source: "fallback",
+              error: "Navigator agent is unavailable",
+            },
+          };
+        }
+        try {
+          return await this.agents.navigate(navigatorInput);
+        } catch (error) {
+          return {
+            value: fallbackNavigatorOutput(navigatorInput),
+            runtime: {
+              source: "fallback",
+              error: errorMessage(error).slice(0, 180),
+            },
+          };
+        }
+      };
+      const navigatorPromise = navigatorTask().then((navigator) => {
+        const navigatorResponse = buildNavigatorResponse(navigatorInput, navigator.value);
+        emit({
+          type: "navigator.completed",
+          agent: "navigator",
+          message: navigatorResponse.message,
+          data: {
+            ...navigatorResponse,
+            navigatorMessage: navigatorResponse.message,
+          },
+        });
+        return { navigator, navigatorResponse };
+      });
+      const characterPromise = (id: CharacterId) =>
+        this.agents.decide(id, buildInput(id)).then((result) => {
+          emit({
+            type: "agent.completed",
+            agent: id,
+            message: `${id === "haru" ? "Haru" : "Aoi"}: ${result.value.decision}`,
+            data: toPublicDecision(result.value),
+          });
+          return result;
+        });
+      const [navigatorResult, haruResult, aoiResult] = await Promise.allSettled([
+        navigatorPromise,
+        characterPromise("haru"),
+        characterPromise("aoi"),
       ]);
-      emit({
-        type: "agent.completed",
-        agent: "haru",
-        message: `Haru: ${haru.value.decision}`,
-        data: toPublicDecision(haru.value),
-      });
-      emit({
-        type: "agent.completed",
-        agent: "aoi",
-        message: `Aoi: ${aoi.value.decision}`,
-        data: toPublicDecision(aoi.value),
-      });
+      if (navigatorResult.status === "rejected") throw navigatorResult.reason;
+      if (haruResult.status === "rejected") throw haruResult.reason;
+      if (aoiResult.status === "rejected") throw aoiResult.reason;
+      const { navigator, navigatorResponse } = navigatorResult.value;
+      const haru = haruResult.value;
+      const aoi = aoiResult.value;
       if (haru.runtime.source === "fallback" || aoi.runtime.source === "fallback") {
         emit({ type: "warning", message: "App Serverに接続できないため、安全なモックへ切り替えました" });
       }
