@@ -680,27 +680,27 @@ a:focus-visible,
   transform: translateY(-5px);
 }
 
-.character-sprite path,
-.character-sprite rect {
-  stroke: #26344d;
-  stroke-width: 4;
-  stroke-linejoin: round;
+.resident-sprite-object { overflow: visible; }
+
+.resident-scene-sprite {
+  width: 64px;
+  height: 64px;
+  display: block;
+  overflow: hidden;
 }
 
-.character-face,
-.character-neck,
-.character-arm {
-  fill: #f1bf98;
+.resident-scene-sprite > img {
+  width: 192px;
+  height: 256px;
+  max-width: none;
+  display: block;
+  image-rendering: pixelated;
+  transform: translateX(-64px);
 }
 
-.character-hair { fill: #3b4355; }
-.character-eye { fill: #25324a; stroke: none !important; }
-.character-leg { fill: #425777; }
-.scene-haru .character-body { fill: #559bb3; }
-.scene-aoi .character-body { fill: #dd7f8d; }
-.scene-aoi .character-hair { fill: #5e4655; }
-.scene-aoi .character-leg { fill: #725b86; }
-.leg-left { transform: translateX(-1px); }
+.resident-scene-sprite.is-active > img {
+  animation: residentWalkCycle 680ms steps(1, end) infinite;
+}
 
 .scene-nameplate {
   width: 78px;
@@ -944,13 +944,25 @@ a:focus-visible,
 .chip-energy::after { background: #65bd6b; }
 .chip-stress::after { background: #ed826d; }
 
+.resident-portrait {
+  display: inline-grid;
+  position: relative;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.resident-portrait > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 .pixel-portrait {
   width: 52px;
   height: 52px;
-  display: block;
-  position: relative;
   overflow: visible;
-  flex: 0 0 auto;
   background: #c9eced;
   border: 3px solid var(--ink);
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.52);
@@ -958,69 +970,7 @@ a:focus-visible,
 
 .portrait-aoi { background: #f6d5d4; }
 
-.pixel-hair,
-.pixel-face,
-.pixel-shirt {
-  position: absolute;
-  display: block;
-}
-
-.pixel-hair {
-  z-index: 2;
-  width: 30px;
-  height: 20px;
-  left: 8px;
-  top: 5px;
-  background: #39455b;
-  border: 2px solid var(--ink);
-  clip-path: polygon(0 0, 100% 0, 100% 82%, 77% 58%, 62% 100%, 35% 65%, 15% 100%, 0 72%);
-}
-
-.portrait-aoi .pixel-hair { background: #6b4b5c; }
-
-.pixel-face {
-  z-index: 1;
-  width: 27px;
-  height: 26px;
-  left: 10px;
-  top: 13px;
-  background: #f2bd96;
-  border: 2px solid var(--ink);
-}
-
-.pixel-face b {
-  position: absolute;
-  width: 4px;
-  height: 5px;
-  top: 10px;
-  left: 5px;
-  background: var(--ink);
-}
-
-.pixel-face b:nth-child(2) { left: 16px; }
-
-.pixel-face em {
-  position: absolute;
-  width: 7px;
-  height: 3px;
-  left: 9px;
-  bottom: 3px;
-  border-bottom: 2px solid #8c5352;
-}
-
-.pixel-shirt {
-  width: 37px;
-  height: 16px;
-  left: 5px;
-  bottom: -1px;
-  background: var(--blue);
-  border: 2px solid var(--ink);
-  clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%);
-}
-
-.portrait-aoi .pixel-shirt { background: var(--coral); }
-
-.pixel-thinking {
+.resident-portrait-thinking {
   position: absolute;
   z-index: 5;
   top: -13px;
@@ -2068,6 +2018,14 @@ a:focus-visible,
   50% { opacity: .55; transform: scale(.84); }
 }
 
+/* resident sheet: step-left -> idle -> step-right -> idle (170ms/frame) */
+@keyframes residentWalkCycle {
+  0%, 24.99% { transform: translateX(0); }
+  25%, 49.99% { transform: translateX(-64px); }
+  50%, 74.99% { transform: translateX(-128px); }
+  75%, 100% { transform: translateX(-64px); }
+}
+
 @keyframes characterIdle {
   0%,100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
@@ -2202,6 +2160,11 @@ a:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .resident-scene-sprite.is-active > img {
+    animation: none !important;
+    transform: translateX(-64px) !important;
+  }
+
   .dekopin-guide .dekopin-sprite-sheet {
     animation: none !important;
     transform: translateX(-33.3333%) !important;
@@ -2381,14 +2344,13 @@ a:focus-visible,
 .personality-avatar {
   width: 50px;
   height: 50px;
-  display: grid;
-  place-items: center;
-  color: #fff;
+  overflow: hidden;
+  background: #d8edf4;
   border: 3px solid var(--ink);
   box-shadow: 3px 3px 0 rgba(31,48,64,.2);
-  font-size: 22px;
-  font-weight: 1000;
 }
+
+.personality-avatar.portrait-aoi { background: #f6d5d4; }
 
 .personality-section {
   margin-top: 12px;

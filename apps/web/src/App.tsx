@@ -26,6 +26,7 @@ import {
   type CharacterId,
   type Point,
 } from "./room-layout";
+import { ResidentPortrait, ResidentSceneSprite } from "./character-assets";
 import { FurnitureSpriteLayer } from "./furniture-assets";
 import { buildMemoryArticle, type MemoryArticle } from "./memory-article";
 import { ResultScreen } from "./result";
@@ -188,14 +189,7 @@ function DekopinGuide({ presentation }: { presentation: DekopinPresentation }) {
 }
 
 function PixelPortrait({ person, thinking = false }: { person: CharacterId; thinking?: boolean }) {
-  return (
-    <span className={`pixel-portrait portrait-${person} ${thinking ? "is-thinking" : ""}`} aria-hidden="true">
-      <i className="pixel-hair" />
-      <i className="pixel-face"><b /><b /><em /></i>
-      <i className="pixel-shirt" />
-      {thinking && <span className="pixel-thinking">•••</span>}
-    </span>
-  );
+  return <ResidentPortrait person={person} thinking={thinking} className="pixel-portrait" />;
 }
 
 function MetricBar({ metric, value, compact = false }: { metric: MetricKey; value: number; compact?: boolean }) {
@@ -354,16 +348,9 @@ function SceneCharacter({
       {selected && <ellipse className="selection-ring" cx="0" cy="20" rx="30" ry="14" />}
       <ellipse className="character-shadow" cx="0" cy="18" rx="21" ry="9" />
       <g className="character-sprite">
-        <path className="character-leg leg-left" d="M-13 4h11v25h-13z" />
-        <path className="character-leg leg-right" d="M2 4h11l2 25H2z" />
-        <path className="character-body" d="M-20-32h40l7 41-27 10-27-14z" />
-        <rect className="character-neck" x="-7" y="-43" width="14" height="14" />
-        <rect className="character-face" x="-19" y="-74" width="38" height="34" rx="8" />
-        <path className="character-hair" d="M-21-62v-18h42v25l-9-7-7 9-13-10-13 9z" />
-        <rect className="character-eye" x="-11" y="-57" width="5" height="5" />
-        <rect className="character-eye" x="7" y="-57" width="5" height="5" />
-        <path className="character-arm arm-left" d="M-20-27l-13 29 9 5 13-24z" />
-        <path className="character-arm arm-right" d="M20-27L33 2l-9 5-13-24z" />
+        <foreignObject x="-32" y="-41" width="64" height="64" className="resident-sprite-object">
+          <ResidentSceneSprite person={person} active={thinking} />
+        </foreignObject>
       </g>
       <foreignObject x="-45" y="28" width="90" height="30" className="nameplate-object">
         <div className="scene-nameplate">{name}</div>

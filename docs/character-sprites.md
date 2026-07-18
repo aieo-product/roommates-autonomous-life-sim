@@ -64,6 +64,15 @@ Issue #6 向けに作成した、生活シミュレーションゲーム用の2D
 }
 ```
 
+現行Webでは、HaruとAoiの素材を次のように共通利用します。
+
+- 2LDKゲーム画面: `walk-cycle.png` のsouth行。通常はidle、判断中は170msごとの歩行ループ
+- 住人メニュー、イベント、インスペクター、思い出、個性設定: `frames/south-idle.png`
+- リザルトHero: Haruは`frames/east-idle.png`、Aoiは`frames/west-idle.png`で向かい合わせ
+- リザルトのハイライト、感想、状態推移、イベントログ: `frames/south-idle.png`
+
+画像は`apps/web/src/character-assets.tsx`から静的importし、ViteとSitesの成果物へ必ず含めます。表示名はユーザーが変更できるため、画像の選択には表示名ではなく`haru` / `aoi`のCharacter IDを使用します。
+
 ## 制作方針
 
 - 等角投影の床と合う、少し上から見下ろす2.5頭身

@@ -1,3 +1,4 @@
+import { ResidentPortrait } from "../character-assets";
 import { EvidenceLinks } from "./EvidenceLinks";
 import type {
   ResultCharacterId,
@@ -44,7 +45,7 @@ function StatJourney({ producer }: { producer: ResultProducer }) {
         const end = journey.end.characters[person];
         return (
           <section key={person}>
-            <h4>{CHARACTER_NAMES[person]}</h4>
+            <h4 className="result-character-heading"><ResidentPortrait person={person} className="result-character-avatar" />{CHARACTER_NAMES[person]}</h4>
             {start && end ? (
               <dl>
                 {METRIC_KEYS.map((metric) => {

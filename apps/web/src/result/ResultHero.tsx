@@ -1,11 +1,12 @@
 import { forwardRef } from "react";
+import { residentCharacterAssets } from "../character-assets";
 import type {
   ResultEnding,
   ResultProducer,
   ResultRelationshipLabel,
   ResultStatus,
 } from "./types";
-import { RELATIONSHIP_LABELS, STYLE_LABELS } from "./utils";
+import { CHARACTER_NAMES, RELATIONSHIP_LABELS, STYLE_LABELS } from "./utils";
 
 type ResultHeroProps = {
   ending: ResultEnding;
@@ -38,6 +39,16 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
             <p className="result-relationship">
               最後の関係 <strong>{RELATIONSHIP_LABELS[relationshipLabel]}</strong>
             </p>
+            <div className="result-resident-pair" role="img" aria-label={`${CHARACTER_NAMES.haru}と${CHARACTER_NAMES.aoi}`}>
+              <span className="is-haru">
+                <img src={residentCharacterAssets.haru.resultUrl} alt="" />
+                <small>{CHARACTER_NAMES.haru}</small>
+              </span>
+              <span className="is-aoi">
+                <img src={residentCharacterAssets.aoi.resultUrl} alt="" />
+                <small>{CHARACTER_NAMES.aoi}</small>
+              </span>
+            </div>
           </div>
 
           <aside className="result-score-stamp" aria-label={`デコピンのサポート評価 ${producer.overallScore}点、ランク${producer.rank}`}>

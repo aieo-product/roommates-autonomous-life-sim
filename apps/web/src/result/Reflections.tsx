@@ -1,3 +1,4 @@
+import { ResidentPortrait } from "../character-assets";
 import { EvidenceLinks } from "./EvidenceLinks";
 import type { ResultAgentReflection, ResultCharacterId, ResultStatus } from "./types";
 import { CHARACTER_NAMES } from "./utils";
@@ -14,7 +15,7 @@ function ReflectionCard({
   if (!reflection) {
     return (
       <article className={`result-reflection-card is-${person} is-missing`}>
-        <h3>{CHARACTER_NAMES[person]}</h3>
+        <header><ResidentPortrait person={person} className="result-character-avatar" /><h3>{CHARACTER_NAMES[person]}</h3></header>
         <p aria-live="polite">
           {status === "generating" ? "7日間を振り返っています…" : "アフターインタビューを取得できませんでした。"}
         </p>
@@ -24,7 +25,7 @@ function ReflectionCard({
 
   return (
     <article className={`result-reflection-card is-${person}`}>
-      <header><span aria-hidden="true">{person === "haru" ? "H" : "A"}</span><h3>{CHARACTER_NAMES[person]}</h3></header>
+      <header><ResidentPortrait person={person} className="result-character-avatar" /><h3>{CHARACTER_NAMES[person]}</h3></header>
       <blockquote>「{reflection.seasonImpression}」</blockquote>
       <dl>
         <div>
