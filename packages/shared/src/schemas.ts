@@ -6,6 +6,7 @@ import {
   phases,
   relationshipLabels,
 } from "./domain.js";
+import { characterSettingsSchema } from "./personality.js";
 
 const text = z.string().trim().min(1).max(2_000);
 const cueText = z.string().trim().min(1).max(240);
@@ -276,6 +277,7 @@ export const turnRequestSchema = z.object({
   suggestion: z.string().max(500).default(""),
   idempotencyKey: z.string().min(1).max(100),
   revision: z.number().int().nonnegative(),
+  characterSettings: characterSettingsSchema.optional(),
 });
 
 export const resetRequestSchema = z.object({ seed: z.string().trim().min(1).max(40).optional() }).default({});

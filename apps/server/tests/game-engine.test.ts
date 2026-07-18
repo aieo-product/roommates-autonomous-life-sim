@@ -11,7 +11,7 @@ import type {
   ResolvedEvent,
   StreamEvent,
 } from "@roommates/shared";
-import { createInitialGameState, mutableStatKeys } from "@roommates/shared";
+import { createInitialGameState, getDefaultCharacterSettings, mutableStatKeys } from "@roommates/shared";
 import { GameConflictError, GameEngine } from "../src/engine/game-engine.js";
 import { EVENT_DEFINITIONS_BY_ID } from "../src/engine/event-definitions.js";
 import { MemoryGameRepository } from "../src/persistence/repository.js";
@@ -73,6 +73,28 @@ describe("GameEngine", () => {
     expect(Object.isFrozen(safeSuggestion.tags)).toBe(true);
     expect(Object.isFrozen(safeSuggestion.cue.safetyFlags)).toBe(true);
     expect(Object.isFrozen(safeSuggestion.alternatives)).toBe(true);
+  });
+
+  it("passes the selected profile and personality to both agents and exposes their chosen goals", async () => {
+    const agents = new StaticAgentCoordinator();
+    const { engine } = await engineWith(agents);
+    const settings = getDefaultCharacterSettings();
+    settings.characters.haru.profile.name = "春";
+    settings.characters.aoi.personality.initiative = 3;
+
+    const result = await engine.resolveTurn(
+      "一緒に夕食を作ってみたら？",
+      "turn-key-personality",
+      0,
+      undefined,
+      settings,
+    );
+
+    expect(agents.inputs.haru?.character.profile.name).toBe("春");
+    expect(agents.inputs.aoi?.character.personality.initiative).toBe(3);
+    expect(agents.inputs.haru?.character).not.toBe(settings.characters.haru);
+    expect(result.characters.haru.state.currentGoal).toBe(acceptedDecision.action);
+    expect(result.characters.aoi.state.currentGoal).toBe(acceptedDecision.action);
   });
 
   it("persists the selected event and cue safety flags", async () => {

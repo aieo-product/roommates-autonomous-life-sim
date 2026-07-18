@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import type {
   CharacterDecision,
   CharacterDecisionInput,
+  CharacterDefinition,
   CharacterId,
   DirectorInput,
   GameSnapshot,
 } from "@roommates/shared";
-import { createInitialGameState } from "@roommates/shared";
+import { DEFAULT_CHARACTER_SETTINGS, createInitialGameState } from "@roommates/shared";
 import { MockCharacterAgent } from "../src/agents/mock/character.js";
 import { MockDirectorAgent } from "../src/agents/mock/director.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
@@ -24,12 +25,17 @@ function snapshot(): GameSnapshot {
   };
 }
 
-function input(id: CharacterId, rawSuggestion: string): CharacterDecisionInput {
+function input(
+  id: CharacterId,
+  rawSuggestion: string,
+  character: CharacterDefinition = structuredClone(DEFAULT_CHARACTER_SETTINGS.characters[id]),
+): CharacterDecisionInput {
   const current = snapshot();
   const other = id === "haru" ? "aoi" : "haru";
   return {
     turnId: "turn-1",
     characterId: id,
+    character,
     snapshot: current,
     self: current.characters[id],
     otherKnownInfo: {
@@ -78,6 +84,44 @@ describe("MockCharacterAgent", () => {
     );
 
     expect(result.decision).not.toBe("ACCEPT");
+  });
+
+  it("uses edited personality and profile values for deterministic choices and dialogue", async () => {
+    const cautious = structuredClone(DEFAULT_CHARACTER_SETTINGS.characters.haru);
+    cautious.profile.dislikes = ["急な距離の変化"];
+    cautious.personality = {
+      ...cautious.personality,
+      sociability: 0,
+      compassion: 0,
+      initiative: 0,
+      expressiveness: 0,
+      romanticCaution: 100,
+      independence: 100,
+      cooperativeness: 0,
+      solitudeWhenTired: 100,
+    };
+    const outgoing = structuredClone(cautious);
+    outgoing.profile.likes = ["率直な会話"];
+    outgoing.personality = {
+      ...outgoing.personality,
+      sociability: 100,
+      compassion: 100,
+      initiative: 100,
+      expressiveness: 100,
+      romanticCaution: 0,
+      independence: 0,
+      cooperativeness: 100,
+      solitudeWhenTired: 0,
+    };
+    const agent = new MockCharacterAgent("haru");
+
+    const reserved = await agent.decide(input("haru", "二人の気持ちを話してみて", cautious));
+    const expressive = await agent.decide(input("haru", "二人の気持ちを話してみて", outgoing));
+
+    expect(reserved.decision).not.toBe(expressive.decision);
+    expect(reserved.dialogue).not.toBe(expressive.dialogue);
+    expect(reserved.action).not.toBe(expressive.action);
+    expect(expressive.publicReason).toContain("率直な会話");
   });
 });
 describe("MockDirectorAgent", () => {

@@ -9,6 +9,7 @@ import type {
   RuntimeInfo,
   StreamMessage,
 } from "./types";
+import type { CharacterSettings } from "@roommates/shared";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -391,11 +392,11 @@ export const getGame = async (signal?: AbortSignal): Promise<unknown> => {
   return response.json();
 };
 
-const postAction = async (path: string): Promise<unknown> => {
+const postAction = async (path: string, payload: unknown = {}): Promise<unknown> => {
   const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: "{}",
+    body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await getErrorMessage(response));
   if (response.status === 204) return undefined;
@@ -405,8 +406,10 @@ const postAction = async (path: string): Promise<unknown> => {
 
 export const advanceGame = (): Promise<unknown> => postAction("/api/game/advance");
 export const resetGame = (): Promise<unknown> => postAction("/api/game/reset");
-export const fastForwardGame = (): Promise<unknown> =>
-  postAction("/api/game/fast-forward");
+export const fastForwardGame = (
+  characterSettings: CharacterSettings,
+): Promise<unknown> =>
+  postAction("/api/game/fast-forward", { characterSettings });
 
 const emitBlock = (
   block: string,
@@ -451,6 +454,7 @@ const emitBlock = (
 export const runTurn = async (
   suggestion: string,
   revision: number,
+  characterSettings: CharacterSettings,
   onMessage: (message: StreamMessage) => void,
   signal?: AbortSignal,
 ): Promise<void> => {
@@ -463,6 +467,7 @@ export const runTurn = async (
     body: JSON.stringify({
       suggestion,
       revision,
+      characterSettings,
       idempotencyKey:
         typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()

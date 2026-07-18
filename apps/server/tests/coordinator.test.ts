@@ -3,7 +3,7 @@ import type {
   AppServerAdapter,
 } from "../src/agents/coordinator.js";
 import type { CharacterDecisionInput, DirectorInput, GameSnapshot } from "@roommates/shared";
-import { createInitialGameState } from "@roommates/shared";
+import { DEFAULT_CHARACTER_SETTINGS, createInitialGameState } from "@roommates/shared";
 import { ResilientAgentCoordinator } from "../src/agents/coordinator.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
 
@@ -25,6 +25,7 @@ function characterInput(): CharacterDecisionInput {
   return {
     turnId: "turn-invalid-json",
     characterId: "haru",
+    character: structuredClone(DEFAULT_CHARACTER_SETTINGS.characters.haru),
     snapshot: current,
     self: current.characters.haru,
     otherKnownInfo: {
