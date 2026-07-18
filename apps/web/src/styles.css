@@ -1071,6 +1071,12 @@ a:focus-visible,
   box-shadow: 5px 5px 0 rgba(30,46,62,.28);
 }
 
+.event-card.is-fresh {
+  min-height: 108px;
+  transform-origin: left bottom;
+  animation: eventCardPop .24s cubic-bezier(.2, .8, .25, 1);
+}
+
 .event-card::before {
   content: "";
   position: absolute;
@@ -2052,6 +2058,11 @@ a:focus-visible,
 }
 
 @keyframes eventAnnouncementIn {
+  from { opacity: 0; transform: translateY(18px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes eventCardPop {
   from { opacity: 0; transform: translateY(18px) scale(.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }

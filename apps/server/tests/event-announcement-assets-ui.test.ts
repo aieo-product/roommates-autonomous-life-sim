@@ -20,10 +20,20 @@ const sourceBetween = (
 };
 
 describe("resolved event announcement", () => {
+  const card = sourceBetween(
+    app,
+    "function EventCard",
+    ["function EventAnnouncementModal"],
+  );
   const modal = sourceBetween(
     app,
     "function EventAnnouncementModal",
     ["function CharacterInspector", "function SchedulePanel"],
+  );
+  const presentationEffect = sourceBetween(
+    app,
+    "    const latestId = latestEvent?.id ?? null;",
+    ["\n  const selectCharacter"],
   );
 
   it("is a labelled, focus-contained modal with responsive scrolling", () => {
@@ -49,11 +59,24 @@ describe("resolved event announcement", () => {
     expect(modal).not.toContain("clipText(");
   });
 
-  it("opens a normal resolved event once by event id", () => {
-    expect(app).toContain("const latestId = latestEvent?.id ?? null");
-    expect(app).toMatch(/game\.status !== "resolved"/);
-    expect(app).toMatch(/presentedEventIdRef\.current === latestId\) return;/);
-    expect(app).toContain("setEventAnnouncementId(latestId)");
+  it("pops a fresh resolved event in the stage and opens details only on request", () => {
+    expect(presentationEffect).toMatch(/game\.status !== "resolved"/);
+    expect(presentationEffect).toMatch(/presentedEventIdRef\.current === latestId\) return;/);
+    expect(app).toContain("const [freshEventId, setFreshEventId]");
+    expect(presentationEffect).toMatch(/if \(submittedSuggestion\) \{[\s\S]*?setFreshEventId\(latestId\)/);
+    expect(presentationEffect.match(/setEventAnnouncementId\(latestId\)/g)).toHaveLength(1);
+    expect(app).toContain('fresh={freshEventId === latestEvent?.id}');
+    expect(app).toContain('role="status" aria-live="polite" aria-atomic="true"');
+    expect(card).toContain('event-result ${fresh ? "is-fresh" : ""}');
+    expect(card).toContain("{event?.eventTitle}");
+    expect(card).toContain("clipText(event?.narration");
+    expect(card).toContain("{navigatorMessage &&");
+    expect(card).toContain("全文を読む");
+    expect(app).toMatch(/onOpen=\{latestEvent \? \(\) => \{[\s\S]*?setEventAnnouncementId\(latestEvent\.id\)/);
+    expect(css).toMatch(/\.event-card\s*\{[\s\S]*?left:\s*18px;[\s\S]*?bottom:\s*15px;[\s\S]*?width:\s*min\(500px,\s*calc\(100% - 36px\)\);/);
+    expect(css).toMatch(/\.event-card\.is-fresh\s*\{[\s\S]*?min-height:\s*108px;[\s\S]*?animation:\s*eventCardPop/);
+    expect(css).toMatch(/@media \(max-height:\s*800px\)[\s\S]*?\.event-card\s*\{[\s\S]*?bottom:\s*10px;/);
+    expect(css).toContain("@keyframes eventCardPop");
     expect(app).toMatch(/eventLog\.find\(\(event\) => event\.id === eventAnnouncementId\)/);
   });
 
@@ -65,6 +88,7 @@ describe("resolved event announcement", () => {
 
   it("keeps the final event over the result until the player chooses Result", () => {
     expect(app).toMatch(/game\.status !== "resolved"\s*&&\s*game\.status !== "ended"/);
+    expect(presentationEffect).toMatch(/if \(game\.status === "ended"\)[\s\S]*?setEventAnnouncementId\(latestId\);[\s\S]*?return;/);
     const resultBranch = sourceBetween(
       app,
       "if (showResult)",
@@ -76,11 +100,11 @@ describe("resolved event announcement", () => {
     expect(resultBranch).toContain("onClose={closeEventAnnouncement}");
   });
 
-  it("uses the fast-forward JSON result to announce only its latest event id", () => {
+  it("does not treat fast-forward as a fresh manual instruction", () => {
     expect(app).toMatch(/:\s*fastForwardGame\([^)]*\)\);/);
     expect(app).toContain('kind === "reset" ? INITIAL_GAME_STATE : previous');
-    expect(app).toContain("const latestId = latestEvent?.id ?? null");
-    expect(app).toContain("setEventAnnouncementId(latestId)");
+    expect(app).toMatch(/operationRef\.current = kind;[\s\S]*?setFreshEventId\(null\);[\s\S]*?submittedSuggestionRef\.current = null;/);
+    expect(presentationEffect).toMatch(/if \(submittedSuggestion\) \{[\s\S]*?setFreshEventId\(latestId\)/);
   });
 });
 
