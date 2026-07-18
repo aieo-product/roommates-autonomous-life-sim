@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "frameSize": {
+    "width": 128,
+    "height": 128
+  },
+  "displaySize": {
+    "width": 64,
+    "height": 64
+  },
+  "sheet": {
+    "width": 384,
+    "height": 512,
+    "columns": 3,
+    "rows": 4
+  },
+  "directions": [
+    "front",
+    "left",
+    "right",
+    "back"
+  ],
+  "steps": [
+    "step-left",
+    "idle",
+    "step-right"
+  ],
+  "walkSequence": [
+    "step-left",
+    "idle",
+    "step-right",
+    "idle"
+  ],
+  "frameDurationMs": 170,
+  "characters": [
+    {
+      "id": "otani-haru",
+      "name": "オータニ ハル",
+      "sheet": "otani-haru/walk-cycle.png"
+    },
+    {
+      "id": "mizuhara-aoi",
+      "name": "ミズハラ アオイ",
+      "sheet": "mizuhara-aoi/walk-cycle.png"
+    },
+    {
+      "id": "player-producer",
+      "name": "プレイヤー／プロデューサー",
+      "sheet": "player-producer/walk-cycle.png"
+    }
+  ]
+}
