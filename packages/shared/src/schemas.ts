@@ -205,6 +205,15 @@ export const characterDecisionSchema = z
   })
   .strict();
 
+export const publicCharacterDecisionSchema = z
+  .object({
+    decision: z.enum(decisions),
+    action: text,
+    dialogue: z.string().max(2_000),
+    publicReason: text,
+  })
+  .strict();
+
 export const resolvedEventSchema = z
   .object({
     eventTitle: text,
@@ -241,6 +250,7 @@ export const characterStateSchema = z.object({
 
 export const memorySchema = z.object({
   id: text,
+  sourceEventId: text.optional(),
   day: z.number().int().min(1).max(7),
   phase: z.string(),
   title: text,
@@ -250,28 +260,422 @@ export const memorySchema = z.object({
   importance: z.number().min(0).max(10),
 });
 
-export const gameStateSchema = z.object({
-  version: z.literal(1),
-  seed: text,
-  revision: z.number().int().nonnegative(),
-  status: z.enum(["awaiting_suggestion", "resolving", "resolved", "ended"]),
-  turnId: z.string().optional(),
-  characters: z.object({
-    haru: z.object({ state: characterStateSchema, lastDecision: characterDecisionSchema.optional(), internalSummary: z.string().optional() }),
-    aoi: z.object({ state: characterStateSchema, lastDecision: characterDecisionSchema.optional(), internalSummary: z.string().optional() }),
-  }),
-  shared: z.object({
+export const runtimeAgentStateSchema = z
+  .object({
+    source: z.enum(["app_server", "mock", "fallback"]),
+    threadId: z.string().optional(),
+    latencyMs: z.number().finite().nonnegative().optional(),
+    error: z.string().max(2_000).optional(),
+  })
+  .strict();
+
+export const endingSchema = z
+  .object({
+    kind: z.enum(["couple", "unspoken", "close_friends", "roommates", "broken"]),
+    title: text,
+    narration: text,
+  })
+  .strict();
+
+export const turnStateSnapshotSchema = z
+  .object({
+    characters: z
+      .object({ haru: characterStateSchema, aoi: characterStateSchema })
+      .strict(),
+    shared: z
+      .object({
+        relationshipLabel: z.enum(relationshipLabels),
+        unresolvedConflicts: z.array(z.string()),
+        memoryIds: z.array(z.string()),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const eventLogEntrySchema = z
+  .object({
+    id: text,
+    turnId: text.optional(),
+    day: z.number().int().min(1).max(7),
+    phase: z.enum(phases),
+    eventDefinitionId: text,
+    eventCategory: z.enum(eventCategories).optional(),
+    intimacyTier: intimacyTierSchema.optional(),
+    cooldownPhases: z.number().int().nonnegative().optional(),
+    cueSafetyFlags: z.array(z.enum(cueSafetyFlags)),
+    suggestion: z.string().max(2_000),
+    haruReaction: z.string().max(2_000),
+    aoiReaction: z.string().max(2_000),
+    haruDecision: z.enum(decisions).optional(),
+    aoiDecision: z.enum(decisions).optional(),
+    haruAction: z.string().max(2_000).optional(),
+    aoiAction: z.string().max(2_000).optional(),
+    haruDialogue: z.string().max(2_000).optional(),
+    aoiDialogue: z.string().max(2_000).optional(),
+    haruPublicReason: z.string().max(2_000).optional(),
+    aoiPublicReason: z.string().max(2_000).optional(),
+    scene: z.object({ haru: text.optional(), aoi: text.optional() }).strict().optional(),
+    memoryId: text.optional(),
+    cue: producerCueSchema.optional(),
+    inputMethod: z.enum(["free_text", "candidate", "observe", "fast_forward"]).optional(),
+    requestedEventId: text.optional(),
+    alternativesShown: z.array(eventCandidateSchema).optional(),
+    lock: eventLockSchema.optional(),
+    cueOutcome: z.enum(["selected", "transformed", "locked_fallback", "observed"]).optional(),
+    decisions: z
+      .object({ haru: publicCharacterDecisionSchema, aoi: publicCharacterDecisionSchema })
+      .strict()
+      .optional(),
+    resolutionBranch: z
+      .enum([
+        "both_participated",
+        "one_participated",
+        "both_declined",
+        "modified",
+        "self_initiated",
+        "fallback",
+      ])
+      .optional(),
+    before: turnStateSnapshotSchema.optional(),
+    after: turnStateSnapshotSchema.optional(),
+    appliedEffects: z
+      .object({ haru: statDeltaSchema, aoi: statDeltaSchema })
+      .strict()
+      .optional(),
+    memory: memorySchema.optional(),
+    conflictUpdate: z
+      .object({ add: z.array(z.string()), resolve: z.array(z.string()) })
+      .strict()
+      .optional(),
+    runtimeSources: z
+      .object({
+        haru: z.enum(["app_server", "mock", "fallback"]),
+        aoi: z.enum(["app_server", "mock", "fallback"]),
+        director: z.enum(["app_server", "mock", "fallback"]),
+      })
+      .strict()
+      .optional(),
+    eventTitle: text,
+    narration: text,
+    relationshipBefore: z.enum(relationshipLabels),
+    relationshipAfter: z.enum(relationshipLabels),
+    createdAt: z.string(),
+  })
+  .strict();
+
+export const producerScoreEvidenceSchema = z
+  .object({
+    id: text,
+    ruleId: text,
+    points: z.number().finite(),
+    message: text,
+    eventLogIds: z.array(z.string()),
+    day: z.number().int().min(1).max(7).optional(),
+    phase: z.enum(phases).optional(),
+  })
+  .strict();
+
+export const resultHighlightSchema = z
+  .object({
+    id: text,
+    kind: z.enum([
+      "relationship_turn",
+      "self_initiated",
+      "respected_no",
+      "conflict_repaired",
+      "quiet_moment",
+      "important_memory",
+    ]),
+    headline: text,
+    reason: text,
+    eventLogIds: z.array(z.string()).min(1),
+    memoryId: z.string().optional(),
+  })
+  .strict();
+
+export const producerResultSchema = z
+  .object({
+    overallScore: z.number().int().min(0).max(100),
+    rank: z.enum(["S", "A", "B", "C"]),
+    producerStyle: z.enum([
+      "space_maker",
+      "condition_reader",
+      "relationship_mender",
+      "pace_designer",
+      "turning_point_editor",
+    ]),
+    scoringVersion: text,
+    axes: z.array(
+      z
+        .object({
+          id: z.enum(["agency", "wellbeing", "care", "pacing", "story"]),
+          label: text,
+          score: z.number().int().nonnegative(),
+          maxScore: z.number().int().positive(),
+          summary: text,
+          evidence: z.array(producerScoreEvidenceSchema),
+        })
+        .strict(),
+    ),
+    topStrengths: z.array(producerScoreEvidenceSchema),
+    improvements: z.array(producerScoreEvidenceSchema),
+    highlights: z.array(resultHighlightSchema).max(4),
+    keyMemoryIds: z.array(z.string()),
+    turningPointEventLogIds: z.array(z.string()),
+    statJourney: z
+      .object({ start: turnStateSnapshotSchema, end: turnStateSnapshotSchema })
+      .strict()
+      .optional(),
+    coverage: z
+      .object({
+        ratio: z.number().finite().min(0).max(1),
+        completeTurns: z.number().int().nonnegative(),
+        expectedTurns: z.number().int().positive(),
+        missing: z.array(z.string()),
+      })
+      .strict(),
+    warnings: z.array(z.string()),
+  })
+  .strict();
+
+export const narrativeParagraphSchema = z
+  .object({ text, sourceEventLogIds: z.array(z.string()) })
+  .strict();
+
+export const resultNarrativeSchema = z
+  .object({
+    headline: text,
+    lead: z.array(narrativeParagraphSchema),
+    daySections: z.array(
+      z
+        .object({
+          day: z.number().int().min(1).max(7),
+          title: text,
+          paragraphs: z.array(narrativeParagraphSchema),
+          featuredEventLogId: z.string().optional(),
+        })
+        .strict(),
+    ),
+    closing: z.array(narrativeParagraphSchema),
+    narrativeVersion: text,
+  })
+  .strict();
+
+export const agentResultReflectionSchema = z
+  .object({
+    characterId: z.enum(["haru", "aoi"]),
+    seasonImpression: text,
+    notableEventComments: z.array(
+      z.object({ eventLogId: text, comment: text }).strict(),
+    ),
+    bestMomentEventLogId: z.string().nullable(),
+    turningPointEventLogId: z.string().nullable(),
+    messageToProducer: text,
+    reflectionVersion: text,
+    runtime: runtimeAgentStateSchema.optional(),
+  })
+  .strict();
+
+const resultIdentityShape = {
+  generationKey: text,
+  endingRevision: z.number().int().nonnegative(),
+  scoringVersion: text,
+  narrativeVersion: text,
+  reflectionVersion: text,
+};
+
+export const gameResultSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      ...resultIdentityShape,
+      status: z.literal("generating"),
+      ending: endingSchema,
+      producer: producerResultSchema,
+      startedAt: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      ...resultIdentityShape,
+      status: z.literal("ready"),
+      ending: endingSchema,
+      producer: producerResultSchema,
+      narrative: resultNarrativeSchema,
+      reflections: z
+        .object({ haru: agentResultReflectionSchema, aoi: agentResultReflectionSchema })
+        .strict(),
+      generatedAt: z.string(),
+      dataQuality: z.literal("complete"),
+    })
+    .strict(),
+  z
+    .object({
+      ...resultIdentityShape,
+      status: z.literal("partial"),
+      ending: endingSchema,
+      producer: producerResultSchema,
+      narrative: resultNarrativeSchema.optional(),
+      reflections: z
+        .object({ haru: agentResultReflectionSchema, aoi: agentResultReflectionSchema })
+        .partial()
+        .strict(),
+      failures: z.array(
+        z
+          .object({
+            component: z.enum(["narrative", "haru_reflection", "aoi_reflection"]),
+            reason: text,
+            retryable: z.boolean(),
+          })
+          .strict(),
+      ),
+      generatedAt: z.string(),
+      dataQuality: z.literal("partial"),
+    })
+    .strict(),
+]);
+
+const sharedStateSchema = z
+  .object({
     day: z.number().int().min(1).max(7),
     phase: z.enum(phases),
     relationshipLabel: z.enum(relationshipLabels),
     unresolvedConflicts: z.array(z.string()),
     sharedMemories: z.array(memorySchema),
-  }),
-  lastEvent: resolvedEventSchema.optional(),
-  eventLog: z.array(z.any()),
-  ending: z.any().optional(),
-  runtime: z.object({ haru: z.any(), aoi: z.any(), director: z.any() }),
+  })
+  .strict();
+
+const legacySharedStateSchema = z.object({
+  day: z.number().int().min(1).max(7),
+  phase: z.enum(phases),
+  relationshipLabel: z.enum(relationshipLabels),
+  unresolvedConflicts: z.array(z.string()),
+  sharedMemories: z.array(memorySchema),
 });
+
+const characterRecordSchema = z
+  .object({
+    state: characterStateSchema,
+    lastDecision: publicCharacterDecisionSchema.optional(),
+  })
+  .strict();
+
+const gameStateV2Schema = z
+  .object({
+    version: z.literal(2),
+    seed: text,
+    revision: z.number().int().nonnegative(),
+    status: z.enum(["awaiting_suggestion", "resolving", "resolved", "ended"]),
+    turnId: z.string().optional(),
+    characters: z
+      .object({ haru: characterRecordSchema, aoi: characterRecordSchema })
+      .strict(),
+    shared: sharedStateSchema,
+    lastEvent: resolvedEventSchema.optional(),
+    eventLog: z.array(eventLogEntrySchema),
+    ending: endingSchema.optional(),
+    result: gameResultSchema.optional(),
+    runtime: z
+      .object({
+        haru: runtimeAgentStateSchema,
+        aoi: runtimeAgentStateSchema,
+        director: runtimeAgentStateSchema,
+      })
+      .strict(),
+  })
+  .strict();
+
+const legacyCharacterRecordSchema = z
+  .object({
+    state: characterStateSchema,
+    lastDecision: z.unknown().optional(),
+    internalSummary: z.unknown().optional(),
+  })
+  .passthrough();
+
+const legacyGameStateV1Schema = z
+  .object({
+    version: z.literal(1),
+    seed: text,
+    revision: z.number().int().nonnegative(),
+    status: z.enum(["awaiting_suggestion", "resolving", "resolved", "ended"]),
+    turnId: z.string().optional(),
+    characters: z
+      .object({
+        haru: legacyCharacterRecordSchema,
+        aoi: legacyCharacterRecordSchema,
+      })
+      .passthrough(),
+    shared: legacySharedStateSchema,
+    lastEvent: z.unknown().optional(),
+    eventLog: z.array(z.unknown()).default([]),
+    ending: z.unknown().optional(),
+    runtime: z
+      .object({
+        haru: z.unknown().optional(),
+        aoi: z.unknown().optional(),
+        director: z.unknown().optional(),
+      })
+      .passthrough()
+      .default({}),
+  })
+  .passthrough();
+
+function migratePublicDecision(value: unknown) {
+  const source =
+    value && typeof value === "object"
+      ? {
+          decision: Reflect.get(value, "decision"),
+          action: Reflect.get(value, "action"),
+          dialogue: Reflect.get(value, "dialogue"),
+          publicReason: Reflect.get(value, "publicReason"),
+        }
+      : value;
+  const parsed = publicCharacterDecisionSchema.safeParse(source);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function migrateRuntime(value: unknown) {
+  const parsed = runtimeAgentStateSchema.strip().safeParse(value);
+  return parsed.success ? parsed.data : { source: "mock" as const };
+}
+
+const gameStateV1Schema = legacyGameStateV1Schema.transform((state) => {
+  const lastEvent = resolvedEventSchema.strip().safeParse(state.lastEvent);
+  const ending = endingSchema.strip().safeParse(state.ending);
+  const haruDecision = migratePublicDecision(state.characters.haru.lastDecision);
+  const aoiDecision = migratePublicDecision(state.characters.aoi.lastDecision);
+  return {
+    version: 2 as const,
+    seed: state.seed,
+    revision: state.revision,
+    status: state.status,
+    ...(state.turnId === undefined ? {} : { turnId: state.turnId }),
+    characters: {
+      haru: {
+        state: state.characters.haru.state,
+        ...(haruDecision ? { lastDecision: haruDecision } : {}),
+      },
+      aoi: {
+        state: state.characters.aoi.state,
+        ...(aoiDecision ? { lastDecision: aoiDecision } : {}),
+      },
+    },
+    shared: state.shared,
+    ...(lastEvent.success ? { lastEvent: lastEvent.data } : {}),
+    eventLog: state.eventLog.flatMap((entry) => {
+      const parsed = eventLogEntrySchema.strip().safeParse(entry);
+      return parsed.success ? [parsed.data] : [];
+    }),
+    ...(ending.success ? { ending: ending.data } : {}),
+    runtime: {
+      haru: migrateRuntime(state.runtime.haru),
+      aoi: migrateRuntime(state.runtime.aoi),
+      director: migrateRuntime(state.runtime.director),
+    },
+  };
+});
+
+export const gameStateSchema = z.union([gameStateV2Schema, gameStateV1Schema]);
 
 export const turnRequestSchema = z.object({
   suggestion: z.string().max(500).default(""),
@@ -280,4 +684,6 @@ export const turnRequestSchema = z.object({
   characterSettings: characterSettingsSchema.optional(),
 });
 
-export const resetRequestSchema = z.object({ seed: z.string().trim().min(1).max(40).optional() }).default({});
+export const resetRequestSchema = z
+  .object({ seed: z.string().trim().min(1).max(40).optional() })
+  .default({});

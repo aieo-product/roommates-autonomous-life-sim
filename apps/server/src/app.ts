@@ -4,14 +4,20 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { characterSettingsSchema, resetRequestSchema, turnRequestSchema, type StreamEvent } from "@roommates/shared";
 import { config } from "./config.js";
 import { GameConflictError, type GameEngine } from "./engine/game-engine.js";
+import {
+  PUBLIC_STREAM_ERROR_MESSAGE,
+  toPublicGameState,
+  toPublicStreamEvent,
+} from "./public-dto.js";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "予期しないエラーが発生しました";
 }
 
 function sse(response: Response, event: StreamEvent): void {
-  response.write(`event: ${event.type}\n`);
-  response.write(`data: ${JSON.stringify(event)}\n\n`);
+  const publicEvent = toPublicStreamEvent(event);
+  response.write(`event: ${publicEvent.type}\n`);
+  response.write(`data: ${JSON.stringify(publicEvent)}\n\n`);
 }
 
 export function createApp(engine: GameEngine) {
@@ -20,7 +26,7 @@ export function createApp(engine: GameEngine) {
   app.use(express.json({ limit: "32kb" }));
 
   app.get("/api/health", (_request, response) => {
-    const state = engine.getState();
+    const state = toPublicGameState(engine.getState());
     response.json({
       ok: true,
       agentMode: config.agentMode,
@@ -30,7 +36,9 @@ export function createApp(engine: GameEngine) {
     });
   });
 
-  app.get("/api/game", (_request, response) => response.json(engine.getState()));
+  app.get("/api/game", (_request, response) =>
+    response.json(toPublicGameState(engine.getState())),
+  );
 
   app.post("/api/game/turn", async (request, response) => {
     const parsed = turnRequestSchema.safeParse(request.body);
@@ -59,7 +67,7 @@ export function createApp(engine: GameEngine) {
         parsed.data.characterSettings,
       );
     } catch (error) {
-      sse(response, { type: "error", message: errorMessage(error) });
+      sse(response, { type: "error", message: PUBLIC_STREAM_ERROR_MESSAGE });
     } finally {
       clearInterval(heartbeat);
       response.end();
@@ -68,7 +76,7 @@ export function createApp(engine: GameEngine) {
 
   app.post("/api/game/advance", async (_request, response, next) => {
     try {
-      response.json(await engine.advance());
+      response.json(toPublicGameState(await engine.advance()));
     } catch (error) {
       next(error);
     }
@@ -81,7 +89,7 @@ export function createApp(engine: GameEngine) {
       return;
     }
     try {
-      response.json(await engine.reset(parsed.data.seed));
+      response.json(toPublicGameState(await engine.reset(parsed.data.seed)));
     } catch (error) {
       next(error);
     }
@@ -95,7 +103,14 @@ export function createApp(engine: GameEngine) {
         response.status(400).json({ error: "個性設定が正しくありません" });
         return;
       }
-      response.json(await engine.fastForward(turns, parsedSettings.success ? parsedSettings.data : undefined));
+      response.json(
+        toPublicGameState(
+          await engine.fastForward(
+            turns,
+            parsedSettings.success ? parsedSettings.data : undefined,
+          ),
+        ),
+      );
     } catch (error) {
       next(error);
     }
@@ -109,7 +124,9 @@ export function createApp(engine: GameEngine) {
 
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
     const status = error instanceof GameConflictError ? 409 : 500;
-    response.status(status).json({ error: errorMessage(error) });
+    response.status(status).json({
+      error: status === 409 ? errorMessage(error) : "サーバーでエラーが発生しました",
+    });
   });
 
   return app;

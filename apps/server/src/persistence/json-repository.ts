@@ -21,7 +21,8 @@ export class JsonGameRepository implements GameRepository {
   async save(state: GameState): Promise<void> {
     await mkdir(dirname(this.file), { recursive: true });
     const temporary = `${this.file}.${process.pid}.tmp`;
-    await writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    const persisted = gameStateSchema.parse(state) as GameState;
+    await writeFile(temporary, `${JSON.stringify(persisted, null, 2)}\n`, "utf8");
     await rename(temporary, this.file);
   }
 
