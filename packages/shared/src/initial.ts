@@ -4,6 +4,7 @@ export function createInitialGameState(seed = "demo-heart"): GameState {
   return {
     version: 2,
     seed,
+    agentEpoch: 0,
     revision: 0,
     status: "awaiting_suggestion",
     characters: {

@@ -22,6 +22,7 @@ const PRIVATE_KEYS = new Set([
   "rawSuggestion",
   "requestHash",
   "idempotencyKey",
+  "agentEpoch",
 ]);
 
 type JsonRecord = Record<string, unknown>;

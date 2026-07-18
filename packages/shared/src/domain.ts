@@ -482,6 +482,8 @@ export type CharacterRecord = {
 export type GameState = {
   version: 2;
   seed: string;
+  /** Rotates on reset so a new game never reuses private agent conversation history. */
+  agentEpoch?: number;
   revision: number;
   status: GameStatus;
   turnId?: string;

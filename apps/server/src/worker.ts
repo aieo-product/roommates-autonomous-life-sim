@@ -9,6 +9,7 @@ import {
   type GameState,
   type StreamEvent,
 } from "@roommates/shared";
+import { AgentWorkerClient } from "./agents/app-server/remote-client.js";
 import { ResilientAgentCoordinator } from "./agents/coordinator.js";
 import { GameConflictError, GameEngine } from "./engine/game-engine.js";
 import {
@@ -25,11 +26,52 @@ import {
 export interface Env {
   DB: D1DatabaseBinding;
   ASSETS: Pick<Fetcher, "fetch">;
+  AGENT_WORKER_URL?: string;
+  AGENT_WORKER_TOKEN?: string;
+  AGENT_WORKER_TIMEOUT_MS?: string;
+  AGENT_WORKER_PROBE_TIMEOUT_MS?: string;
 }
+
+export type AgentWorkerEnv = Pick<
+  Env,
+  | "AGENT_WORKER_URL"
+  | "AGENT_WORKER_TOKEN"
+  | "AGENT_WORKER_TIMEOUT_MS"
+  | "AGENT_WORKER_PROBE_TIMEOUT_MS"
+>;
 
 const SESSION_COOKIE = "roommates_session";
 const MAX_BODY_BYTES = 32 * 1024;
-export const WORKER_STATE_LEASE_MS = 60_000;
+const DEFAULT_AGENT_WORKER_TIMEOUT_MS = 60_000;
+const MIN_AGENT_WORKER_TIMEOUT_MS = 1_000;
+const MAX_AGENT_WORKER_TIMEOUT_MS = 120_000;
+const DEFAULT_AGENT_WORKER_PROBE_TIMEOUT_MS = 2_000;
+const MIN_AGENT_WORKER_PROBE_TIMEOUT_MS = 250;
+const MAX_AGENT_WORKER_PROBE_TIMEOUT_MS = 10_000;
+const AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS = 5_000;
+const MAX_AGENT_WORKER_ATTEMPTS_PER_OPERATION = 2;
+// Navigator, Haru, Aoi, and director are the four remote operations that may
+// run between persisted checkpoints. Count them conservatively as sequential
+// even though character decisions currently run in parallel.
+const MAX_AGENT_WORKER_OPERATIONS_PER_CHECKPOINT = 4;
+const MAX_AGENT_WORKER_COORDINATOR_TIMEOUT_MS =
+  MAX_AGENT_WORKER_TIMEOUT_MS +
+  MAX_AGENT_WORKER_PROBE_TIMEOUT_MS +
+  AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS;
+export const MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS =
+  MAX_AGENT_WORKER_COORDINATOR_TIMEOUT_MS *
+  MAX_AGENT_WORKER_ATTEMPTS_PER_OPERATION *
+  MAX_AGENT_WORKER_OPERATIONS_PER_CHECKPOINT;
+const MIN_WORKER_STATE_LEASE_MS = 20 * 60_000;
+const WORKER_STATE_LEASE_SAFETY_MARGIN_MS = 60_000;
+// A cross-isolate reader must never reclaim a legitimate remote turn while it
+// is still within the maximum supported operation budget.
+export const WORKER_STATE_LEASE_MS = Math.max(
+  MIN_WORKER_STATE_LEASE_MS,
+  MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS + WORKER_STATE_LEASE_SAFETY_MARGIN_MS,
+);
+export const SSE_KEEPALIVE_INTERVAL_MS = 15_000;
+const SSE_KEEPALIVE_BYTES = new TextEncoder().encode(": keepalive\n\n");
 const SESSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -150,8 +192,99 @@ async function readJsonBody(request: Request): Promise<unknown> {
   }
 }
 
-function createEngine(repository: D1GameRepository): GameEngine {
-  const agents = new ResilientAgentCoordinator("mock", 15_000);
+function configuredAgentWorkerUrl(env?: AgentWorkerEnv): string | undefined {
+  const value = env?.AGENT_WORKER_URL?.trim();
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+    if (url.username || url.password) return undefined;
+    const loopback =
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "[::1]" ||
+      url.hostname === "::1";
+    if (url.protocol === "http:" && !loopback) return undefined;
+    if (!loopback && !env?.AGENT_WORKER_TOKEN?.trim()) return undefined;
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+export function workerAgentMode(env?: AgentWorkerEnv): "auto" | "mock" {
+  return configuredAgentWorkerUrl(env) ? "auto" : "mock";
+}
+
+export function workerAgentTimeoutMs(env?: AgentWorkerEnv): number {
+  const raw = env?.AGENT_WORKER_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_AGENT_WORKER_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_AGENT_WORKER_TIMEOUT_MS;
+  return Math.min(
+    MAX_AGENT_WORKER_TIMEOUT_MS,
+    Math.max(MIN_AGENT_WORKER_TIMEOUT_MS, Math.trunc(parsed)),
+  );
+}
+
+export function workerAgentProbeTimeoutMs(env?: AgentWorkerEnv): number {
+  const raw = env?.AGENT_WORKER_PROBE_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_AGENT_WORKER_PROBE_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_AGENT_WORKER_PROBE_TIMEOUT_MS;
+  return Math.min(
+    MAX_AGENT_WORKER_PROBE_TIMEOUT_MS,
+    Math.max(MIN_AGENT_WORKER_PROBE_TIMEOUT_MS, Math.trunc(parsed)),
+  );
+}
+
+export function workerAgentCoordinatorTimeoutMs(env?: AgentWorkerEnv): number {
+  return (
+    workerAgentTimeoutMs(env) +
+    workerAgentProbeTimeoutMs(env) +
+    AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS
+  );
+}
+
+export function createWorkerAgentCoordinator(
+  sessionId: string,
+  env?: AgentWorkerEnv,
+  fetchImpl?: typeof fetch,
+  agentEpoch = 0,
+): ResilientAgentCoordinator {
+  const baseUrl = configuredAgentWorkerUrl(env);
+  const timeoutMs = workerAgentTimeoutMs(env);
+  const probeTimeoutMs = workerAgentProbeTimeoutMs(env);
+  const remote = baseUrl
+    ? new AgentWorkerClient({
+        baseUrl,
+        sessionId,
+        scopeId: `${sessionId}:${agentEpoch}`,
+        token: env?.AGENT_WORKER_TOKEN,
+        timeoutMs,
+        probeTimeoutMs,
+        fetchImpl,
+      })
+    : undefined;
+  return new ResilientAgentCoordinator(
+    remote ? "auto" : "mock",
+    workerAgentCoordinatorTimeoutMs(env),
+    remote,
+  );
+}
+
+function createEngine(
+  repository: D1GameRepository,
+  sessionId: string,
+  env?: AgentWorkerEnv,
+  agentEpoch = 0,
+): GameEngine {
+  const agents = createWorkerAgentCoordinator(
+    sessionId,
+    env,
+    undefined,
+    agentEpoch,
+  );
   return new GameEngine(repository, agents);
 }
 
@@ -167,6 +300,7 @@ export async function stateForRead(
   database: D1DatabaseBinding,
   sessionId: string,
   now = Date.now(),
+  agentEnv?: AgentWorkerEnv,
 ): Promise<GameState> {
   const repository = new D1GameRepository(database, sessionId);
   const stored = await repository.load();
@@ -200,7 +334,12 @@ export async function stateForRead(
   if (!release) return stored ?? createInitialWorkerState();
 
   try {
-    const engine = createEngine(repository);
+    const engine = createEngine(
+      repository,
+      sessionId,
+      agentEnv,
+      stored?.agentEpoch ?? 0,
+    );
     await engine.initialize();
     const initialized = engine.getState();
     if (stored?.status === "resolving" && initialized.status !== "resolving") {
@@ -222,6 +361,16 @@ function createInitialWorkerState(): GameState {
   return createInitialGameState("demo-heart");
 }
 
+export async function stateForHealth(
+  database: D1DatabaseBinding,
+  sessionId: string,
+): Promise<GameState> {
+  return (
+    (await new D1GameRepository(database, sessionId).load()) ??
+    createInitialWorkerState()
+  );
+}
+
 type PreparedMutation = {
   engine: GameEngine;
   release: () => void;
@@ -231,6 +380,7 @@ async function engineForMutation(
   database: D1DatabaseBinding,
   sessionId: string,
   resolvingMessage: string,
+  agentEnv?: AgentWorkerEnv,
   now = Date.now(),
 ): Promise<PreparedMutation> {
   const release = acquireSessionWork(sessionId, "mutation");
@@ -246,7 +396,12 @@ async function engineForMutation(
       throw new GameConflictError(resolvingMessage);
     }
 
-    const engine = createEngine(repository);
+    const engine = createEngine(
+      repository,
+      sessionId,
+      agentEnv,
+      stored?.agentEpoch ?? 0,
+    );
     await engine.initialize();
     const initialized = engine.getState();
     if (stored?.status === "resolving" && initialized.status !== "resolving") {
@@ -266,6 +421,16 @@ function encodeSse(event: StreamEvent): Uint8Array {
   );
 }
 
+/** @internal Exported to keep the Worker timer behavior directly testable. */
+export function startWorkerSseKeepalive(
+  enqueue: (bytes: Uint8Array) => void,
+): () => void {
+  const timer = setInterval(() => {
+    enqueue(SSE_KEEPALIVE_BYTES);
+  }, SSE_KEEPALIVE_INTERVAL_MS);
+  return () => clearInterval(timer);
+}
+
 function streamTurn(
   engine: GameEngine,
   input: {
@@ -282,11 +447,13 @@ function streamTurn(
   const writer = writable.getWriter();
   let writeQueue: Promise<void> = Promise.resolve();
 
-  const emit = (event: StreamEvent): void => {
+  const enqueue = (bytes: Uint8Array): void => {
     writeQueue = writeQueue
-      .then(() => writer.write(encodeSse(event)))
+      .then(() => writer.write(bytes))
       .catch(() => undefined);
   };
+  const emit = (event: StreamEvent): void => enqueue(encodeSse(event));
+  const stopKeepalive = startWorkerSseKeepalive(enqueue);
 
   const streamTask = (async (): Promise<void> => {
     try {
@@ -300,6 +467,7 @@ function streamTurn(
     } catch (error) {
       emit({ type: "error", message: PUBLIC_STREAM_ERROR_MESSAGE });
     } finally {
+      stopKeepalive();
       await writeQueue;
       try {
         await writer.close();
@@ -330,11 +498,12 @@ async function handleApi(
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
 
   if (request.method === "GET" && path === "/api/health") {
-    const state = await stateForRead(env.DB, sessionId);
+    const state = await stateForHealth(env.DB, sessionId);
     return jsonResponse(
       {
         ok: true,
-        agentMode: "mock",
+        agentMode: workerAgentMode(env),
+        agentWorkerConfigured: workerAgentMode(env) === "auto",
         runtime: toPublicGameState(state).runtime,
         day: state.shared.day,
         phase: state.shared.phase,
@@ -345,7 +514,7 @@ async function handleApi(
 
   if (request.method === "GET" && path === "/api/game") {
     return jsonResponse(
-      toPublicGameState(await stateForRead(env.DB, sessionId)),
+      toPublicGameState(await stateForRead(env.DB, sessionId, Date.now(), env)),
       sessionId,
     );
   }
@@ -367,6 +536,7 @@ async function handleApi(
       env.DB,
       sessionId,
       "すでにターンを処理中です",
+      env,
     );
     const { engine, release } = prepared;
     const current = engine.getState();
@@ -397,6 +567,7 @@ async function handleApi(
       env.DB,
       sessionId,
       "ターン処理中です",
+      env,
     );
     try {
       return jsonResponse(toPublicGameState(await engine.advance()), sessionId);
@@ -414,6 +585,7 @@ async function handleApi(
       env.DB,
       sessionId,
       "ターン処理中はリセットできません",
+      env,
     );
     try {
       return jsonResponse(
@@ -437,6 +609,7 @@ async function handleApi(
       env.DB,
       sessionId,
       "すでにターンを処理中です",
+      env,
     );
     try {
       return jsonResponse(

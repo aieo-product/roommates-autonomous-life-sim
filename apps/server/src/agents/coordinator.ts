@@ -33,6 +33,7 @@ export interface AgentCoordinator {
   decide(id: CharacterId, input: CharacterDecisionInput): Promise<AgentResult<CharacterDecision>>;
   resolve(input: DirectorInput): Promise<AgentResult<ResolvedEvent>>;
   reflect?(id: CharacterId, input: AgentReflectionInput): Promise<AgentResult<AgentResultReflection>>;
+  resetContext?(): Promise<void>;
   shutdown?(): Promise<void>;
 }
 
@@ -41,6 +42,7 @@ export interface AppServerAdapter {
   decide(id: CharacterId, input: CharacterDecisionInput): Promise<{ value: unknown; threadId: string }>;
   resolve(input: DirectorInput): Promise<{ value: unknown; threadId: string }>;
   reflect?(id: CharacterId, input: AgentReflectionInput): Promise<{ value: unknown; threadId: string }>;
+  resetContext?(): Promise<void>;
   shutdown(): Promise<void>;
 }
 
@@ -58,6 +60,9 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
     aoi: new MockReflectionAgent("aoi"),
   };
   private appServerDisabledReason?: string;
+  private appServerDisabledAt?: number;
+
+  private static readonly RETRY_AFTER_MS = 5_000;
 
   constructor(
     private readonly mode: AgentMode,
@@ -126,6 +131,14 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
     disableAppServerOnFailure = true,
   ): Promise<AgentResult<T>> {
     const started = Date.now();
+    if (
+      this.appServerDisabledReason &&
+      this.appServerDisabledAt !== undefined &&
+      started - this.appServerDisabledAt >= ResilientAgentCoordinator.RETRY_AFTER_MS
+    ) {
+      this.appServerDisabledReason = undefined;
+      this.appServerDisabledAt = undefined;
+    }
     if (this.mode !== "mock" && this.real && !this.appServerDisabledReason) {
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -142,7 +155,10 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
         }
       }
       const reason = lastError instanceof Error ? lastError.message : "App Server connection failed";
-      if (this.mode === "auto" && disableAppServerOnFailure) this.appServerDisabledReason = reason;
+      if (this.mode === "auto" && disableAppServerOnFailure) {
+        this.appServerDisabledReason = reason;
+        this.appServerDisabledAt = Date.now();
+      }
       return {
         value: await fallbackCall(),
         runtime: { source: "fallback", latencyMs: Date.now() - started, error: reason.slice(0, 180) },
@@ -176,5 +192,11 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
 
   async shutdown(): Promise<void> {
     await this.real?.shutdown();
+  }
+
+  async resetContext(): Promise<void> {
+    await this.real?.resetContext?.();
+    this.appServerDisabledReason = undefined;
+    this.appServerDisabledAt = undefined;
   }
 }
