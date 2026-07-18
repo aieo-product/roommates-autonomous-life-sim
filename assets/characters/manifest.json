@@ -1,0 +1,110 @@
+{
+  "version": 2,
+  "projection": {
+    "type": "isometric-cutaway",
+    "tileRatio": "2:1",
+    "cameraDirection": "south-west-to-north-east",
+    "origin": "top-left"
+  },
+  "frameSize": {
+    "width": 128,
+    "height": 128
+  },
+  "displaySize": {
+    "width": 64,
+    "height": 64
+  },
+  "pivot": {
+    "x": 64,
+    "y": 118
+  },
+  "logicalTileFootprint": {
+    "width": 1,
+    "height": 1
+  },
+  "placementClearanceTiles": {
+    "width": 2,
+    "height": 2
+  },
+  "sheet": {
+    "width": 384,
+    "height": 512,
+    "columns": 3,
+    "rows": 4
+  },
+  "directionOrder": [
+    "south",
+    "east",
+    "north",
+    "west"
+  ],
+  "directions": {
+    "south": {
+      "worldVector": { "x": 0, "y": 1 },
+      "screenVector": { "x": -1, "y": 0.5 },
+      "facing": "south-west"
+    },
+    "east": {
+      "worldVector": { "x": 1, "y": 0 },
+      "screenVector": { "x": 1, "y": 0.5 },
+      "facing": "south-east"
+    },
+    "north": {
+      "worldVector": { "x": 0, "y": -1 },
+      "screenVector": { "x": 1, "y": -0.5 },
+      "facing": "north-east"
+    },
+    "west": {
+      "worldVector": { "x": -1, "y": 0 },
+      "screenVector": { "x": -1, "y": -0.5 },
+      "facing": "north-west"
+    }
+  },
+  "interactionModel": {
+    "playerRepresentation": "not-rendered",
+    "commandTargetCharacterId": "producer",
+    "supportCharacterId": "navigator"
+  },
+  "animationPresets": {
+    "walk": {
+      "columns": ["step-left", "idle", "step-right"],
+      "sequence": ["step-left", "idle", "step-right", "idle"]
+    },
+    "hover": {
+      "columns": ["float-a", "idle", "float-b"],
+      "sequence": ["float-a", "idle", "float-b", "idle"]
+    }
+  },
+  "frameDurationMs": 170,
+  "characters": [
+    {
+      "id": "otani-haru",
+      "name": "オータニ ハル",
+      "role": "resident",
+      "animationPreset": "walk",
+      "sheet": "otani-haru/walk-cycle.png"
+    },
+    {
+      "id": "mizuhara-aoi",
+      "name": "ミズハラ アオイ",
+      "role": "resident",
+      "animationPreset": "walk",
+      "sheet": "mizuhara-aoi/walk-cycle.png"
+    },
+    {
+      "id": "producer",
+      "name": "プロデューサー",
+      "role": "player-command-agent",
+      "animationPreset": "walk",
+      "sheet": "producer/walk-cycle.png"
+    },
+    {
+      "id": "navigator",
+      "name": "ナビゲーター",
+      "role": "game-flow-support",
+      "animationPreset": "hover",
+      "relativeVisualHeight": 0.85,
+      "sheet": "navigator/walk-cycle.png"
+    }
+  ]
+}
