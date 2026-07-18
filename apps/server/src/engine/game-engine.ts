@@ -437,6 +437,7 @@ export class GameEngine {
             haruDialogue: resolved.haruDialogue,
             aoiDialogue: resolved.aoiDialogue,
             conversation: resolved.conversation,
+            storyBeats: resolved.storyBeats,
             haruPublicReason: haru.value.publicReason,
             aoiPublicReason: aoi.value.publicReason,
             scene: {

@@ -7,7 +7,11 @@ import type {
   DirectorInput,
   GameSnapshot,
 } from "@roommates/shared";
-import { DEFAULT_CHARACTER_SETTINGS, createInitialGameState } from "@roommates/shared";
+import {
+  DEFAULT_CHARACTER_SETTINGS,
+  createInitialGameState,
+  directorResolvedEventSchema,
+} from "@roommates/shared";
 import { MockCharacterAgent } from "../src/agents/mock/character.js";
 import { MockDirectorAgent } from "../src/agents/mock/director.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
@@ -146,6 +150,16 @@ describe("MockDirectorAgent", () => {
       speaker: "aoi",
       text: "今日はやめておくね。",
     });
+    expect(directorResolvedEventSchema.safeParse(event).success).toBe(true);
+    expect(event.storyBeats?.map((beat) => beat.kind)).toEqual([
+      "move",
+      "dialogue",
+      "move",
+      "dialogue",
+      "action",
+      "dialogue",
+    ]);
+    expect(event.storyBeats?.some((beat) => beat.actor === "both")).toBe(false);
   });
 
   it("creates a cooperative tag-specific event when both independently join", async () => {
@@ -162,10 +176,21 @@ describe("MockDirectorAgent", () => {
 
     expect(event.eventTitle).toContain("共同料理");
     expect(event.effects.haru.affection).toBeGreaterThan(0);
-    expect(event.scene).toEqual({ haru: "キッチン", aoi: "キッチン" });
+    expect(event.scene).toEqual({
+      haru: "ダイニングの食卓",
+      aoi: "ダイニングの食卓",
+    });
     expect(event.conversation).toHaveLength(4);
     expect(new Set(event.conversation?.map((line) => line.speaker))).toEqual(
       new Set(["haru", "aoi"]),
+    );
+    expect(directorResolvedEventSchema.safeParse(event).success).toBe(true);
+    expect(event.storyBeats?.filter((beat) => beat.kind === "move")).toEqual([
+      { kind: "move", actor: "both", location: "キッチンの調理台" },
+      { kind: "move", actor: "both", location: "ダイニングの食卓" },
+    ]);
+    expect(event.storyBeats).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "action", actor: "both" })]),
     );
   });
 });

@@ -119,4 +119,38 @@ describe("App Server event normalization", () => {
       { speaker: "haru", text: "こちらこそ。" },
     ]);
   });
+
+  it("normalizes atomic story beats and keeps them when current detail merges into the log", () => {
+    const normalized = normalizeGameState({
+      status: "resolved",
+      eventLog: [{
+        id: "story-event",
+        day: 2,
+        phase: "afternoon",
+        eventTitle: "午後の小さな物語",
+        narration: "ふたりは部屋を行き来した。",
+      }],
+      currentEvent: {
+        id: "story-event-detail",
+        day: 2,
+        phase: "afternoon",
+        eventTitle: "午後の小さな物語",
+        narration: "ふたりは部屋を行き来した。",
+        story_beats: [
+          { type: "move", character: "Haru", destination: " キッチンの調理台 " },
+          { kind: "dialogue", actor: "haru", dialogue: " お茶を淹れるね。 " },
+          { kind: "action", actor: "both", description: " カップを並べる " },
+          { kind: "move", actor: "aoi", location: "ダイニングテーブル" },
+        ],
+      },
+    }, INITIAL_GAME_STATE);
+
+    expect(normalized.currentEvent?.storyBeats).toEqual([
+      { kind: "move", actor: "haru", location: "キッチンの調理台" },
+      { kind: "dialogue", actor: "haru", text: "お茶を淹れるね。" },
+      { kind: "action", actor: "both", action: "カップを並べる" },
+      { kind: "move", actor: "aoi", location: "ダイニングテーブル" },
+    ]);
+    expect(normalized.eventLog[0]?.storyBeats).toEqual(normalized.currentEvent?.storyBeats);
+  });
 });

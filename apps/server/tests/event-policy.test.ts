@@ -208,6 +208,12 @@ describe("constrainResolvedEvent", () => {
           { speaker: "aoi", text: "本当は参加することにしたよ。" },
           { speaker: "haru", text: "説得できてよかった。" },
         ],
+        storyBeats: [
+          { kind: "move", actor: "both", location: "キッチン" },
+          { kind: "dialogue", actor: "aoi", text: "本当は参加することにしたよ。" },
+          { kind: "action", actor: "both", action: "二人で料理を始める" },
+          { kind: "dialogue", actor: "haru", text: "説得できてよかった。" },
+        ],
       };
 
       const constrained = constrainResolvedEvent(
@@ -234,6 +240,16 @@ describe("constrainResolvedEvent", () => {
         haru: "キッチン",
         aoi: "Aoiの自室",
       });
+      expect(constrained.storyBeats?.some((beat) => beat.actor === "both")).toBe(false);
+      expect(constrained.storyBeats?.filter((beat) => beat.kind === "dialogue")).toEqual(
+        constrained.conversation?.map((line) => ({ kind: "dialogue", actor: line.speaker, text: line.text })),
+      );
+      expect(constrained.storyBeats).toEqual(
+        expect.arrayContaining([
+          { kind: "move", actor: "aoi", location: "Aoiの自室" },
+          { kind: "action", actor: "haru", action: haru.action },
+        ]),
+      );
     },
   );
 
@@ -284,6 +300,123 @@ describe("constrainResolvedEvent", () => {
       { speaker: "haru", text: "続きの会話" },
     ]);
     expect(constrained.conversation?.[3]?.text).toHaveLength(160);
+  });
+
+  it("keeps a multi-stage authored story while aligning dialogue and its final move", () => {
+    const haru = decision("ACCEPT");
+    const aoi = decision("MODIFY");
+    const event: ResolvedEvent = {
+      ...structuredClone(resolvedEvent),
+      scene: { haru: "ダイニング", aoi: "ダイニング" },
+      conversation: [
+        { speaker: "haru", text: "置き換えられる" },
+        { speaker: "aoi", text: "置き換えられる" },
+        { speaker: "haru", text: "いい香りになってきたね。" },
+        { speaker: "aoi", text: "食卓で続きを話そう。" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "haru", location: "キッチン" },
+        { kind: "move", actor: "aoi", location: "キッチン" },
+        { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
+        { kind: "dialogue", actor: "haru", text: "置き換えられる" },
+        { kind: "action", actor: "both", action: "鍋を混ぜて味を調える" },
+        { kind: "move", actor: "both", location: "ダイニングテーブル" },
+        { kind: "dialogue", actor: "haru", text: "いい香りになってきたね。" },
+        { kind: "dialogue", actor: "aoi", text: "食卓で続きを話そう。" },
+      ],
+    };
+
+    const constrained = constrainResolvedEvent(
+      definition("shared-cooking"),
+      event,
+      { haru, aoi },
+      [],
+    );
+
+    expect(constrained.storyBeats).toEqual([
+      { kind: "move", actor: "haru", location: "キッチン" },
+      { kind: "move", actor: "aoi", location: "キッチン" },
+      { kind: "dialogue", actor: "haru", text: haru.dialogue },
+      { kind: "dialogue", actor: "aoi", text: aoi.dialogue },
+      { kind: "action", actor: "both", action: "鍋を混ぜて味を調える" },
+      { kind: "move", actor: "both", location: "ダイニング" },
+      { kind: "dialogue", actor: "haru", text: "いい香りになってきたね。" },
+      { kind: "dialogue", actor: "aoi", text: "食卓で続きを話そう。" },
+    ]);
+    expect(constrained.scene).toEqual({ haru: "ダイニング", aoi: "ダイニング" });
+  });
+
+  it("expands a one-location cooperative story into a staged two-location journey", () => {
+    const haru = decision("ACCEPT");
+    const aoi = decision("MODIFY");
+    const event: ResolvedEvent = {
+      ...structuredClone(resolvedEvent),
+      scene: { haru: "リビングのソファ", aoi: "リビングのソファ" },
+      conversation: [
+        { speaker: "haru", text: "置き換えられる" },
+        { speaker: "aoi", text: "置き換えられる" },
+        { speaker: "haru", text: "ここまで片付くと気持ちいいね。" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "both", location: "リビング" },
+        { kind: "dialogue", actor: "haru", text: "置き換えられる" },
+        { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
+        { kind: "action", actor: "both", action: "二人で散らかったものを片付ける" },
+        { kind: "dialogue", actor: "haru", text: "ここまで片付くと気持ちいいね。" },
+      ],
+    };
+
+    const constrained = constrainResolvedEvent(
+      definition("shared-cleaning"),
+      event,
+      { haru, aoi },
+      [],
+    );
+    const moves = constrained.storyBeats?.filter((beat) => beat.kind === "move") ?? [];
+
+    expect(moves).toEqual([
+      { kind: "move", actor: "both", location: "ダイニングの食卓" },
+      { kind: "move", actor: "both", location: "リビングのソファ" },
+    ]);
+    expect(constrained.storyBeats?.map((beat) => beat.kind)).toEqual([
+      "move", "dialogue", "dialogue", "move", "action", "dialogue",
+    ]);
+    expect(new Set(moves.map((beat) => beat.location)).size).toBe(2);
+  });
+
+  it("replaces consecutive destinations with two narrated movement stages", () => {
+    const haru = decision("ACCEPT");
+    const aoi = decision("MODIFY");
+    const event: ResolvedEvent = {
+      ...structuredClone(resolvedEvent),
+      scene: { haru: "リビング", aoi: "リビング" },
+      conversation: [
+        { speaker: "haru", text: "置き換えられる" },
+        { speaker: "aoi", text: "置き換えられる" },
+        { speaker: "haru", text: "片付いたね。" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "both", location: "キッチン" },
+        { kind: "move", actor: "both", location: "リビング" },
+        { kind: "dialogue", actor: "haru", text: "置き換えられる" },
+        { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
+        { kind: "action", actor: "both", action: "部屋を片付ける" },
+        { kind: "dialogue", actor: "haru", text: "片付いたね。" },
+      ],
+    };
+
+    const constrained = constrainResolvedEvent(
+      definition("shared-cleaning"),
+      event,
+      { haru, aoi },
+      [],
+    );
+    const kinds = constrained.storyBeats?.map((beat) => beat.kind);
+    const moveIndexes = kinds?.flatMap((kind, index) => kind === "move" ? [index] : []) ?? [];
+
+    expect(moveIndexes).toHaveLength(2);
+    expect(moveIndexes[1]! - moveIndexes[0]!).toBeGreaterThan(1);
+    expect(constrained.storyBeats?.at(-1)?.kind).toBe("dialogue");
   });
 
   it("lets targeted apology resolve exactly one requested existing conflict", () => {
