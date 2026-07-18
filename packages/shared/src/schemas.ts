@@ -55,6 +55,22 @@ export const safeSuggestionSchema = z
   })
   .strict();
 
+export const navigatorAgentOutputSchema = z
+  .object({
+    message: cueText,
+  })
+  .strict();
+
+export const navigatorResponseSchema = navigatorAgentOutputSchema
+  .extend({
+    characterId: z.literal("navigator"),
+    characterName: z.literal("デコピン"),
+    eventDefinitionId: text,
+    eventTitle: text,
+    outcome: z.enum(["selected", "transformed", "locked_fallback", "observed"]),
+  })
+  .strict();
+
 const effectBudgetSchema = z
   .object({
     energy: z.number().finite().min(0).max(10),
@@ -218,6 +234,7 @@ export const resolvedEventSchema = z
   .object({
     eventTitle: text,
     narration: text,
+    navigatorMessage: cueText.optional(),
     haruDialogue: z.string().max(2_000),
     aoiDialogue: z.string().max(2_000),
     effects: z.object({ haru: statDeltaSchema, aoi: statDeltaSchema }).strict(),
@@ -322,6 +339,8 @@ export const eventLogEntrySchema = z
     alternativesShown: z.array(eventCandidateSchema).optional(),
     lock: eventLockSchema.optional(),
     cueOutcome: z.enum(["selected", "transformed", "locked_fallback", "observed"]).optional(),
+    navigatorMessage: cueText.optional(),
+    navigatorResponse: navigatorResponseSchema.optional(),
     decisions: z
       .object({ haru: publicCharacterDecisionSchema, aoi: publicCharacterDecisionSchema })
       .strict()
@@ -352,6 +371,7 @@ export const eventLogEntrySchema = z
         haru: z.enum(["app_server", "mock", "fallback"]),
         aoi: z.enum(["app_server", "mock", "fallback"]),
         director: z.enum(["app_server", "mock", "fallback"]),
+        navigator: z.enum(["app_server", "mock", "fallback"]).optional(),
       })
       .strict()
       .optional(),
@@ -571,6 +591,7 @@ const gameStateV2Schema = z
       .strict(),
     shared: sharedStateSchema,
     lastEvent: resolvedEventSchema.optional(),
+    navigator: navigatorResponseSchema.optional(),
     eventLog: z.array(eventLogEntrySchema),
     ending: endingSchema.optional(),
     result: gameResultSchema.optional(),
@@ -579,6 +600,7 @@ const gameStateV2Schema = z
         haru: runtimeAgentStateSchema,
         aoi: runtimeAgentStateSchema,
         director: runtimeAgentStateSchema,
+        navigator: runtimeAgentStateSchema.optional(),
       })
       .strict(),
   })
@@ -607,6 +629,7 @@ const legacyGameStateV1Schema = z
       .passthrough(),
     shared: legacySharedStateSchema,
     lastEvent: z.unknown().optional(),
+    navigator: z.unknown().optional(),
     eventLog: z.array(z.unknown()).default([]),
     ending: z.unknown().optional(),
     runtime: z
@@ -614,6 +637,7 @@ const legacyGameStateV1Schema = z
         haru: z.unknown().optional(),
         aoi: z.unknown().optional(),
         director: z.unknown().optional(),
+        navigator: z.unknown().optional(),
       })
       .passthrough()
       .default({}),
@@ -641,6 +665,7 @@ function migrateRuntime(value: unknown) {
 
 const gameStateV1Schema = legacyGameStateV1Schema.transform((state) => {
   const lastEvent = resolvedEventSchema.strip().safeParse(state.lastEvent);
+  const navigator = navigatorResponseSchema.strip().safeParse(state.navigator);
   const ending = endingSchema.strip().safeParse(state.ending);
   const haruDecision = migratePublicDecision(state.characters.haru.lastDecision);
   const aoiDecision = migratePublicDecision(state.characters.aoi.lastDecision);
@@ -662,6 +687,7 @@ const gameStateV1Schema = legacyGameStateV1Schema.transform((state) => {
     },
     shared: state.shared,
     ...(lastEvent.success ? { lastEvent: lastEvent.data } : {}),
+    ...(navigator.success ? { navigator: navigator.data } : {}),
     eventLog: state.eventLog.flatMap((entry) => {
       const parsed = eventLogEntrySchema.strip().safeParse(entry);
       return parsed.success ? [parsed.data] : [];
@@ -671,6 +697,9 @@ const gameStateV1Schema = legacyGameStateV1Schema.transform((state) => {
       haru: migrateRuntime(state.runtime.haru),
       aoi: migrateRuntime(state.runtime.aoi),
       director: migrateRuntime(state.runtime.director),
+      ...(state.runtime.navigator === undefined
+        ? {}
+        : { navigator: migrateRuntime(state.runtime.navigator) }),
     },
   };
 });

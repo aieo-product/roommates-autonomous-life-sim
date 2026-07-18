@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
@@ -15,6 +15,129 @@
     "y": 236
   },
   "recommendedDisplayScale": 0.5,
+  "defaultScene": {
+    "viewBox": { "width": 1280, "height": 720 },
+    "instances": [
+      {
+        "instanceId": "haru-bed",
+        "assetId": "haru-bed",
+        "roomId": "haru_room",
+        "anchorId": "haru_bed",
+        "pivot": { "x": 550, "y": 213 },
+        "displayScale": 0.9
+      },
+      {
+        "instanceId": "haru-storage-shelf",
+        "assetId": "storage-shelf",
+        "roomId": "haru_room",
+        "pivot": { "x": 620, "y": 205 },
+        "displayScale": 0.72
+      },
+      {
+        "instanceId": "haru-work-desk",
+        "assetId": "work-desk",
+        "roomId": "haru_room",
+        "anchorId": "haru_desk",
+        "pivot": { "x": 725, "y": 225 },
+        "displayScale": 0.8
+      },
+      {
+        "instanceId": "haru-desk-chair",
+        "assetId": "desk-chair",
+        "roomId": "haru_room",
+        "pivot": { "x": 670, "y": 255 },
+        "displayScale": 0.72
+      },
+      {
+        "instanceId": "aoi-bed",
+        "assetId": "aoi-bed",
+        "roomId": "aoi_room",
+        "anchorId": "aoi_bed",
+        "pivot": { "x": 750, "y": 313 },
+        "displayScale": 0.9
+      },
+      {
+        "instanceId": "aoi-work-desk",
+        "assetId": "work-desk",
+        "roomId": "aoi_room",
+        "anchorId": "aoi_desk",
+        "pivot": { "x": 925, "y": 325 },
+        "displayScale": 0.8
+      },
+      {
+        "instanceId": "aoi-desk-chair",
+        "assetId": "desk-chair",
+        "roomId": "aoi_room",
+        "pivot": { "x": 870, "y": 355 },
+        "displayScale": 0.72
+      },
+      {
+        "instanceId": "balcony-laundry-basket",
+        "assetId": "laundry-basket",
+        "roomId": "balcony",
+        "pivot": { "x": 350, "y": 420 },
+        "displayScale": 0.72
+      },
+      {
+        "instanceId": "dining-table",
+        "assetId": "dining-table",
+        "roomId": "dining",
+        "anchorId": "dining_table",
+        "pivot": { "x": 600, "y": 425 },
+        "displayScale": 0.95
+      },
+      {
+        "instanceId": "dining-chair-west",
+        "assetId": "dining-chair",
+        "roomId": "dining",
+        "pivot": { "x": 485, "y": 455 },
+        "displayScale": 0.72
+      },
+      {
+        "instanceId": "dining-chair-east",
+        "assetId": "dining-chair",
+        "roomId": "dining",
+        "pivot": { "x": 655, "y": 455 },
+        "displayScale": 0.72
+      },
+      {
+        "instanceId": "living-floor-lamp",
+        "assetId": "floor-lamp",
+        "roomId": "living",
+        "pivot": { "x": 820, "y": 515 },
+        "displayScale": 0.7
+      },
+      {
+        "instanceId": "living-sofa",
+        "assetId": "sofa",
+        "roomId": "living",
+        "anchorId": "living_sofa",
+        "pivot": { "x": 900, "y": 525 },
+        "displayScale": 0.9
+      },
+      {
+        "instanceId": "living-low-table",
+        "assetId": "low-table",
+        "roomId": "living",
+        "pivot": { "x": 725, "y": 545 },
+        "displayScale": 0.9
+      },
+      {
+        "instanceId": "living-tv-console",
+        "assetId": "tv-console",
+        "roomId": "living",
+        "pivot": { "x": 1010, "y": 555 },
+        "displayScale": 0.76
+      },
+      {
+        "instanceId": "living-potted-plant",
+        "assetId": "potted-plant",
+        "roomId": "living",
+        "pivot": { "x": 965, "y": 570 },
+        "displayScale": 0.72
+      }
+    ]
+  },
   "assets": [
     {
       "id": "haru-bed",

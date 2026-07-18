@@ -4,13 +4,20 @@ import type {
   CharacterDecisionInput,
   CharacterId,
   DirectorInput,
+  NavigatorAgentOutput,
+  NavigatorInput,
   ResolvedEvent,
   RuntimeAgentState,
 } from "@roommates/shared";
-import { characterDecisionSchema, resolvedEventSchema } from "@roommates/shared";
+import {
+  characterDecisionSchema,
+  navigatorAgentOutputSchema,
+  resolvedEventSchema,
+} from "@roommates/shared";
 import type { AgentMode } from "../config.js";
 import { MockCharacterAgent } from "./mock/character.js";
 import { MockDirectorAgent } from "./mock/director.js";
+import { MockNavigatorAgent } from "./mock/navigator.js";
 import { MockReflectionAgent } from "./mock/reflection.js";
 import {
   agentResultReflectionSchemaFor,
@@ -22,6 +29,7 @@ import {
 export type AgentResult<T> = { value: T; runtime: RuntimeAgentState };
 
 export interface AgentCoordinator {
+  navigate?(input: NavigatorInput): Promise<AgentResult<NavigatorAgentOutput>>;
   decide(id: CharacterId, input: CharacterDecisionInput): Promise<AgentResult<CharacterDecision>>;
   resolve(input: DirectorInput): Promise<AgentResult<ResolvedEvent>>;
   reflect?(id: CharacterId, input: AgentReflectionInput): Promise<AgentResult<AgentResultReflection>>;
@@ -29,6 +37,7 @@ export interface AgentCoordinator {
 }
 
 export interface AppServerAdapter {
+  navigate?(input: NavigatorInput): Promise<{ value: unknown; threadId: string }>;
   decide(id: CharacterId, input: CharacterDecisionInput): Promise<{ value: unknown; threadId: string }>;
   resolve(input: DirectorInput): Promise<{ value: unknown; threadId: string }>;
   reflect?(id: CharacterId, input: AgentReflectionInput): Promise<{ value: unknown; threadId: string }>;
@@ -43,6 +52,7 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
     aoi: new MockCharacterAgent("aoi"),
   };
   private readonly director = new MockDirectorAgent();
+  private readonly navigator = new MockNavigatorAgent();
   private readonly reflections = {
     haru: new MockReflectionAgent("haru"),
     aoi: new MockReflectionAgent("aoi"),
@@ -54,6 +64,20 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
     private readonly timeoutMs: number,
     private readonly real?: AppServerAdapter,
   ) {}
+
+  async navigate(input: NavigatorInput): Promise<AgentResult<NavigatorAgentOutput>> {
+    return this.run(
+      "navigator",
+      () => {
+        if (!this.real?.navigate) throw new Error("App Server navigator adapter is unavailable");
+        return this.real.navigate(input);
+      },
+      () => this.navigator.respond(input),
+      navigatorAgentOutputSchema as SchemaLike<NavigatorAgentOutput>,
+      undefined,
+      false,
+    );
+  }
 
   async decide(id: CharacterId, input: CharacterDecisionInput): Promise<AgentResult<CharacterDecision>> {
     return this.run(

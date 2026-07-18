@@ -1,6 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import type { CharacterDecisionInput, CharacterId, DirectorInput } from "@roommates/shared";
+import type {
+  CharacterDecisionInput,
+  CharacterId,
+  DirectorInput,
+  NavigatorInput,
+} from "@roommates/shared";
 import type { AppServerAdapter } from "../coordinator.js";
 import type { AgentReflectionInput } from "../reflection.js";
 import { extractJson } from "./json.js";
@@ -9,19 +14,22 @@ import {
   characterPrompt,
   directorInstructions,
   directorPrompt,
+  navigatorInstructions,
+  navigatorPrompt,
   reflectionInstructions,
   reflectionPrompt,
 } from "./prompts.js";
 import {
   characterOutputSchema,
   directorOutputSchema,
+  navigatorOutputSchema,
   reflectionOutputSchema,
 } from "./schemas.js";
 
 type RpcResponse = { id: number; result?: unknown; error?: { message?: string; code?: number } };
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 type TurnWaiter = { texts: string[]; resolve: (value: unknown) => void; reject: (error: Error) => void };
-type AppServerRole = CharacterId | "director" | `${CharacterId}-reflection`;
+type AppServerRole = CharacterId | "navigator" | "director" | `${CharacterId}-reflection`;
 
 export class CodexAppServerClient implements AppServerAdapter {
   private process?: ChildProcessWithoutNullStreams;
@@ -36,6 +44,12 @@ export class CodexAppServerClient implements AppServerAdapter {
     private readonly executable: string,
     private readonly cwd: string,
   ) {}
+
+  async navigate(input: NavigatorInput): Promise<{ value: unknown; threadId: string }> {
+    const threadId = await this.thread("navigator");
+    const value = await this.turn(threadId, navigatorPrompt(input), navigatorOutputSchema);
+    return { value, threadId };
+  }
 
   async decide(id: CharacterId, input: CharacterDecisionInput): Promise<{ value: unknown; threadId: string }> {
     const threadId = await this.thread(id);
@@ -157,17 +171,20 @@ export class CodexAppServerClient implements AppServerAdapter {
         : role === "aoi-reflection"
           ? "aoi"
           : undefined;
+    const baseInstructions =
+      role === "director"
+        ? directorInstructions
+        : role === "navigator"
+          ? navigatorInstructions
+          : reflectionCharacter
+            ? reflectionInstructions(reflectionCharacter)
+            : characterInstructions(role === "haru" ? "haru" : "aoi");
     const result = (await this.request("thread/start", {
       cwd: this.cwd,
       approvalPolicy: "never",
       sandbox: "read-only",
       ephemeral: false,
-      baseInstructions:
-        role === "director"
-          ? directorInstructions
-          : reflectionCharacter
-            ? reflectionInstructions(reflectionCharacter)
-            : characterInstructions(role === "haru" ? "haru" : "aoi"),
+      baseInstructions,
       experimentalRawEvents: false,
     })) as { thread?: { id?: string } };
     const id = result.thread?.id;
@@ -176,11 +193,13 @@ export class CodexAppServerClient implements AppServerAdapter {
     const threadName =
       role === "director"
         ? "Director"
-        : reflectionCharacter
-          ? `${reflectionCharacter === "haru" ? "Haru" : "Aoi"} Reflection`
-          : role === "haru"
-            ? "Haru"
-            : "Aoi";
+        : role === "navigator"
+          ? "デコピン"
+          : reflectionCharacter
+            ? `${reflectionCharacter === "haru" ? "Haru" : "Aoi"} Reflection`
+            : role === "haru"
+              ? "Haru"
+              : "Aoi";
     void this.request("thread/name/set", { threadId: id, name: `ROOMMATES · ${threadName}` }).catch(() => undefined);
     return id;
   }

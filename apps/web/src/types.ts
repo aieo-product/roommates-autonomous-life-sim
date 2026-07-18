@@ -88,6 +88,7 @@ export interface GameEvent extends ResultEventLogEntry {
     aoi?: string;
   };
   suggestion?: string;
+  navigatorMessage?: string;
   timestamp?: string;
 }
 

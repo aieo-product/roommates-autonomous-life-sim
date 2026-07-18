@@ -44,6 +44,7 @@ export function createInitialGameState(seed = "demo-heart"): GameState {
       haru: { source: "mock" },
       aoi: { source: "mock" },
       director: { source: "mock" },
+      navigator: { source: "mock" },
     },
   };
 }

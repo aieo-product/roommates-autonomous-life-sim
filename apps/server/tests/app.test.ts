@@ -47,6 +47,9 @@ describe("game API", () => {
 
     expect(turn.status).toBe(200);
     expect(turn.headers["content-type"]).toContain("text/event-stream");
+    expect(turn.text).toContain("event: navigator.thinking");
+    expect(turn.text).toContain("event: navigator.completed");
+    expect(turn.text).toContain('"navigatorMessage":"デコピンが二人へきっかけを届けるね。"');
     expect(turn.text).toContain("event: agent.thinking");
     expect(turn.text).toContain("event: director.completed");
     expect(turn.text).toContain("event: turn.completed");
@@ -55,6 +58,12 @@ describe("game API", () => {
     const resolved = await request(app).get("/api/game");
     expect(resolved.body.status).toBe("resolved");
     expect(resolved.body.shared.sharedMemories).toHaveLength(1);
+    expect(resolved.body.navigator).toMatchObject({
+      characterId: "navigator",
+      characterName: "デコピン",
+      eventDefinitionId: "shared-cooking",
+    });
+    expect(resolved.body.lastEvent.navigatorMessage).toBe("デコピンが二人へきっかけを届けるね。");
 
     const advanced = await request(app).post("/api/game/advance").send({});
     expect(advanced.status).toBe(200);
