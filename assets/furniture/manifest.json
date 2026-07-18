@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "projection": {
+    "type": "isometric-cutaway",
+    "tileRatio": "2:1",
+    "camera": "south-west-to-north-east",
+    "origin": "top-left"
+  },
+  "canvas": {
+    "width": 256,
+    "height": 256
+  },
+  "pivot": {
+    "x": 128,
+    "y": 236
+  },
+  "recommendedDisplayScale": 0.5,
+  "assets": [
+    {
+      "id": "haru-bed",
+      "file": "haru-bed.png",
+      "footprintTiles": { "width": 3, "depth": 5 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["haru_bed"]
+    },
+    {
+      "id": "aoi-bed",
+      "file": "aoi-bed.png",
+      "footprintTiles": { "width": 3, "depth": 5 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["aoi_bed"]
+    },
+    {
+      "id": "work-desk",
+      "file": "work-desk.png",
+      "footprintTiles": { "width": 3, "depth": 2 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["haru_desk", "aoi_desk"]
+    },
+    {
+      "id": "desk-chair",
+      "file": "desk-chair.png",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "storage-shelf",
+      "file": "storage-shelf.png",
+      "footprintTiles": { "width": 2, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "sofa",
+      "file": "sofa.png",
+      "footprintTiles": { "width": 6, "depth": 2 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["living_sofa"]
+    },
+    {
+      "id": "low-table",
+      "file": "low-table.png",
+      "footprintTiles": { "width": 3, "depth": 2 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "dining-table",
+      "file": "dining-table.png",
+      "footprintTiles": { "width": 5, "depth": 3 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["dining_table"]
+    },
+    {
+      "id": "dining-chair",
+      "file": "dining-chair.png",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "tv-console",
+      "file": "tv-console.png",
+      "footprintTiles": { "width": 4, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "potted-plant",
+      "file": "potted-plant.png",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "floor-lamp",
+      "file": "floor-lamp.png",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    },
+    {
+      "id": "laundry-basket",
+      "file": "laundry-basket.png",
+      "footprintTiles": { "width": 2, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": []
+    }
+  ]
+}
