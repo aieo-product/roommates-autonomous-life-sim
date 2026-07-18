@@ -37,6 +37,7 @@ flowchart LR
 
 - [基本間取りと2Dゲーム画面](./docs/room-layout.md)
 - [キャラクタースプライト](./docs/character-sprites.md)
+- [家具・生活小物2Dドット素材](./docs/furniture-assets.md)
 - [7日間の総集編・Agent感想・Producer評価リザルト](./docs/result-experience.md) — Issue #22で採用したP0設計。実装は進行中です。
 - [Producer Score v1](./docs/result-scoring-v1.md) — 決定的な採点ルール、根拠、coverage、テストベクトル。
 - [GameState v2](./docs/game-state-v2.md) — 全28ターンの正本ログ、Result状態、privacy、migration。
