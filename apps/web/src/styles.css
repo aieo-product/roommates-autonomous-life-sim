@@ -1499,6 +1499,7 @@ a:focus-visible,
 .watch-button { padding: 0 8px; color: #31546b; background: #dceef0; }
 .watch-button span { margin-right: 4px; }
 .fast-button { color: #6a572e; background: #f7e6ad; }
+.fast-button.is-busy { min-width: 66px; }
 .advance-button { min-width: 100px; padding: 0 10px; color: #fff; background: #4787ad; }
 .advance-button span { margin-left: 8px; font-size: 16px; }
 
@@ -1670,7 +1671,7 @@ a:focus-visible,
 .schedule-pair { min-width: 0; display: grid; gap: 4px; }
 .schedule-item { min-width: 0; display: grid; grid-template-columns: 32px minmax(0,1fr) auto; align-items: center; gap: 6px; padding: 5px; color: var(--ink); text-align: left; background: #eef8f4; border: 2px solid var(--ink); box-shadow: 2px 2px 0 rgba(35,48,65,.16); }
 .schedule-aoi { background: #f9e9e8; }
-.schedule-item:hover { filter: brightness(1.04); transform: translateY(-1px); }
+.schedule-item:not(:disabled):hover { filter: brightness(1.04); transform: translateY(-1px); }
 .plan-icon { width: 29px; height: 29px; display: grid; place-items: center; background: #94c9cc; border: 1px solid var(--ink); font-size: 9px; font-weight: 1000; }
 .schedule-aoi .plan-icon { background: #e6a3a5; }
 .schedule-item > span:nth-child(2) { min-width: 0; display: grid; }
