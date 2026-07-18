@@ -76,6 +76,67 @@ describe("game API", () => {
     expect(reset.body.shared.sharedMemories).toHaveLength(0);
   });
 
+  it("routes a named Dekopin instruction through the navigator and keeps it after time advances", async () => {
+    const { app, agents } = await testApp();
+    const suggestion = "デコピン、二人で朝食を作るよう伝えて";
+
+    const turn = await request(app)
+      .post("/api/game/turn")
+      .send({
+        suggestion,
+        idempotencyKey: "api-dekopin-instruction",
+        revision: 0,
+      });
+
+    expect(turn.status).toBe(200);
+    const navigatorThinkingIndex = turn.text.indexOf("event: navigator.thinking");
+    const navigatorCompletedIndex = turn.text.indexOf("event: navigator.completed");
+    const turnCompletedIndex = turn.text.indexOf("event: turn.completed");
+    expect(navigatorThinkingIndex).toBeGreaterThanOrEqual(0);
+    expect(navigatorCompletedIndex).toBeGreaterThanOrEqual(0);
+    expect(turnCompletedIndex).toBeGreaterThanOrEqual(0);
+    expect(navigatorThinkingIndex).toBeLessThan(navigatorCompletedIndex);
+    expect(navigatorCompletedIndex).toBeLessThan(turnCompletedIndex);
+    expect(agents.navigatorInput).toMatchObject({
+      rawInput: suggestion,
+      resolvedSuggestion: {
+        eventDefinitionId: "shared-cooking",
+        eventTitle: "一緒に料理する",
+      },
+    });
+
+    const resolved = await request(app).get("/api/game");
+    expect(resolved.body).toMatchObject({
+      revision: 1,
+      status: "resolved",
+      navigator: {
+        characterId: "navigator",
+        characterName: "デコピン",
+        eventDefinitionId: "shared-cooking",
+        outcome: "selected",
+      },
+    });
+    expect(resolved.body.eventLog.at(-1)).toMatchObject({
+      suggestion,
+      navigatorResponse: {
+        characterName: "デコピン",
+        eventDefinitionId: "shared-cooking",
+      },
+    });
+
+    const advanced = await request(app).post("/api/game/advance").send({});
+    expect(advanced.status).toBe(200);
+    expect(advanced.body).toMatchObject({
+      revision: 2,
+      status: "awaiting_suggestion",
+      shared: { day: 1, phase: "afternoon" },
+      navigator: {
+        characterName: "デコピン",
+        eventDefinitionId: "shared-cooking",
+      },
+    });
+  });
+
   it("rejects invalid and stale turn requests without changing state", async () => {
     const { app } = await testApp();
 

@@ -1052,16 +1052,26 @@ export const runTurn = async (
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let streamFailure: Error | undefined;
+  const handleMessage = (message: StreamMessage): void => {
+    onMessage(message);
+    if (message.event.toLowerCase() !== "error") return;
+    const payload = record(message.data);
+    streamFailure = new Error(
+      text(first(payload.message, payload.error), "ターンの処理に失敗しました"),
+    );
+  };
   while (true) {
     const { done, value } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      emitBlock(buffer.slice(0, boundary), onMessage);
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
+    buffer += decoder.decode(value, { stream: !done });
+    let boundary = /\r?\n\r?\n/.exec(buffer);
+    while (boundary) {
+      emitBlock(buffer.slice(0, boundary.index), handleMessage);
+      buffer = buffer.slice(boundary.index + boundary[0].length);
+      boundary = /\r?\n\r?\n/.exec(buffer);
     }
     if (done) break;
   }
-  if (buffer.trim()) emitBlock(buffer, onMessage);
+  if (buffer.trim()) emitBlock(buffer, handleMessage);
+  if (streamFailure) throw streamFailure;
 };

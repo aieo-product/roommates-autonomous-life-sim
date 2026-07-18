@@ -35,6 +35,7 @@ import {
   getDekopinPresentation,
   type DekopinPresentation,
 } from "./dekopin";
+import { getGameControlState, type ActionBusy } from "./game-controls";
 import dekopinSpriteUrl from "../../../assets/characters/navigator/walk-cycle.png";
 import type {
   AgentDecision,
@@ -750,7 +751,17 @@ function CharacterInspector({
   );
 }
 
-function SchedulePanel({ game, people, onUseCue }: { game: GameState; people: People; onUseCue: (value: string) => void }) {
+function SchedulePanel({
+  game,
+  people,
+  canUseCue,
+  onUseCue,
+}: {
+  game: GameState;
+  people: People;
+  canUseCue: boolean;
+  onUseCue: (value: string) => void;
+}) {
   const activeIndex = phaseIndex(game.shared.phase);
   return (
     <section className="schedule-panel">
@@ -768,7 +779,7 @@ function SchedulePanel({ game, people, onUseCue }: { game: GameState; people: Pe
               {(["haru", "aoi"] as CharacterId[]).map((person) => {
                 const plan = planFor(person, phase.id, game[person], game.shared.phase);
                 return (
-                  <button type="button" className={`schedule-item schedule-${person}`} key={person} onClick={() => onUseCue(`${people[person].name}の「${plan.title}」に、ふたりで取り組んでみたら？`)} title="この予定からきっかけ文を作る">
+                  <button type="button" className={`schedule-item schedule-${person}`} key={person} onClick={() => onUseCue(`${people[person].name}の「${plan.title}」に、ふたりで取り組んでみたら？`)} disabled={!canUseCue} title={canUseCue ? "この予定からきっかけ文を作る" : "次の時間帯へ進むと、新しいきっかけを作れます"}>
                     <span className="plan-icon" aria-hidden="true">{plan.icon}</span>
                     <span><small>{people[person].name}</small><strong>{plan.title}</strong><em>{plan.location}</em></span>
                     {index === activeIndex && <i>NOW</i>}
@@ -779,7 +790,7 @@ function SchedulePanel({ game, people, onUseCue }: { game: GameState; people: Pe
           </div>
         ))}
       </div>
-      <div className="panel-note"><span>i</span><p>予定を押すと、その行動に合わせた「きっかけ」の文案を作れます。</p></div>
+      <div className="panel-note"><span>i</span><p>{canUseCue ? "予定を押すと、その行動に合わせた「きっかけ」の文案を作れます。" : "次の時間帯へ進むと、予定から新しい「きっかけ」を作れます。"}</p></div>
     </section>
   );
 }
@@ -1022,7 +1033,7 @@ export default function App() {
   const [resolving, setResolving] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [offline, setOffline] = useState(false);
-  const [actionBusy, setActionBusy] = useState<"advance" | "reset" | "fast" | null>(null);
+  const [actionBusy, setActionBusy] = useState<ActionBusy>(null);
   const [streamMessage, setStreamMessage] = useState("");
   const [navigatorMessage, setNavigatorMessage] = useState("");
   const [navigatorResponses, setNavigatorResponses] = useState<Record<string, string>>({});
@@ -1037,6 +1048,7 @@ export default function App() {
   const [personalityOpen, setPersonalityOpen] = useState(false);
   const personalityButtonRef = useRef<HTMLButtonElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
+  const operationRef = useRef<"turn" | Exclude<ActionBusy, null> | null>(null);
   const presentedEventIdRef = useRef<string | null | undefined>(undefined);
   const submittedSuggestionRef = useRef<string | null>(null);
 
@@ -1064,6 +1076,22 @@ export default function App() {
       });
     return () => controller.abort();
   }, [refreshGame]);
+
+  useEffect(() => {
+    if (initialLoading || resolving || game.status !== "resolving") return;
+    let cancelled = false;
+    const pollPersistedTurn = () => {
+      void refreshGame().catch(() => {
+        if (!cancelled) setOffline(true);
+      });
+    };
+    pollPersistedTurn();
+    const interval = window.setInterval(pollPersistedTurn, 1_500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [game.status, initialLoading, refreshGame, resolving]);
 
   useEffect(() => () => turnAbortRef.current?.abort(), []);
 
@@ -1177,12 +1205,21 @@ export default function App() {
   }, []);
 
   const submitSuggestion = async (value?: string) => {
-    if (resolving || game.completed || offline) return;
+    if (operationRef.current || initialLoading || resolving || game.completed || offline) return;
+    if (game.status !== "awaiting_suggestion") {
+      setNotice(
+        game.status === "resolved"
+          ? "次の指示を送る前に「次の時間帯」を押してください。"
+          : "デコピンが現在の指示を反映しています。しばらくお待ちください。",
+      );
+      return;
+    }
     const cue = (value ?? suggestion).trim();
     if (!cue) {
       setNotice("ふたりへのきっかけを入力するか、「何もせず見守る」を選んでください。");
       return;
     }
+    operationRef.current = "turn";
     setNotice("");
     setLastSuggestion(cue);
     submittedSuggestionRef.current = cue;
@@ -1207,6 +1244,7 @@ export default function App() {
     } finally {
       setResolving(false);
       turnAbortRef.current = null;
+      if (operationRef.current === "turn") operationRef.current = null;
     }
   };
 
@@ -1226,7 +1264,20 @@ export default function App() {
     kind: "advance" | "reset" | "fast",
     resetSeed = game.seed,
   ) => {
-    if (resolving || actionBusy) return;
+    if (operationRef.current || initialLoading || resolving || actionBusy) return;
+    if (kind === "advance" && game.status !== "resolved") {
+      setNotice(
+        game.status === "awaiting_suggestion"
+          ? "先にデコピンへ指示するか、「見守る」を選んでください。"
+          : "現在のターンが完了するまでお待ちください。",
+      );
+      return;
+    }
+    if (kind === "fast" && game.status !== "awaiting_suggestion" && game.status !== "resolved") {
+      setNotice("現在のターンが完了するまでお待ちください。");
+      return;
+    }
+    operationRef.current = kind;
     submittedSuggestionRef.current = null;
     if (kind === "fast") setNavigatorMessage("");
     setActionBusy(kind);
@@ -1252,12 +1303,17 @@ export default function App() {
         setEventSuggestionFallbacks({});
         presentedEventIdRef.current = null;
         setActiveMemory(undefined);
+      } else if (kind === "advance") {
+        setStreamMessage("");
+        setNavigatorMessage("");
+        setStages(WAITING_STAGES);
       }
       setOffline(false);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "操作に失敗しました");
     } finally {
       setActionBusy(null);
+      if (operationRef.current === kind) operationRef.current = null;
     }
   };
 
@@ -1301,7 +1357,15 @@ export default function App() {
       suggestion,
     ],
   );
-  const canAdvance = !resolving && !actionBusy && !offline && game.status !== "awaiting_suggestion" && !game.completed;
+  const controls = getGameControlState({
+    status: game.status,
+    completed: game.completed,
+    loading: initialLoading,
+    offline,
+    resolving,
+    actionBusy,
+  });
+  const { canSubmitCue, canAdvance, canFastForward } = controls;
   const activePhase = PHASES.find((phase) => phase.id === game.shared.phase) ?? PHASES[0];
   const eventAnnouncement = eventAnnouncementId
     ? eventLog.find((event) => event.id === eventAnnouncementId)
@@ -1417,7 +1481,7 @@ export default function App() {
           <RuntimeBadge runtime={game.runtime} offline={offline} />
           <button ref={personalityButtonRef} className="personality-open-button" type="button" aria-haspopup="dialog" onClick={() => setPersonalityOpen(true)}><span aria-hidden="true">◆</span>個性設定</button>
           <button className={`header-log-button ${logOpen ? "is-open" : ""}`} type="button" onClick={() => setLogOpen((open) => !open)}><span aria-hidden="true">▤</span>生活ログ</button>
-          <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
+          <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={initialLoading || Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
         </div>
       </header>
 
@@ -1454,20 +1518,21 @@ export default function App() {
               <DekopinGuide presentation={dekopinPresentation} />
               <div className="preset-menu">
                 <label htmlFor="preset-select">指示例</label>
-                <select id="preset-select" value="" onChange={(event) => setSuggestion(event.target.value)} disabled={resolving || game.completed}>
+                <select id="preset-select" value="" onChange={(event) => setSuggestion(event.target.value)} disabled={!canSubmitCue}>
                   <option value="">選ぶ…</option>{PRESETS.map((preset) => <option value={preset} key={preset}>{preset}</option>)}
                 </select>
               </div>
               <form className="suggestion-form" onSubmit={handleSubmit}>
                 <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
-                <textarea id="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={resolving || game.completed || offline} placeholder="例：今日は一緒に夕食を作ってみたら？" />
+                <textarea id="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={!canSubmitCue} aria-describedby="game-control-status" placeholder="例：今日は一緒に夕食を作ってみたら？" />
                 <span className="character-count">{suggestion.length}/240</span>
-                <button className="submit-cue" type="submit" disabled={resolving || game.completed || offline || !suggestion.trim()}><span>{resolving ? "反映中…" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
+                <button className="submit-cue" type="submit" disabled={!canSubmitCue || !suggestion.trim()}><span>{resolving || game.status === "resolving" ? "反映中…" : game.status === "resolved" ? "先に時間を進める" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
               </form>
               <div className="dock-actions">
-                <button className="watch-button" type="button" onClick={() => void submitSuggestion("何も提案せず見守る")} disabled={resolving || game.completed || offline}><span aria-hidden="true">◉</span>見守る</button>
-                <button type="button" className="fast-button" onClick={() => void runAction("fast")} disabled={resolving || Boolean(actionBusy) || offline || game.completed} title="デモ用に8ターン自動進行します">×8</button>
-                <button type="button" className="advance-button" onClick={() => void runAction("advance")} disabled={!canAdvance}>{actionBusy === "advance" ? "進行中…" : "次の時間帯"}<span aria-hidden="true">›</span></button>
+                <p id="game-control-status" className="sr-only" aria-live="polite">{controls.cueStatusMessage}</p>
+                <button className="watch-button" type="button" onClick={() => void submitSuggestion("何も提案せず見守る")} disabled={!canSubmitCue}><span aria-hidden="true">◉</span>見守る</button>
+                <button type="button" className={`fast-button ${actionBusy === "fast" ? "is-busy" : ""}`} onClick={() => void runAction("fast")} disabled={!canFastForward} title="デモ用に8ターン自動進行します" aria-label={actionBusy === "fast" ? "8ターン自動進行中" : "8ターン自動進行する"}>{actionBusy === "fast" ? "進行中…" : "×8"}</button>
+                <button type="button" className="advance-button" onClick={() => void runAction("advance")} disabled={!canAdvance} title={game.status === "awaiting_suggestion" ? "先にデコピンへ指示するか、見守るを選んでください" : game.status === "resolved" ? "次の時間帯へ進む" : controls.cueStatusMessage}>{actionBusy === "advance" ? "進行中…" : game.status === "awaiting_suggestion" ? "指示後に進めます" : "次の時間帯"}<span aria-hidden="true">›</span></button>
               </div>
             </div>
           </section>
@@ -1485,7 +1550,7 @@ export default function App() {
           </div>
           <div className="inspector-body">
             {inspectorTab === "status" && <CharacterInspector person={selectedPerson} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
-            {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} onUseCue={useScheduleCue} />}
+            {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} canUseCue={canSubmitCue} onUseCue={useScheduleCue} />}
             {inspectorTab === "memories" && <MemoryPanel game={game} onOpenMemory={setActiveMemory} />}
           </div>
           <DebugDetails game={game} />
