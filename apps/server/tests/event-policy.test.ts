@@ -53,8 +53,16 @@ function decision(kind: CharacterDecision["decision"]): CharacterDecision {
   return {
     ...acceptedDecision,
     decision: kind,
-    action: kind === "DECLINE" ? "参加せず休む" : acceptedDecision.action,
-    dialogue: kind === "DECLINE" ? "今回はやめておくね。" : acceptedDecision.dialogue,
+    action:
+      kind === "DECLINE" || kind === "IGNORE"
+        ? "参加せず自分の時間を過ごす"
+        : acceptedDecision.action,
+    dialogue:
+      kind === "DECLINE"
+        ? "今回はやめておくね。"
+        : kind === "IGNORE"
+          ? "今は自分のことをしているね。"
+          : acceptedDecision.dialogue,
   };
 }
 
@@ -185,6 +193,97 @@ describe("constrainResolvedEvent", () => {
     expect(constrained.effects.haru.stress).toBe(-cooking.effectBudget.stress);
     expect(constrained.effects.aoi.affection).toBeGreaterThan(0);
     expect(constrained.effects.aoi.trust).toBeGreaterThan(0);
+  });
+
+  it.each(["DECLINE", "IGNORE"] as const)(
+    "replaces Director conversation when Aoi chooses %s",
+    (choice) => {
+      const haru = decision("ACCEPT");
+      const aoi = decision(choice);
+      const unsafeConversation: ResolvedEvent = {
+        ...structuredClone(resolvedEvent),
+        scene: { haru: "キッチン", aoi: "キッチン" },
+        conversation: [
+          { speaker: "haru", text: "一緒にやろう。" },
+          { speaker: "aoi", text: "本当は参加することにしたよ。" },
+          { speaker: "haru", text: "説得できてよかった。" },
+        ],
+      };
+
+      const constrained = constrainResolvedEvent(
+        definition("shared-cooking"),
+        unsafeConversation,
+        { haru, aoi },
+        [],
+        {
+          originalLocations: { haru: "リビング", aoi: "Aoiの自室" },
+        },
+      );
+
+      expect(constrained.conversation).toEqual([
+        { speaker: "haru", text: haru.dialogue },
+        { speaker: "aoi", text: aoi.dialogue },
+        {
+          speaker: "haru",
+          text: "わかった。今日はそれぞれのペースで過ごそう。",
+        },
+      ]);
+      expect(JSON.stringify(constrained.conversation)).not.toContain("参加することにした");
+      expect(JSON.stringify(constrained.conversation)).not.toContain("説得できて");
+      expect(constrained.scene).toEqual({
+        haru: "キッチン",
+        aoi: "Aoiの自室",
+      });
+    },
+  );
+
+  it("moves a non-participant out of a shared event room when already there", () => {
+    const constrained = constrainResolvedEvent(
+      definition("gentle-conversation"),
+      {
+        ...structuredClone(resolvedEvent),
+        scene: { haru: "リビングのソファ", aoi: "リビングのソファ" },
+      },
+      { haru: decision("ACCEPT"), aoi: decision("DECLINE") },
+      [],
+      { originalLocations: { haru: "キッチン", aoi: "リビング" } },
+    );
+
+    expect(constrained.scene).toEqual({
+      haru: "リビングのソファ",
+      aoi: "自室",
+    });
+  });
+
+  it("normalizes cooperative conversation to public decision openings and bounded text", () => {
+    const haru = decision("ACCEPT");
+    const aoi = decision("MODIFY");
+    const event: ResolvedEvent = {
+      ...structuredClone(resolvedEvent),
+      conversation: [
+        { speaker: "aoi", text: "置き換えられる冒頭" },
+        { speaker: "haru", text: "置き換えられる冒頭" },
+        { speaker: "haru", text: "  続きの会話  " },
+        { speaker: "aoi", text: "あ".repeat(200) },
+        { speaker: "haru", text: "もう一言" },
+        { speaker: "aoi", text: "最後の一言" },
+      ],
+    };
+
+    const constrained = constrainResolvedEvent(
+      definition("shared-cooking"),
+      event,
+      { haru, aoi },
+      [],
+    );
+
+    expect(constrained.conversation).toHaveLength(6);
+    expect(constrained.conversation?.slice(0, 3)).toEqual([
+      { speaker: "haru", text: haru.dialogue },
+      { speaker: "aoi", text: aoi.dialogue },
+      { speaker: "haru", text: "続きの会話" },
+    ]);
+    expect(constrained.conversation?.[3]?.text).toHaveLength(160);
   });
 
   it("lets targeted apology resolve exactly one requested existing conflict", () => {

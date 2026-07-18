@@ -51,7 +51,12 @@ export const reflectionOutputSchema = {
   additionalProperties: false,
 };
 
-const statDelta = { type: "object", properties: statProperties, additionalProperties: false };
+const statDelta = {
+  type: "object",
+  properties: statProperties,
+  required: ["energy", "stress", "affection", "trust", "romanticAwareness"],
+  additionalProperties: false,
+};
 
 export const navigatorOutputSchema = {
   type: "object",
@@ -67,7 +72,7 @@ export const characterOutputSchema = {
   properties: {
     decision: { type: "string", enum: ["ACCEPT", "DECLINE", "MODIFY", "IGNORE", "INITIATE"] },
     action: { type: "string" },
-    dialogue: { type: "string" },
+    dialogue: { type: "string", minLength: 1, maxLength: 160 },
     publicReason: { type: "string" },
     internalSummary: { type: "string" },
     expectedEffects: statDelta,
@@ -81,8 +86,22 @@ export const directorOutputSchema = {
   properties: {
     eventTitle: { type: "string" },
     narration: { type: "string" },
-    haruDialogue: { type: "string" },
-    aoiDialogue: { type: "string" },
+    haruDialogue: { type: "string", minLength: 1, maxLength: 160 },
+    aoiDialogue: { type: "string", minLength: 1, maxLength: 160 },
+    conversation: {
+      type: "array",
+      minItems: 3,
+      maxItems: 6,
+      items: {
+        type: "object",
+        properties: {
+          speaker: { type: "string", enum: ["haru", "aoi"] },
+          text: { type: "string", minLength: 1, maxLength: 160 },
+        },
+        required: ["speaker", "text"],
+        additionalProperties: false,
+      },
+    },
     effects: {
       type: "object",
       properties: { haru: statDelta, aoi: statDelta },
@@ -103,6 +122,7 @@ export const directorOutputSchema = {
     scene: {
       type: "object",
       properties: { haru: { type: "string" }, aoi: { type: "string" } },
+      required: ["haru", "aoi"],
       additionalProperties: false,
     },
     conflictUpdate: {
@@ -111,9 +131,20 @@ export const directorOutputSchema = {
         add: { type: "array", items: { type: "string" } },
         resolve: { type: "array", items: { type: "string" } },
       },
+      required: ["add", "resolve"],
       additionalProperties: false,
     },
   },
-  required: ["eventTitle", "narration", "haruDialogue", "aoiDialogue", "effects", "memory"],
+  required: [
+    "eventTitle",
+    "narration",
+    "haruDialogue",
+    "aoiDialogue",
+    "conversation",
+    "effects",
+    "memory",
+    "scene",
+    "conflictUpdate",
+  ],
   additionalProperties: false,
 };

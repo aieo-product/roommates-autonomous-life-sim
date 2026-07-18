@@ -5,6 +5,7 @@ import haruResultUrl from "../../../assets/characters/otani-haru/frames/east-idl
 import aoiWalkCycleUrl from "../../../assets/characters/mizuhara-aoi/walk-cycle.png";
 import aoiSouthIdleUrl from "../../../assets/characters/mizuhara-aoi/frames/south-idle.png";
 import aoiResultUrl from "../../../assets/characters/mizuhara-aoi/frames/west-idle.png";
+import type { SpriteDirection } from "./after-scene.js";
 
 type ResidentCharacterAsset = {
   sheetUrl: string;
@@ -49,13 +50,18 @@ export function ResidentPortrait({
 
 export function ResidentSceneSprite({
   person,
-  active = false,
+  direction = "south",
+  moving = false,
 }: {
   person: CharacterId;
-  active?: boolean;
+  direction?: SpriteDirection;
+  moving?: boolean;
 }) {
   return (
-    <span className={`resident-scene-sprite ${active ? "is-active" : ""}`} aria-hidden="true">
+    <span
+      className={`resident-scene-sprite direction-${direction} ${moving ? "is-moving" : ""}`}
+      aria-hidden="true"
+    >
       <img src={residentCharacterAssets[person].sheetUrl} alt="" />
     </span>
   );

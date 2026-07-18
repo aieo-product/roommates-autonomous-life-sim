@@ -27,6 +27,11 @@ import {
   type Point,
 } from "./room-layout";
 import { ResidentPortrait, ResidentSceneSprite } from "./character-assets";
+import {
+  createAfterScenePlan,
+  type AfterScenePlan,
+  type SpriteDirection,
+} from "./after-scene";
 import { FurnitureSpriteLayer } from "./furniture-assets";
 import { buildMemoryArticle, type MemoryArticle } from "./memory-article";
 import { ResultScreen } from "./result";
@@ -54,6 +59,13 @@ import { useCharacterSettings } from "./personality/useCharacterSettings";
 type InspectorTab = "status" | "schedule" | "memories";
 type StageStatus = "waiting" | "active" | "complete";
 type LogFilter = "all" | "haru" | "aoi" | "event";
+type AfterScenePhase = "placing" | "moving" | "talking" | "settled";
+
+type AfterScenePlayback = {
+  plan: AfterScenePlan;
+  phase: AfterScenePhase;
+  lineIndex: number;
+};
 
 type TurnStages = {
   navigator: StageStatus;
@@ -316,6 +328,10 @@ function SceneCharacter({
   point,
   selected,
   thinking,
+  direction,
+  moving,
+  travelling,
+  conversing,
   dialogue,
   onSelect,
 }: {
@@ -324,6 +340,10 @@ function SceneCharacter({
   point: Point;
   selected: boolean;
   thinking: boolean;
+  direction: SpriteDirection;
+  moving: boolean;
+  travelling: boolean;
+  conversing: boolean;
   dialogue?: string;
   onSelect: () => void;
 }) {
@@ -331,8 +351,8 @@ function SceneCharacter({
   const activate = () => onSelect();
   return (
     <g
-      className={`scene-character scene-${person} ${selected ? "is-selected" : ""} ${thinking ? "is-thinking" : ""}`}
-      transform={`translate(${point.x} ${point.y})`}
+      className={`scene-character scene-${person} ${selected ? "is-selected" : ""} ${thinking ? "is-thinking" : ""} ${moving ? "is-moving" : ""} ${travelling ? "is-travelling" : ""} ${conversing ? "is-conversing" : ""}`}
+      style={{ transform: `translate(${point.x}px, ${point.y}px)` }}
       role="button"
       tabIndex={0}
       aria-label={thinking ? `${name}、判断中。選択` : `${name}を選択`}
@@ -349,7 +369,7 @@ function SceneCharacter({
       <ellipse className="character-shadow" cx="0" cy="18" rx="21" ry="9" />
       <g className="character-sprite">
         <foreignObject x="-32" y="-41" width="64" height="64" className="resident-sprite-object">
-          <ResidentSceneSprite person={person} active={thinking} />
+          <ResidentSceneSprite person={person} direction={direction} moving={moving || thinking} />
         </foreignObject>
       </g>
       <foreignObject x="-45" y="28" width="90" height="30" className="nameplate-object">
@@ -366,7 +386,7 @@ function SceneCharacter({
       )}
       {!thinking && dialogue && (
         <foreignObject x={bubbleX} y="-142" width="208" height="94" className="speech-object">
-          <div className={`scene-speech speech-${person}`}>
+          <div className={`scene-speech speech-${person}`} aria-live={conversing ? "polite" : undefined}>
             <small>{name}</small>
             <p>{clipText(dialogue, 46)}</p>
           </div>
@@ -382,6 +402,7 @@ function ApartmentStage({
   stages,
   selectedPerson,
   currentEvent,
+  afterScene,
   resolving,
   onSelectPerson,
 }: {
@@ -390,6 +411,7 @@ function ApartmentStage({
   stages: TurnStages;
   selectedPerson: CharacterId;
   currentEvent?: GameEvent;
+  afterScene?: AfterScenePlayback;
   resolving: boolean;
   onSelectPerson: (person: CharacterId) => void;
 }) {
@@ -401,10 +423,24 @@ function ApartmentStage({
   const focusPoint = focusPointForRoom(focusRoom);
   // Event focus changes only the camera/lighting. Character placement always
   // follows the resolved world state, including decline and split-room cases.
-  const haruPoint = characterAnchor("haru", game.haru);
-  const aoiPoint = characterAnchor("aoi", game.aoi);
-  const haruDialogue = game.decisions.haru?.dialogue ?? currentEvent?.haruDialogue;
-  const aoiDialogue = game.decisions.aoi?.dialogue ?? currentEvent?.aoiDialogue;
+  const playback = afterScene?.plan.eventId === currentEvent?.id ? afterScene : undefined;
+  const activeTurn = playback && playback.lineIndex >= 0
+    ? playback.plan.conversation[playback.lineIndex]
+    : undefined;
+  const pointFor = (person: CharacterId): Point => playback?.phase === "placing"
+    ? playback.plan.routes[person].start
+    : playback?.plan.routes[person].end ?? characterAnchor(person, game[person]);
+  const dialogueFor = (person: CharacterId): string | undefined => {
+    if (!playback) {
+      return game.decisions[person]?.dialogue
+        ?? (person === "haru" ? currentEvent?.haruDialogue : currentEvent?.aoiDialogue);
+    }
+    if (playback.phase === "placing" || playback.phase === "moving") return undefined;
+    return activeTurn?.speaker === person ? activeTurn.text : undefined;
+  };
+  const directionFor = (person: CharacterId): SpriteDirection =>
+    playback?.plan.routes[person].direction ?? "south";
+  const isMoving = playback?.phase === "moving";
 
   return (
     <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""}`}>
@@ -459,8 +495,8 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" name={people.haru.name} point={pointFor("haru")} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={Boolean(isMoving)} travelling={Boolean(isMoving && playback?.plan.routes.haru.hasTravel)} conversing={activeTurn?.speaker === "haru"} dialogue={dialogueFor("haru")} onSelect={() => onSelectPerson("haru")} />
+            <SceneCharacter person="aoi" name={people.aoi.name} point={pointFor("aoi")} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={Boolean(isMoving)} travelling={Boolean(isMoving && playback?.plan.routes.aoi.hasTravel)} conversing={activeTurn?.speaker === "aoi"} dialogue={dialogueFor("aoi")} onSelect={() => onSelectPerson("aoi")} />
           </g>
         </g>
       </svg>
@@ -1049,6 +1085,8 @@ export default function App() {
   const [eventAnnouncementId, setEventAnnouncementId] = useState<string | null>(null);
   const [freshEventId, setFreshEventId] = useState<string | null>(null);
   const [eventSuggestionFallbacks, setEventSuggestionFallbacks] = useState<Record<string, string>>({});
+  const [afterScene, setAfterScene] = useState<AfterScenePlayback>();
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [activeMemory, setActiveMemory] = useState<Memory>();
   const [personalityOpen, setPersonalityOpen] = useState(false);
   const personalityButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1056,6 +1094,8 @@ export default function App() {
   const operationRef = useRef<"turn" | Exclude<ActionBusy, null> | null>(null);
   const presentedEventIdRef = useRef<string | null | undefined>(undefined);
   const submittedSuggestionRef = useRef<string | null>(null);
+  const playedAfterSceneIdsRef = useRef(new Set<string>());
+  const turnStartStatesRef = useRef<Partial<Record<CharacterId, CharacterState>> | undefined>(undefined);
 
   const closePersonality = useCallback(() => {
     setPersonalityOpen(false);
@@ -1099,6 +1139,75 @@ export default function App() {
   }, [game.status, initialLoading, refreshGame, resolving]);
 
   useEffect(() => () => turnAbortRef.current?.abort(), []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !afterScene
+      || eventAnnouncementId
+      || logOpen
+      || personalityOpen
+      || activeMemory
+      || resolving
+      || actionBusy
+    ) return;
+    if (game.status === "ended" || game.completed) {
+      setAfterScene(undefined);
+      return;
+    }
+
+    const activeLine = afterScene.plan.conversation[afterScene.lineIndex];
+    const delay = afterScene.phase === "placing"
+      ? 80
+      : afterScene.phase === "moving"
+        ? reducedMotion
+          ? 80
+          : Object.values(afterScene.plan.routes).some((route) => route.hasTravel)
+            ? 1_650
+            : 850
+        : afterScene.phase === "talking"
+          ? Math.min(3_400, Math.max(2_100, (activeLine?.text.length ?? 0) * 70))
+          : null;
+    if (delay === null) return;
+
+    const timer = window.setTimeout(() => {
+      setAfterScene((current) => {
+        if (!current || current.plan.eventId !== afterScene.plan.eventId) return current;
+        if (current.phase === "placing") return { ...current, phase: "moving" };
+        if (current.phase === "moving") {
+          return current.plan.conversation.length
+            ? { ...current, phase: "talking", lineIndex: 0 }
+            : { ...current, phase: "settled", lineIndex: -1 };
+        }
+        if (current.phase === "talking") {
+          const nextLine = current.lineIndex + 1;
+          return nextLine < current.plan.conversation.length
+            ? { ...current, lineIndex: nextLine }
+            : { ...current, phase: "settled" };
+        }
+        return current;
+      });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [
+    actionBusy,
+    activeMemory,
+    afterScene,
+    eventAnnouncementId,
+    game.completed,
+    game.status,
+    logOpen,
+    personalityOpen,
+    reducedMotion,
+    resolving,
+  ]);
 
   const applyStreamMessage = useCallback((message: StreamMessage) => {
     const envelope = record(message.data);
@@ -1226,6 +1335,11 @@ export default function App() {
     }
     operationRef.current = "turn";
     setFreshEventId(null);
+    turnStartStatesRef.current = {
+      haru: { ...game.haru },
+      aoi: { ...game.aoi },
+    };
+    setAfterScene(undefined);
     setNotice("");
     setLastSuggestion(cue);
     submittedSuggestionRef.current = cue;
@@ -1285,6 +1399,8 @@ export default function App() {
     }
     operationRef.current = kind;
     setFreshEventId(null);
+    setAfterScene(undefined);
+    turnStartStatesRef.current = undefined;
     submittedSuggestionRef.current = null;
     if (kind === "fast") setNavigatorMessage("");
     setActionBusy(kind);
@@ -1308,6 +1424,7 @@ export default function App() {
         setLogOpen(false);
         setEventAnnouncementId(null);
         setEventSuggestionFallbacks({});
+        playedAfterSceneIdsRef.current.clear();
         presentedEventIdRef.current = null;
         setActiveMemory(undefined);
       } else if (kind === "advance") {
@@ -1379,6 +1496,17 @@ export default function App() {
       ?? (latestEvent?.id === eventAnnouncementId ? latestEvent : undefined)
     : undefined;
 
+  const beginAfterScene = useCallback((event: GameEvent) => {
+    if (playedAfterSceneIdsRef.current.has(event.id)) return;
+    playedAfterSceneIdsRef.current.add(event.id);
+    setAfterScene({
+      plan: createAfterScenePlan(event, game, turnStartStatesRef.current),
+      phase: "placing",
+      lineIndex: -1,
+    });
+    turnStartStatesRef.current = undefined;
+  }, [game]);
+
   useEffect(() => {
     if (initialLoading) return;
     const latestId = latestEvent?.id ?? null;
@@ -1413,8 +1541,9 @@ export default function App() {
       setLogOpen(false);
       setActiveMemory(undefined);
       setPersonalityOpen(false);
+      if (latestEvent) beginAfterScene(latestEvent);
     }
-  }, [game.status, initialLoading, latestEvent?.id, resolving]);
+  }, [beginAfterScene, game.status, initialLoading, latestEvent, resolving]);
 
   const selectCharacter = (person: CharacterId) => {
     setSelectedPerson(person);
@@ -1427,17 +1556,19 @@ export default function App() {
   };
 
   const closeEventAnnouncement = useCallback(() => {
+    const closingEvent = eventAnnouncement;
     setEventAnnouncementId(null);
     setNotice("");
-  }, []);
+    if (closingEvent && game.status === "resolved" && !game.completed) {
+      beginAfterScene(closingEvent);
+    }
+  }, [beginAfterScene, eventAnnouncement, game.completed, game.status]);
   const openEventLogFromAnnouncement = useCallback(() => {
-    setEventAnnouncementId(null);
-    setNotice("");
+    closeEventAnnouncement();
     setLogOpen(true);
-  }, []);
+  }, [closeEventAnnouncement]);
   const advanceFromAnnouncement = () => {
     closeEventAnnouncement();
-    void runAction("advance");
   };
 
   const restartSameSeed = () => runAction("reset", game.seed);
@@ -1511,7 +1642,7 @@ export default function App() {
       <main id="game" className="game-layout" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
           <div className="world-stage-wrap">
-            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} resolving={resolving} onSelectPerson={selectCharacter} />
+            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} resolving={resolving} onSelectPerson={selectCharacter} />
             <div className="resident-hud" aria-label="住人の状態">
               <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
               <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
@@ -1586,6 +1717,7 @@ export default function App() {
           navigatorMessage={eventAnnouncement.navigatorMessage ?? (latestNavigatorMessage || undefined)}
           notice={notice || undefined}
           canAdvance={canAdvance}
+          continueLabel="ふたりの様子を見る"
           onClose={closeEventAnnouncement}
           onOpenLog={openEventLogFromAnnouncement}
           onAdvance={advanceFromAnnouncement}

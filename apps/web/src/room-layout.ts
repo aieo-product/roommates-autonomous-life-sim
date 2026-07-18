@@ -23,10 +23,12 @@ export type RoomZone = {
   points: string;
 };
 
-const iso = (x: number, y: number): Point => ({
+export const projectRoomPoint = (x: number, y: number): Point => ({
   x: 600 + x * 25 - y * 25,
   y: 100 + x * 12.5 + y * 12.5,
 });
+
+const iso = projectRoomPoint;
 
 const polygon = (...points: Array<[number, number]>): string =>
   points.map(([x, y]) => {

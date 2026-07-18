@@ -11,8 +11,8 @@ import type {
 } from "@roommates/shared";
 import {
   characterDecisionSchema,
+  directorResolvedEventSchema,
   navigatorAgentOutputSchema,
-  resolvedEventSchema,
 } from "@roommates/shared";
 import type { AgentMode } from "../config.js";
 import { MockCharacterAgent } from "./mock/character.js";
@@ -93,7 +93,7 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
       "director",
       () => this.real!.resolve(input),
       () => this.director.resolve(input),
-      resolvedEventSchema as SchemaLike<ResolvedEvent>,
+      directorResolvedEventSchema as SchemaLike<ResolvedEvent>,
     );
   }
 

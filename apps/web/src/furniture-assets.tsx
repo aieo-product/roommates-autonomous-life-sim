@@ -12,6 +12,7 @@ import sofaUrl from "../../../assets/furniture/sofa.png";
 import storageShelfUrl from "../../../assets/furniture/storage-shelf.png";
 import tvConsoleUrl from "../../../assets/furniture/tv-console.png";
 import workDeskUrl from "../../../assets/furniture/work-desk.png";
+import { projectRoomPoint, type Point } from "./room-layout.js";
 
 export const FURNITURE_ASSET_URLS = {
   "aoi-bed": aoiBedUrl,
@@ -36,7 +37,8 @@ type FurniturePlacement = {
   assetId: FurnitureAssetId;
   roomId: string;
   anchorId?: string;
-  pivot: { x: number; y: number };
+  floorContact: Point;
+  pivot: Point;
   displayScale: number;
 };
 
@@ -67,6 +69,7 @@ export const FURNITURE_SCENE_PLACEMENTS = furnitureManifest.defaultScene.instanc
     return {
       ...placement,
       assetId: placement.assetId as FurnitureAssetId,
+      pivot: projectRoomPoint(placement.floorContact.x, placement.floorContact.y),
     };
   })
   .sort((left, right) => left.pivot.y - right.pivot.y);

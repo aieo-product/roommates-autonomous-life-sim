@@ -31,6 +31,17 @@ type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => vo
 type TurnWaiter = { texts: string[]; resolve: (value: unknown) => void; reject: (error: Error) => void };
 type AppServerRole = CharacterId | "navigator" | "director" | `${CharacterId}-reflection`;
 
+function readableAppServerError(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const parsed = JSON.parse(value) as { error?: { message?: unknown } };
+    if (typeof parsed.error?.message === "string") return parsed.error.message;
+  } catch {
+    // Some App Server versions already send a plain message.
+  }
+  return value;
+}
+
 export class CodexAppServerClient implements AppServerAdapter {
   private process?: ChildProcessWithoutNullStreams;
   private startPromise?: Promise<void>;
@@ -156,7 +167,12 @@ export class CodexAppServerClient implements AppServerAdapter {
       const waiter = this.turns.get(turnId);
       if (waiter) {
         this.turns.delete(turnId);
-        waiter.reject(new Error(String(params.message ?? "App Server error")));
+        const nestedError = params.error as { message?: unknown } | undefined;
+        const message =
+          readableAppServerError(params.message) ??
+          readableAppServerError(nestedError?.message) ??
+          "App Server error";
+        waiter.reject(new Error(message));
       }
     }
   }

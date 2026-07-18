@@ -1,7 +1,11 @@
 import { z } from "zod";
 import {
+  EVENT_CONVERSATION_MAX_LINES,
+  EVENT_CONVERSATION_MIN_LINES,
+  EVENT_CONVERSATION_TEXT_MAX_LENGTH,
   cueSafetyFlags,
   decisions,
+  eventConversationSpeakers,
   eventCategories,
   phases,
   relationshipLabels,
@@ -230,6 +234,18 @@ export const publicCharacterDecisionSchema = z
   })
   .strict();
 
+export const eventConversationLineSchema = z
+  .object({
+    speaker: z.enum(eventConversationSpeakers),
+    text: z.string().trim().min(1).max(EVENT_CONVERSATION_TEXT_MAX_LENGTH),
+  })
+  .strict();
+
+export const eventConversationSchema = z
+  .array(eventConversationLineSchema)
+  .min(EVENT_CONVERSATION_MIN_LINES)
+  .max(EVENT_CONVERSATION_MAX_LINES);
+
 export const resolvedEventSchema = z
   .object({
     eventTitle: text,
@@ -237,6 +253,7 @@ export const resolvedEventSchema = z
     navigatorMessage: cueText.optional(),
     haruDialogue: z.string().max(2_000),
     aoiDialogue: z.string().max(2_000),
+    conversation: eventConversationSchema.optional(),
     effects: z.object({ haru: statDeltaSchema, aoi: statDeltaSchema }).strict(),
     memory: z
       .object({
@@ -253,6 +270,11 @@ export const resolvedEventSchema = z
       .optional(),
   })
   .strict();
+
+/** AI Director output requires the new exchange; persisted legacy events do not. */
+export const directorResolvedEventSchema = resolvedEventSchema.extend({
+  conversation: eventConversationSchema,
+});
 
 export const characterStateSchema = z.object({
   energy: z.number().min(0).max(100),
@@ -329,6 +351,7 @@ export const eventLogEntrySchema = z
     aoiAction: z.string().max(2_000).optional(),
     haruDialogue: z.string().max(2_000).optional(),
     aoiDialogue: z.string().max(2_000).optional(),
+    conversation: eventConversationSchema.optional(),
     haruPublicReason: z.string().max(2_000).optional(),
     aoiPublicReason: z.string().max(2_000).optional(),
     scene: z.object({ haru: text.optional(), aoi: text.optional() }).strict().optional(),

@@ -650,6 +650,12 @@ a:focus-visible,
 .scene-character {
   cursor: pointer;
   outline: none;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.scene-character.is-travelling {
+  transition: transform 1.55s cubic-bezier(.3, .05, .55, 1);
 }
 
 .character-layer {
@@ -698,8 +704,16 @@ a:focus-visible,
   transform: translateX(-64px);
 }
 
-.resident-scene-sprite.is-active > img {
+.resident-scene-sprite.direction-east > img { margin-top: -64px; }
+.resident-scene-sprite.direction-north > img { margin-top: -128px; }
+.resident-scene-sprite.direction-west > img { margin-top: -192px; }
+
+.resident-scene-sprite.is-moving > img {
   animation: residentWalkCycle 680ms steps(1, end) infinite;
+}
+
+.scene-character.is-conversing .character-sprite {
+  animation: characterTalk 520ms ease-in-out infinite alternate;
 }
 
 .scene-nameplate {
@@ -2055,6 +2069,11 @@ a:focus-visible,
   50% { transform: translateY(-2px); }
 }
 
+@keyframes characterTalk {
+  from { transform: translateY(0) rotate(-1deg); }
+  to { transform: translateY(-3px) rotate(1deg); }
+}
+
 @keyframes thinkBounce {
   0%,100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
@@ -2194,9 +2213,18 @@ a:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .resident-scene-sprite.is-active > img {
+  .scene-character.is-travelling {
+    transition: none !important;
+  }
+
+  .resident-scene-sprite.is-moving > img {
     animation: none !important;
     transform: translateX(-64px) !important;
+  }
+
+  .scene-character.is-conversing .character-sprite {
+    animation: none !important;
+    transform: none !important;
   }
 
   .dekopin-guide .dekopin-sprite-sheet {

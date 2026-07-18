@@ -5,6 +5,39 @@ const appUrl = new URL("../../web/src/App.tsx", import.meta.url);
 const app = readFileSync(appUrl, "utf8");
 const css = readFileSync(new URL("../../web/src/styles.css", import.meta.url), "utf8");
 
+type Rect = { x: number; y: number; width: number; height: number };
+type Anchor = Rect & { id: string };
+type LayoutArea = {
+  id: string;
+  bounds: Rect | Rect[];
+  anchors?: Anchor[];
+  blocked?: Rect[];
+  zones?: LayoutArea[];
+};
+type FurnitureManifest = {
+  assets: Array<{
+    id: string;
+    file: string;
+    footprintTiles: { width: number; depth: number };
+  }>;
+  defaultScene: {
+    instances: Array<{
+      instanceId: string;
+      assetId: string;
+      roomId: string;
+      anchorId?: string;
+      floorContact: { x: number; y: number };
+      pivot?: { x: number; y: number };
+    }>;
+  };
+};
+
+const overlaps = (left: Rect, right: Rect): boolean =>
+  left.x < right.x + right.width
+  && left.x + left.width > right.x
+  && left.y < right.y + right.height
+  && left.y + left.height > right.y;
+
 const sourceBetween = (
   source: string,
   startToken: string,
@@ -64,6 +97,7 @@ describe("resolved event announcement", () => {
     expect(presentationEffect).toMatch(/presentedEventIdRef\.current === latestId\) return;/);
     expect(app).toContain("const [freshEventId, setFreshEventId]");
     expect(presentationEffect).toMatch(/if \(submittedSuggestion\) \{[\s\S]*?setFreshEventId\(latestId\)/);
+    expect(presentationEffect).toMatch(/if \(submittedSuggestion\) \{[\s\S]*?beginAfterScene\(latestEvent\)/);
     expect(presentationEffect.match(/setEventAnnouncementId\(latestId\)/g)).toHaveLength(1);
     expect(app).toContain('fresh={freshEventId === latestEvent?.id}');
     expect(app).toContain('role="status" aria-live="polite" aria-atomic="true"');
@@ -111,8 +145,23 @@ describe("resolved event announcement", () => {
 describe("generated furniture integration", () => {
   const manifestUrl = new URL("../../../assets/furniture/manifest.json", import.meta.url);
   const rendererUrl = new URL("../../web/src/furniture-assets.tsx", import.meta.url);
-  const manifest = JSON.parse(readFileSync(manifestUrl, "utf8")) as {
-    assets: Array<{ id: string; file: string }>;
+  const layoutUrl = new URL("../../../docs/room-layout.json", import.meta.url);
+  const manifest = JSON.parse(readFileSync(manifestUrl, "utf8")) as FurnitureManifest;
+  const layout = JSON.parse(readFileSync(layoutUrl, "utf8")) as { rooms: LayoutArea[] };
+  const areas = layout.rooms.flatMap((room) => [room, ...(room.zones ?? [])]);
+  const areaById = new Map(areas.map((area) => [area.id, area]));
+  const anchorById = new Map(areas.flatMap((area) => area.anchors ?? []).map((anchor) => [anchor.id, anchor]));
+  const assetById = new Map(manifest.assets.map((asset) => [asset.id, asset]));
+
+  const footprintFor = (instance: FurnitureManifest["defaultScene"]["instances"][number]): Rect => {
+    const asset = assetById.get(instance.assetId);
+    expect(asset, `${instance.instanceId} should reference a registered asset`).toBeDefined();
+    return {
+      x: instance.floorContact.x - (asset?.footprintTiles.width ?? 0),
+      y: instance.floorContact.y - (asset?.footprintTiles.depth ?? 0),
+      width: asset?.footprintTiles.width ?? 0,
+      height: asset?.footprintTiles.depth ?? 0,
+    };
   };
 
   it("statically imports and references all 13 furniture PNGs", () => {
@@ -137,6 +186,62 @@ describe("generated furniture integration", () => {
         `${asset.file} should be referenced by the renderer`,
       ).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("derives anchor-bound furniture feet from the canonical room anchors", () => {
+    for (const instance of manifest.defaultScene.instances) {
+      expect(instance.pivot, `${instance.instanceId} should not persist an SVG pixel position`).toBeUndefined();
+      if (!instance.anchorId) continue;
+
+      const anchor = anchorById.get(instance.anchorId);
+      expect(anchor, `${instance.anchorId} should exist in the canonical layout`).toBeDefined();
+      expect(instance.floorContact).toEqual({
+        x: (anchor?.x ?? 0) + (anchor?.width ?? 0),
+        y: (anchor?.y ?? 0) + (anchor?.height ?? 0),
+      });
+    }
+  });
+
+  it("keeps every furniture footprint on its room floor and clear of fixed areas", () => {
+    const footprintsByRoom = new Map<string, Array<{ instanceId: string; rect: Rect }>>();
+
+    for (const instance of manifest.defaultScene.instances) {
+      const area = areaById.get(instance.roomId);
+      expect(area, `${instance.roomId} should exist in the canonical layout`).toBeDefined();
+      expect(Array.isArray(area?.bounds), `${instance.roomId} should have one rectangular floor`).toBe(false);
+
+      const bounds = area?.bounds as Rect;
+      const footprint = footprintFor(instance);
+      expect(footprint.x, `${instance.instanceId} should stay inside the left wall`).toBeGreaterThanOrEqual(bounds.x);
+      expect(footprint.y, `${instance.instanceId} should stay inside the back wall`).toBeGreaterThanOrEqual(bounds.y);
+      expect(footprint.x + footprint.width, `${instance.instanceId} should stay inside the right wall`)
+        .toBeLessThanOrEqual(bounds.x + bounds.width);
+      expect(footprint.y + footprint.height, `${instance.instanceId} should stay inside the front wall`)
+        .toBeLessThanOrEqual(bounds.y + bounds.height);
+
+      for (const blocked of area?.blocked ?? []) {
+        expect(overlaps(footprint, blocked), `${instance.instanceId} should avoid a blocked floor area`).toBe(false);
+      }
+
+      const roomFootprints = footprintsByRoom.get(instance.roomId) ?? [];
+      roomFootprints.push({ instanceId: instance.instanceId, rect: footprint });
+      footprintsByRoom.set(instance.roomId, roomFootprints);
+    }
+
+    for (const roomFootprints of footprintsByRoom.values()) {
+      roomFootprints.forEach((left, index) => {
+        for (const right of roomFootprints.slice(index + 1)) {
+          expect(overlaps(left.rect, right.rect), `${left.instanceId} should not overlap ${right.instanceId}`).toBe(false);
+        }
+      });
+    }
+  });
+
+  it("projects tile floor contacts through the shared room transform", () => {
+    const renderer = readFileSync(rendererUrl, "utf8");
+    expect(renderer).toMatch(/import\s*\{\s*projectRoomPoint,\s*type Point\s*\}\s*from\s*["']\.\/room-layout(?:\.js)?["']/);
+    expect(renderer).toContain("projectRoomPoint(placement.floorContact.x, placement.floorContact.y)");
+    expect(renderer).toMatch(/sort\(\(left, right\) => left\.pivot\.y - right\.pivot\.y\)/);
   });
 
   it("connects one generated furniture layer to the shared apartment renderer", () => {

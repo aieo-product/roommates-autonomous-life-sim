@@ -92,6 +92,18 @@ const stringArray = (value: unknown): string[] =>
     ? value.filter((item): item is string => typeof item === "string")
     : [];
 
+const normalizeConversation = (value: unknown): GameEvent["conversation"] => {
+  if (!Array.isArray(value)) return undefined;
+  const turns = value.flatMap((item) => {
+    const source = record(item);
+    const speaker = text(first(source.speaker, source.character, source.person)).toLowerCase();
+    const line = optionalText(first(source.text, source.dialogue, source.line, source.message));
+    if ((speaker !== "haru" && speaker !== "aoi") || !line) return [];
+    return [{ speaker: speaker as "haru" | "aoi", text: line.trim().slice(0, 160) }];
+  });
+  return turns.length ? turns : undefined;
+};
+
 const normalizePhase = (value: unknown, fallback: Phase): Phase => {
   const normalized = text(value).toLowerCase();
   return ["morning", "afternoon", "evening", "night"].includes(normalized)
@@ -329,6 +341,9 @@ const normalizeEvent = (
     haruDialogue:
       optionalText(first(haruDecision?.dialogue, merged.haruDialogue, merged.haru_dialogue)),
     aoiDialogue: optionalText(first(aoiDecision?.dialogue, merged.aoiDialogue, merged.aoi_dialogue)),
+    conversation: normalizeConversation(
+      first(merged.conversation, merged.eventConversation, merged.event_conversation),
+    ),
     haruPublicReason: optionalText(first(haruDecision?.publicReason, merged.haruPublicReason)),
     aoiPublicReason: optionalText(first(aoiDecision?.publicReason, merged.aoiPublicReason)),
     scene: Object.keys(scene).length
@@ -817,6 +832,7 @@ export const normalizeGameState = (
         aoiAction: currentDetail.aoiAction ?? lastLogged.aoiAction,
         haruDialogue: currentDetail.haruDialogue ?? lastLogged.haruDialogue,
         aoiDialogue: currentDetail.aoiDialogue ?? lastLogged.aoiDialogue,
+        conversation: currentDetail.conversation ?? lastLogged.conversation,
         haruPublicReason: currentDetail.haruPublicReason ?? lastLogged.haruPublicReason,
         aoiPublicReason: currentDetail.aoiPublicReason ?? lastLogged.aoiPublicReason,
         scene: currentDetail.scene ?? lastLogged.scene,

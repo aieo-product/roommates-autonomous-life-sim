@@ -327,6 +327,10 @@ export class GameEngine {
           {
             suppressRelationshipEffects:
               suggestion.cue.transformed && eventDefinition.category === "rest",
+            originalLocations: {
+              haru: snapshot.characters.haru.location,
+              aoi: snapshot.characters.aoi.location,
+            },
           },
         ),
         navigatorMessage: navigatorResponse.message,
@@ -419,6 +423,7 @@ export class GameEngine {
             aoiAction: aoi.value.action,
             haruDialogue: resolved.haruDialogue,
             aoiDialogue: resolved.aoiDialogue,
+            conversation: resolved.conversation,
             haruPublicReason: haru.value.publicReason,
             aoiPublicReason: aoi.value.publicReason,
             scene: {

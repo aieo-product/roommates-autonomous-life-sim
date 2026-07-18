@@ -45,6 +45,11 @@ export type ResultPublicDecision = {
   publicReason?: string;
 };
 
+export type ResultConversationTurn = {
+  speaker: ResultCharacterId;
+  text: string;
+};
+
 export type ResultStatDelta = Partial<Record<ResultMetricKey, number>>;
 
 export type ResultMemory = {
@@ -82,6 +87,8 @@ export type ResultEventLogEntry = {
   aoiAction?: string;
   haruDialogue?: string;
   aoiDialogue?: string;
+  /** Ordered post-event exchange shown in the room after residents arrive. */
+  conversation?: ResultConversationTurn[];
   haruPublicReason?: string;
   aoiPublicReason?: string;
   memoryId?: string;

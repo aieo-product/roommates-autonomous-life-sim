@@ -1,11 +1,17 @@
 import type {
   CharacterDecision,
+  CharacterId,
+  EventConversationLine,
   EventDefinition,
   GameState,
   ResolvedEvent,
   StatDelta,
 } from "@roommates/shared";
-import { mutableStatKeys } from "@roommates/shared";
+import {
+  EVENT_CONVERSATION_MAX_LINES,
+  EVENT_CONVERSATION_TEXT_MAX_LENGTH,
+  mutableStatKeys,
+} from "@roommates/shared";
 
 const phaseOrder = ["morning", "afternoon", "evening", "night"] as const;
 const cooperative = new Set(["ACCEPT", "MODIFY", "INITIATE"]);
@@ -167,12 +173,108 @@ function branchKey(
   return "bothParticipate";
 }
 
+function conversationText(value: string, fallback: string): string {
+  const normalized = value.trim().slice(0, EVENT_CONVERSATION_TEXT_MAX_LENGTH).trim();
+  return normalized || fallback;
+}
+
+function safeConversation(
+  event: ResolvedEvent,
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+): EventConversationLine[] {
+  const haruJoins = cooperative.has(decisions.haru.decision);
+  const aoiJoins = cooperative.has(decisions.aoi.decision);
+  const opening: EventConversationLine[] = [
+    {
+      speaker: "haru",
+      text: conversationText(decisions.haru.dialogue, "今は自分のペースで過ごすね。"),
+    },
+    {
+      speaker: "aoi",
+      text: conversationText(decisions.aoi.dialogue, "私も自分のペースで過ごすね。"),
+    },
+  ];
+
+  // Director prose must never turn a refusal or IGNORE into participation.
+  if (!haruJoins || !aoiJoins) {
+    const acknowledgement: EventConversationLine = haruJoins
+      ? { speaker: "haru", text: "わかった。今日はそれぞれのペースで過ごそう。" }
+      : aoiJoins
+        ? { speaker: "aoi", text: "わかった。今日はそれぞれのペースで過ごそう。" }
+        : { speaker: "haru", text: "うん。今日はそれぞれの時間を大切にしよう。" };
+    return [...opening, acknowledgement];
+  }
+
+  const continuation = (event.conversation ?? [])
+    .slice(2)
+    .map((line) => ({
+      speaker: line.speaker,
+      text: conversationText(line.text, "少しずつ進めよう。"),
+    }));
+  const conversation = [...opening, ...continuation].slice(
+    0,
+    EVENT_CONVERSATION_MAX_LINES,
+  );
+  if (conversation.length < 3) {
+    conversation.push({
+      speaker: "haru",
+      text: "それじゃ、二人のペースで始めよう。",
+    });
+  }
+  return conversation;
+}
+
+function locationZone(location: string): string {
+  const value = location.trim().toLowerCase();
+  const zones: Array<[string, string[]]> = [
+    ["kitchen", ["キッチン", "台所", "kitchen"]],
+    ["dining", ["ダイニング", "食卓", "dining"]],
+    ["living", ["リビング", "ソファ", "living"]],
+    ["balcony", ["ベランダ", "バルコニー", "balcony"]],
+    ["entry", ["玄関", "entry"]],
+    ["bathroom", ["風呂", "浴室", "bathroom"]],
+    ["washroom", ["洗面", "washroom"]],
+    ["hallway", ["廊下", "hallway"]],
+  ];
+  return zones.find(([, keywords]) =>
+    keywords.some((keyword) => value.includes(keyword))
+  )?.[0] ?? value;
+}
+
+function safeScene(
+  event: ResolvedEvent,
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+  originalLocations?: Partial<Record<CharacterId, string>>,
+): ResolvedEvent["scene"] {
+  const scene = { ...(event.scene ?? {}) };
+  for (const id of ["haru", "aoi"] as const) {
+    if (cooperative.has(decisions[id].decision)) continue;
+    const other = id === "haru" ? "aoi" : "haru";
+    const original = originalLocations?.[id]?.trim();
+    const participatingTarget = cooperative.has(decisions[other].decision)
+      ? event.scene?.[other]
+      : undefined;
+    // A refusal/IGNORE never inherits Director's event placement. Keep the
+    // pre-turn location when it is outside the participant's event room;
+    // otherwise give the character privacy in their own room.
+    scene[id] =
+      original &&
+      (!participatingTarget || locationZone(original) !== locationZone(participatingTarget))
+        ? original
+        : "自室";
+  }
+  return Object.keys(scene).length > 0 ? scene : undefined;
+}
+
 export function constrainResolvedEvent(
   definition: EventDefinition,
   event: ResolvedEvent,
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
   unresolvedConflicts: string[],
-  options: { suppressRelationshipEffects?: boolean } = {},
+  options: {
+    suppressRelationshipEffects?: boolean;
+    originalLocations?: Partial<Record<CharacterId, string>>;
+  } = {},
 ): ResolvedEvent {
   const branch = branchKey(decisions.haru, decisions.aoi);
   const haruJoins = cooperative.has(decisions.haru.decision);
@@ -217,6 +319,8 @@ export function constrainResolvedEvent(
     narration,
     haruDialogue: decisions.haru.dialogue,
     aoiDialogue: decisions.aoi.dialogue,
+    conversation: safeConversation(event, decisions),
+    scene: safeScene(event, decisions, options.originalLocations),
     effects: { haru: haruEffects, aoi: aoiEffects },
     memory: {
       ...event.memory,

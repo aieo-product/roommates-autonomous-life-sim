@@ -162,3 +162,5 @@ flowchart TB
 - `anchors`: 家具、キャラクター、演出を置ける基準領域
 - `blocked`: 固定設備や通行確保のため配置できない領域
 - `situationMappings`: シチュエーションから表示シーンへの既定マッピング
+
+家具素材の配置は [`../assets/furniture/manifest.json`](../assets/furniture/manifest.json) の `floorContact` を使う。これはPNGの足元ピボットに対応するタイル座標で、アンカー付き家具ではアンカー矩形の遠端 `(x + width, y + height)` と一致させる。SVGピクセル座標は保存せず、Web側でこの間取りと同じ等角投影を適用する。
