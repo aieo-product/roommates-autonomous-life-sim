@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">ROOMMATES ゲーム画面構図ガイド</title>
+  <desc id="desc">住居全体を南西側の斜め上から覗く、屋根を外した等角投影風のカットアウェイ構図。</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6EEE3"/>
+      <stop offset="1" stop-color="#E7DCCF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#3C3029" flood-opacity="0.22"/>
+    </filter>
+    <style>
+      .floor { stroke: #5A4D46; stroke-width: 4; stroke-linejoin: round; }
+      .partition { fill: none; stroke: #776961; stroke-width: 5; stroke-linejoin: round; }
+      .zone { fill: none; stroke: #8E7F75; stroke-width: 2; stroke-dasharray: 8 8; }
+      .label { font-family: "Noto Sans JP", "Yu Gothic", sans-serif; fill: #302925; font-weight: 700; text-anchor: middle; }
+      .sub { font-family: "Noto Sans JP", "Yu Gothic", sans-serif; fill: #685C54; font-size: 14px; text-anchor: middle; }
+      .wall-top { fill: #F7F1E8; stroke: #5A4D46; stroke-width: 4; stroke-linejoin: round; }
+      .wall-face { fill: #D8CABE; stroke: #5A4D46; stroke-width: 4; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="720" fill="url(#background)"/>
+  <g filter="url(#shadow)">
+    <!-- Floors, drawn back to front -->
+    <polygon points="600,100 800,200 650,275 450,175" fill="#DDE8DA" class="floor"/>
+    <polygon points="800,200 1000,300 850,375 650,275" fill="#E6DCEB" class="floor"/>
+    <polygon points="1000,300 1075,338 1000,375 925,338" fill="#F0E2C7" class="floor"/>
+    <polygon points="1075,338 1200,400 1125,438 1000,375" fill="#D9E8E7" class="floor"/>
+    <polygon points="450,175 925,413 875,438 400,200" fill="#E8E2D9" class="floor"/>
+    <polygon points="925,338 1000,375 925,413 850,375" fill="#E8E2D9" class="floor"/>
+    <polygon points="1000,375 1125,438 925,538 800,475" fill="#D6E4EA" class="floor"/>
+    <polygon points="400,200 1000,500 800,600 200,300" fill="#F1DFC7" class="floor"/>
+    <polygon points="200,300 800,600 750,625 150,325" fill="#DCE7CF" class="floor"/>
+
+    <!-- LDK zone boundaries -->
+    <polyline points="575,288 375,388" class="zone"/>
+    <polyline points="750,375 550,475" class="zone"/>
+
+    <!-- North and east full-height cutaway walls -->
+    <polygon points="600,100 1200,400 1200,345 600,45" class="wall-face"/>
+    <polygon points="600,45 1200,345 1190,350 590,50" class="wall-top"/>
+    <polygon points="1200,400 800,600 800,545 1200,345" class="wall-face"/>
+    <polygon points="1200,345 800,545 790,540 1190,340" class="wall-top"/>
+
+    <!-- Interior partitions, kept low enough to preserve visibility -->
+    <polyline points="800,200 650,275 450,175" class="partition"/>
+    <polyline points="1000,300 850,375 650,275" class="partition"/>
+    <polyline points="1075,338 1000,375 925,338" class="partition"/>
+    <polyline points="925,338 850,375 925,413" class="partition"/>
+    <polyline points="1000,375 800,475" class="partition"/>
+    <polyline points="450,175 925,413 875,438 400,200" class="partition"/>
+
+    <!-- Simplified furniture anchors -->
+    <polygon points="500,142 610,197 560,222 450,167" fill="#B9C9B5" stroke="#6C6058" stroke-width="2"/>
+    <polygon points="710,222 820,277 770,302 660,247" fill="#CCBFD3" stroke="#6C6058" stroke-width="2"/>
+    <polygon points="380,258 535,335 485,360 330,283" fill="#D7AE87" stroke="#6C6058" stroke-width="2"/>
+    <polygon points="565,365 690,428 640,453 515,390" fill="#FFF9F0" stroke="#6C6058" stroke-width="2"/>
+    <polygon points="760,435 900,505 850,530 710,460" fill="#C8B49E" stroke="#6C6058" stroke-width="2"/>
+
+    <!-- Pair character anchors -->
+    <g stroke="#FFFFFF" stroke-width="3">
+      <ellipse cx="744" cy="479" rx="16" ry="22" fill="#C9775A"/>
+      <ellipse cx="784" cy="499" rx="16" ry="22" fill="#CF8063"/>
+    </g>
+
+    <!-- Room labels -->
+    <g>
+      <text x="585" y="150" class="label" font-size="17">Haru</text>
+      <text x="790" y="252" class="label" font-size="17">Aoi</text>
+      <text x="1002" y="328" class="label" font-size="15">玄関</text>
+      <text x="1090" y="382" class="label" font-size="15">洗面</text>
+      <text x="957" y="462" class="label" font-size="15">浴室</text>
+      <text x="630" y="333" class="label" font-size="16">廊下</text>
+      <text x="403" y="327" class="label" font-size="17">キッチン</text>
+      <text x="588" y="441" class="label" font-size="17">ダイニング</text>
+      <text x="817" y="543" class="label" font-size="17">リビング</text>
+      <text x="447" y="480" class="label" font-size="17">バルコニー</text>
+    </g>
+  </g>
+
+  <g>
+    <rect x="260" y="8" width="760" height="76" rx="18" fill="#F6EEE3" fill-opacity="0.96"/>
+    <text x="640" y="42" class="label" font-size="29">ゲーム画面構図 — 住居全体を斜め上から覗く</text>
+    <text x="640" y="69" class="sub">屋根なし / 南・西の手前壁は非表示または腰壁 / 全体を常時表示</text>
+  </g>
+
+  <!-- Camera and focus behavior -->
+  <g transform="translate(76 555)">
+    <circle cx="55" cy="55" r="44" fill="#FFF9F1" stroke="#6C5E55" stroke-width="4"/>
+    <path d="M33 55 Q55 31 77 55 Q55 79 33 55 Z" fill="none" stroke="#6C5E55" stroke-width="4"/>
+    <circle cx="55" cy="55" r="10" fill="#C9775A"/>
+    <path d="M100 35 C165 5 220 -5 285 20" fill="none" stroke="#C9775A" stroke-width="4" stroke-linecap="round"/>
+    <path d="M272 7 L289 21 L267 27" fill="none" stroke="#C9775A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="55" y="117" class="label" font-size="16">カメラ</text>
+    <text x="195" y="58" class="sub">南西側から北東方向を見る</text>
+  </g>
+
+  <g transform="translate(900 612)">
+    <rect x="0" y="0" width="305" height="64" rx="14" fill="#FFF9F1" stroke="#9A897E" stroke-width="2"/>
+    <circle cx="32" cy="32" r="12" fill="#C9775A"/>
+    <text x="170" y="27" class="label" font-size="15">イベント時も全体構図を維持</text>
+    <text x="170" y="48" class="sub">対象エリアのみ照明 + 最大1.2倍ズーム</text>
+  </g>
+</svg>

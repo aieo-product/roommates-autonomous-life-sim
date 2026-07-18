@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "roommates-2ldk-v1",
+  "name": "ROOMMATES 基本2LDK",
+  "orientation": {
+    "north": "top",
+    "origin": "top-left"
+  },
+  "grid": {
+    "width": 24,
+    "interiorHeight": 16,
+    "balconyHeight": 2,
+    "tileSizeMeters": 0.4
+  },
+  "viewport": {
+    "aspectRatio": "16:9",
+    "baseWidthPx": 1280,
+    "baseHeightPx": 720,
+    "projection": "isometric-cutaway",
+    "displayScope": "whole-apartment",
+    "cameraDirection": "south-west-to-north-east",
+    "roofVisible": false,
+    "nearWalls": "hidden-or-half-height",
+    "defaultFocusId": "whole_apartment",
+    "maxEventZoom": 1.2
+  },
+  "rooms": [
+    {
+      "id": "haru_room",
+      "name": "Haruの個室",
+      "privacy": "private",
+      "focusId": "haru_room",
+      "bounds": { "x": 0, "y": 0, "width": 8, "height": 6 },
+      "capacity": 2,
+      "defaultOccupancy": 1,
+      "anchors": [
+        { "id": "haru_bed", "kind": "furniture", "x": 0.5, "y": 0.5, "width": 3, "height": 5 },
+        { "id": "haru_desk", "kind": "furniture", "x": 4.5, "y": 0.5, "width": 3, "height": 2 },
+        { "id": "haru_solo", "kind": "character", "tags": ["solo"], "x": 4.5, "y": 3, "width": 2, "height": 2 },
+        { "id": "haru_guest", "kind": "character", "tags": ["pair"], "x": 2.5, "y": 3, "width": 2, "height": 2 }
+      ],
+      "blocked": [
+        { "reason": "door_clearance", "x": 5, "y": 4, "width": 2, "height": 2 }
+      ]
+    },
+    {
+      "id": "aoi_room",
+      "name": "Aoiの個室",
+      "privacy": "private",
+      "focusId": "aoi_room",
+      "bounds": { "x": 8, "y": 0, "width": 8, "height": 6 },
+      "capacity": 2,
+      "defaultOccupancy": 1,
+      "anchors": [
+        { "id": "aoi_bed", "kind": "furniture", "x": 8.5, "y": 0.5, "width": 3, "height": 5 },
+        { "id": "aoi_desk", "kind": "furniture", "x": 12.5, "y": 0.5, "width": 3, "height": 2 },
+        { "id": "aoi_solo", "kind": "character", "tags": ["solo"], "x": 12.5, "y": 3, "width": 2, "height": 2 },
+        { "id": "aoi_guest", "kind": "character", "tags": ["pair"], "x": 10.5, "y": 3, "width": 2, "height": 2 }
+      ],
+      "blocked": [
+        { "reason": "door_clearance", "x": 13, "y": 4, "width": 2, "height": 2 }
+      ]
+    },
+    {
+      "id": "entry",
+      "name": "玄関",
+      "privacy": "semi-private",
+      "focusId": "entry",
+      "bounds": { "x": 16, "y": 0, "width": 3, "height": 3 },
+      "capacity": 2,
+      "defaultOccupancy": 0,
+      "anchors": [
+        { "id": "entry_pair", "kind": "character", "tags": ["pair"], "x": 16, "y": 0.5, "width": 3, "height": 2 }
+      ],
+      "blocked": [
+        { "reason": "door_clearance", "x": 16, "y": 0, "width": 3, "height": 1 }
+      ]
+    },
+    {
+      "id": "washroom",
+      "name": "洗面所",
+      "privacy": "private",
+      "focusId": "washroom",
+      "bounds": { "x": 19, "y": 0, "width": 5, "height": 3 },
+      "capacity": 1,
+      "defaultOccupancy": 0,
+      "anchors": [
+        { "id": "washroom_solo", "kind": "character", "tags": ["solo"], "x": 20.5, "y": 1, "width": 2, "height": 2 }
+      ],
+      "blocked": [
+        { "reason": "fixed_plumbing", "x": 19, "y": 0, "width": 5, "height": 1 }
+      ]
+    },
+    {
+      "id": "hallway",
+      "name": "廊下",
+      "privacy": "semi-private",
+      "focusId": "hallway",
+      "bounds": [
+        { "x": 0, "y": 6, "width": 19, "height": 2 },
+        { "x": 16, "y": 3, "width": 3, "height": 3 }
+      ],
+      "capacity": 2,
+      "defaultOccupancy": 0,
+      "anchors": [
+        { "id": "hallway_pair", "kind": "character", "tags": ["pair"], "x": 10, "y": 6, "width": 4, "height": 2 }
+      ],
+      "blocked": []
+    },
+    {
+      "id": "bathroom",
+      "name": "浴室",
+      "privacy": "private",
+      "focusId": "bathroom",
+      "bounds": { "x": 19, "y": 3, "width": 5, "height": 5 },
+      "capacity": 1,
+      "defaultOccupancy": 0,
+      "anchors": [
+        { "id": "bathroom_solo", "kind": "character", "tags": ["solo"], "x": 19.5, "y": 5, "width": 2, "height": 2 }
+      ],
+      "blocked": [
+        { "reason": "fixed_bathtub", "x": 21.5, "y": 3.5, "width": 2, "height": 4 }
+      ]
+    },
+    {
+      "id": "ldk",
+      "name": "LDK",
+      "privacy": "shared",
+      "focusId": "ldk",
+      "bounds": { "x": 0, "y": 8, "width": 24, "height": 8 },
+      "capacity": 6,
+      "defaultOccupancy": 2,
+      "zones": [
+        {
+          "id": "kitchen",
+          "name": "キッチン",
+          "bounds": { "x": 0, "y": 8, "width": 7, "height": 8 },
+          "anchors": [
+            { "id": "kitchen_pair", "kind": "character", "tags": ["pair", "cooking"], "x": 2, "y": 11, "width": 4, "height": 2 }
+          ],
+          "blocked": [
+            { "reason": "fixed_kitchen", "x": 0, "y": 8, "width": 7, "height": 2 }
+          ]
+        },
+        {
+          "id": "dining",
+          "name": "ダイニング",
+          "bounds": { "x": 7, "y": 8, "width": 7, "height": 8 },
+          "anchors": [
+            { "id": "dining_table", "kind": "furniture", "x": 8, "y": 10, "width": 5, "height": 3 },
+            { "id": "dining_pair", "kind": "character", "tags": ["pair", "eating", "conversation"], "x": 8, "y": 13, "width": 5, "height": 2 }
+          ],
+          "blocked": []
+        },
+        {
+          "id": "living",
+          "name": "リビング",
+          "bounds": { "x": 14, "y": 8, "width": 10, "height": 8 },
+          "anchors": [
+            { "id": "living_sofa", "kind": "furniture", "x": 17, "y": 9, "width": 6, "height": 2 },
+            { "id": "living_pair", "kind": "character", "tags": ["pair", "movie", "conversation", "relax"], "x": 17, "y": 12, "width": 5, "height": 2 }
+          ],
+          "blocked": [
+            { "reason": "balcony_door_clearance", "x": 20, "y": 14, "width": 3, "height": 2 }
+          ]
+        }
+      ],
+      "anchors": [],
+      "blocked": [
+        { "reason": "main_circulation", "x": 6, "y": 8, "width": 2, "height": 8 }
+      ]
+    },
+    {
+      "id": "balcony",
+      "name": "バルコニー",
+      "privacy": "shared",
+      "focusId": "balcony",
+      "bounds": { "x": 0, "y": 16, "width": 24, "height": 2 },
+      "capacity": 2,
+      "defaultOccupancy": 0,
+      "anchors": [
+        { "id": "balcony_pair", "kind": "character", "tags": ["pair", "conversation"], "x": 15, "y": 16, "width": 5, "height": 2 },
+        { "id": "laundry", "kind": "prop", "tags": ["laundry"], "x": 2, "y": 16, "width": 6, "height": 2 }
+      ],
+      "blocked": [
+        { "reason": "balcony_door_clearance", "x": 20, "y": 16, "width": 3, "height": 2 }
+      ]
+    }
+  ],
+  "connections": [
+    { "from": "entry", "to": "hallway", "kind": "open" },
+    { "from": "hallway", "to": "haru_room", "kind": "door" },
+    { "from": "hallway", "to": "aoi_room", "kind": "door" },
+    { "from": "hallway", "to": "washroom", "kind": "door" },
+    { "from": "washroom", "to": "bathroom", "kind": "door" },
+    { "from": "hallway", "to": "ldk", "kind": "open" },
+    { "from": "ldk", "to": "balcony", "kind": "sliding-door" }
+  ],
+  "situationMappings": [
+    { "situation": "cook_together", "displayScope": "whole-apartment", "focusId": "kitchen", "anchorTags": ["pair", "cooking"] },
+    { "situation": "eat_together", "displayScope": "whole-apartment", "focusId": "dining", "anchorTags": ["pair", "eating"] },
+    { "situation": "watch_movie", "displayScope": "whole-apartment", "focusId": "living", "anchorTags": ["pair", "movie"] },
+    { "situation": "conversation", "displayScope": "whole-apartment", "focusId": "living", "anchorTags": ["pair", "conversation"] },
+    { "situation": "haru_rest", "displayScope": "whole-apartment", "focusId": "haru_room", "anchorTags": ["solo"] },
+    { "situation": "aoi_rest", "displayScope": "whole-apartment", "focusId": "aoi_room", "anchorTags": ["solo"] },
+    { "situation": "get_ready", "displayScope": "whole-apartment", "focusId": "washroom", "anchorTags": ["solo"] },
+    { "situation": "arrive_or_leave", "displayScope": "whole-apartment", "focusId": "entry", "anchorTags": ["pair"] },
+    { "situation": "hang_laundry", "displayScope": "whole-apartment", "focusId": "balcony", "anchorTags": ["laundry"] },
+    { "situation": "cool_evening", "displayScope": "whole-apartment", "focusId": "balcony", "anchorTags": ["pair", "conversation"] }
+  ],
+  "generationPolicy": {
+    "fixed": [
+      "room_geometry",
+      "doors",
+      "windows",
+      "plumbing",
+      "kitchen_counter",
+      "main_circulation",
+      "camera_orientation",
+      "character_scale"
+    ],
+    "anchorBound": [
+      "large_furniture",
+      "bed",
+      "desk",
+      "sofa",
+      "dining_set",
+      "television"
+    ],
+    "dynamic": [
+      "props",
+      "food",
+      "books",
+      "laundry",
+      "lighting",
+      "weather",
+      "time_of_day",
+      "particles",
+      "character_pose"
+    ],
+    "fallbackPreset": "warm-neutral-default"
+  }
+}
