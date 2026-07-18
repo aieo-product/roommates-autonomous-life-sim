@@ -148,6 +148,13 @@ function resolvedEvent() {
       { speaker: "aoi" as const, text: "うん、そうしよう。" },
       { speaker: "haru" as const, text: "今日はどんな一日だった？" },
     ],
+    storyBeats: [
+      { kind: "move" as const, actor: "both" as const, location: "リビング" },
+      { kind: "dialogue" as const, actor: "haru" as const, text: "少し話そうか。" },
+      { kind: "dialogue" as const, actor: "aoi" as const, text: "うん、そうしよう。" },
+      { kind: "action" as const, actor: "both" as const, action: "ソファに腰掛ける" },
+      { kind: "dialogue" as const, actor: "haru" as const, text: "今日はどんな一日だった？" },
+    ],
     effects: { haru: {}, aoi: {} },
     memory: {
       title: "リビングの会話",

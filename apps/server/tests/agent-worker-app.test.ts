@@ -98,6 +98,13 @@ function resolvedEvent() {
       { speaker: "aoi" as const, text: "うん、そうしよう。" },
       { speaker: "haru" as const, text: "今日はどんな一日だった？" },
     ],
+    storyBeats: [
+      { kind: "move" as const, actor: "both" as const, location: "リビング" },
+      { kind: "dialogue" as const, actor: "haru" as const, text: "少し話そうか。" },
+      { kind: "dialogue" as const, actor: "aoi" as const, text: "うん、そうしよう。" },
+      { kind: "action" as const, actor: "both" as const, action: "ソファに腰掛ける" },
+      { kind: "dialogue" as const, actor: "haru" as const, text: "今日はどんな一日だった？" },
+    ],
     effects: { haru: {}, aoi: {} },
     memory: {
       title: "リビングの会話",
@@ -715,10 +722,54 @@ describe("AgentWorker HTTP gateway", () => {
       turnTimeoutMs: 45_678,
     });
     expect(defaults).toMatchObject({
-      requestTimeoutMs: 10_000,
+      requestTimeoutMs: 30_000,
       turnTimeoutMs: 50_000,
       maxInvocationsPerMinute: 60,
+      modelPolicy: {
+        model: "gpt-5.6-terra",
+        fastReasoningEffort: "low",
+        deliberateReasoningEffort: "medium",
+      },
     });
+  });
+
+  it("allows Agent Worker-only model and reasoning overrides", () => {
+    const settings = readAgentWorkerSettings({
+      NODE_ENV: "production",
+      AGENT_WORKER_TOKEN: TOKEN,
+      AGENT_WORKER_MODEL: " gpt-5.6-sol ",
+      AGENT_WORKER_FAST_REASONING_EFFORT: "minimal",
+      AGENT_WORKER_DELIBERATE_REASONING_EFFORT: "high",
+    });
+
+    expect(settings.modelPolicy).toEqual({
+      model: "gpt-5.6-sol",
+      fastReasoningEffort: "minimal",
+      deliberateReasoningEffort: "high",
+    });
+  });
+
+  it("rejects invalid Agent Worker model policy settings", () => {
+    const base = {
+      NODE_ENV: "production",
+      AGENT_WORKER_TOKEN: TOKEN,
+    };
+
+    expect(() =>
+      readAgentWorkerSettings({ ...base, AGENT_WORKER_MODEL: "   " }),
+    ).toThrow("AGENT_WORKER_MODEL");
+    expect(() =>
+      readAgentWorkerSettings({
+        ...base,
+        AGENT_WORKER_FAST_REASONING_EFFORT: "fast",
+      }),
+    ).toThrow("AGENT_WORKER_FAST_REASONING_EFFORT");
+    expect(() =>
+      readAgentWorkerSettings({
+        ...base,
+        AGENT_WORKER_DELIBERATE_REASONING_EFFORT: "FAST",
+      }),
+    ).toThrow("AGENT_WORKER_DELIBERATE_REASONING_EFFORT");
   });
 
   it("shuts down only the owning process client", async () => {

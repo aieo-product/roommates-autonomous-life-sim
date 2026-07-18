@@ -57,6 +57,23 @@ export type CodexAppServerClientOptions = {
   sessionScopeTtlMs?: number;
   maxSessionScopes?: number;
   now?: () => number;
+  modelPolicy?: CodexAppServerModelPolicy;
+};
+
+export type AppServerReasoningEffort =
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max"
+  | "ultra";
+
+export type CodexAppServerModelPolicy = {
+  model: string;
+  fastReasoningEffort: AppServerReasoningEffort;
+  deliberateReasoningEffort: AppServerReasoningEffort;
 };
 
 export class AppServerScopeCapacityError extends Error {
@@ -72,6 +89,17 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_TURN_TIMEOUT_MS = 120_000;
 const DEFAULT_SESSION_SCOPE_TTL_MS = 30 * 60_000;
 const DEFAULT_MAX_SESSION_SCOPES = 64;
+const MAX_MODEL_NAME_LENGTH = 128;
+const APP_SERVER_REASONING_EFFORTS = new Set<AppServerReasoningEffort>([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+]);
 const DISABLED_FEATURES = [
   "shell_tool",
   "unified_exec",
@@ -127,6 +155,28 @@ function positiveTimeout(value: number | undefined, fallback: number, name: stri
     throw new Error(`${name} must be a positive finite number`);
   }
   return timeout;
+}
+
+function modelPolicy(
+  value: CodexAppServerModelPolicy | undefined,
+): CodexAppServerModelPolicy | undefined {
+  if (value === undefined) return undefined;
+
+  const model = value.model.trim();
+  if (model.length === 0 || model.length > MAX_MODEL_NAME_LENGTH) {
+    throw new Error(`modelPolicy.model must be 1-${MAX_MODEL_NAME_LENGTH} characters`);
+  }
+  if (!APP_SERVER_REASONING_EFFORTS.has(value.fastReasoningEffort)) {
+    throw new Error("modelPolicy.fastReasoningEffort is invalid");
+  }
+  if (!APP_SERVER_REASONING_EFFORTS.has(value.deliberateReasoningEffort)) {
+    throw new Error("modelPolicy.deliberateReasoningEffort is invalid");
+  }
+  return {
+    model,
+    fastReasoningEffort: value.fastReasoningEffort,
+    deliberateReasoningEffort: value.deliberateReasoningEffort,
+  };
 }
 
 function appServerEnvironment(): NodeJS.ProcessEnv {
@@ -190,6 +240,7 @@ export class CodexAppServerClient implements AppServerAdapter {
   private readonly sessionScopeTtlMs: number;
   private readonly maxSessionScopes: number;
   private readonly now: () => number;
+  private readonly modelPolicy?: CodexAppServerModelPolicy;
   private activeOperations = 0;
   private stderrTail = "";
 
@@ -219,6 +270,7 @@ export class CodexAppServerClient implements AppServerAdapter {
     }
     this.maxSessionScopes = maxSessionScopes;
     this.now = options.now ?? Date.now;
+    this.modelPolicy = modelPolicy(options.modelPolicy);
   }
 
   async navigate(input: NavigatorInput): Promise<{ value: unknown; threadId: string }> {
@@ -536,14 +588,22 @@ export class CodexAppServerClient implements AppServerAdapter {
           : reflectionCharacter
             ? reflectionInstructions(reflectionCharacter)
             : characterInstructions(role === "haru" ? "haru" : "aoi");
+    const reasoningEffort =
+      role === "director" || reflectionCharacter
+        ? this.modelPolicy?.deliberateReasoningEffort
+        : this.modelPolicy?.fastReasoningEffort;
     const result = (await this.request("thread/start", {
+      ...(this.modelPolicy ? { model: this.modelPolicy.model } : {}),
       cwd: this.cwd,
       approvalPolicy: "never",
       sandbox: "read-only",
       ephemeral: true,
       baseInstructions,
       experimentalRawEvents: false,
-      config: restrictedThreadConfig(),
+      config: {
+        ...restrictedThreadConfig(),
+        ...(reasoningEffort ? { model_reasoning_effort: reasoningEffort } : {}),
+      },
     })) as { thread?: { id?: string } };
     const id = result.thread?.id;
     if (!id) throw new Error("App Server did not return a thread ID");

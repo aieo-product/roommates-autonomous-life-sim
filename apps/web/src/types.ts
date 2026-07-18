@@ -3,6 +3,9 @@ import type {
   ResultEventLogEntry,
   ResultScreenData,
 } from "./result/types.js";
+import type { EventStoryBeat } from "@roommates/shared";
+
+export type { EventStoryBeat } from "@roommates/shared";
 
 export type Phase = "morning" | "afternoon" | "evening" | "night";
 
@@ -83,6 +86,7 @@ export interface GameEvent extends ResultEventLogEntry {
   haruDialogue?: string;
   aoiDialogue?: string;
   conversation?: EventConversationTurn[];
+  storyBeats?: EventStoryBeat[];
   haruDecision?: DecisionType;
   aoiDecision?: DecisionType;
   haruAction?: string;

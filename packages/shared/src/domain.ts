@@ -23,6 +23,28 @@ export type EventConversationLine = {
   speaker: (typeof eventConversationSpeakers)[number];
   text: string;
 };
+export const storyBeatActors = ["haru", "aoi", "both"] as const;
+export const storyBeatKinds = ["move", "dialogue", "action"] as const;
+export const EVENT_STORY_BEATS_MIN_LENGTH = 4;
+export const EVENT_STORY_BEATS_MAX_LENGTH = 8;
+export const EVENT_STORY_BEAT_LOCATION_MAX_LENGTH = 48;
+export const EVENT_STORY_BEAT_CONTENT_MAX_LENGTH = 160;
+export type EventStoryBeat =
+  | {
+      kind: "move";
+      actor: (typeof storyBeatActors)[number];
+      location: string;
+    }
+  | {
+      kind: "dialogue";
+      actor: CharacterId;
+      text: string;
+    }
+  | {
+      kind: "action";
+      actor: (typeof storyBeatActors)[number];
+      action: string;
+    };
 export type CoreAgentId = CharacterId | "director";
 export type AgentId = CoreAgentId | "navigator";
 export type AgentSource = "app_server" | "mock" | "fallback";
@@ -243,6 +265,8 @@ export type ResolvedEvent = {
    * newly resolved turns are normalized to 3-6 lines by the server.
    */
   conversation?: EventConversationLine[];
+  /** Ordered public choreography for the post-resolution scene. */
+  storyBeats?: EventStoryBeat[];
   effects: Record<CharacterId, StatDelta>;
   memory: {
     title: string;
@@ -305,6 +329,7 @@ export type EventLogEntry = {
   haruDialogue?: string;
   aoiDialogue?: string;
   conversation?: EventConversationLine[];
+  storyBeats?: EventStoryBeat[];
   haruPublicReason?: string;
   aoiPublicReason?: string;
   scene?: Partial<Record<CharacterId, string>>;

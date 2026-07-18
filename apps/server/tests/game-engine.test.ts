@@ -94,14 +94,19 @@ describe("GameEngine", () => {
       publicReason: acceptedDecision.publicReason,
     });
     expect(JSON.stringify(result)).not.toContain("internalSummary");
-    expect(streamed.map((event) => event.type)).toEqual([
+    const streamedTypes = streamed.map((event) => event.type);
+    expect(streamedTypes.slice(0, 4)).toEqual([
       "turn.started",
       "navigator.thinking",
+      "agent.thinking",
+      "agent.thinking",
+    ]);
+    expect(streamedTypes.slice(4, 7).sort()).toEqual([
+      "agent.completed",
+      "agent.completed",
       "navigator.completed",
-      "agent.thinking",
-      "agent.thinking",
-      "agent.completed",
-      "agent.completed",
+    ]);
+    expect(streamedTypes.slice(7)).toEqual([
       "director.resolving",
       "director.completed",
       "turn.completed",
@@ -119,6 +124,65 @@ describe("GameEngine", () => {
     expect(Object.isFrozen(safeSuggestion.alternatives)).toBe(true);
     expect(agents.navigatorInput?.resolvedSuggestion).toBe(safeSuggestion);
     expect(Object.isFrozen(agents.navigatorInput)).toBe(true);
+  });
+
+  it("starts navigator, Haru, and Aoi concurrently while keeping director downstream", async () => {
+    let releaseRoles!: () => void;
+    const roleGate = new Promise<void>((resolve) => {
+      releaseRoles = resolve;
+    });
+    const started = new Set<"navigator" | CharacterId>();
+    let directorStarted = false;
+
+    class ParallelRoleCoordinator implements AgentCoordinator {
+      async navigate(
+        _input: NavigatorInput,
+      ): Promise<AgentResult<NavigatorAgentOutput>> {
+        started.add("navigator");
+        await roleGate;
+        throw new Error("navigator failed independently");
+      }
+
+      async decide(
+        id: CharacterId,
+        _input: CharacterDecisionInput,
+      ): Promise<AgentResult<CharacterDecision>> {
+        started.add(id);
+        await roleGate;
+        return mockResult(acceptedDecision);
+      }
+
+      async resolve(
+        _input: DirectorInput,
+      ): Promise<AgentResult<ResolvedEvent>> {
+        directorStarted = true;
+        return mockResult(structuredClone(resolvedEvent));
+      }
+    }
+
+    const { engine } = await engineWith(new ParallelRoleCoordinator());
+    const turn = engine.resolveTurn(
+      "一緒に夕食を作ってみたら？",
+      "turn-key-three-parallel-roles",
+      0,
+    );
+
+    await vi.waitFor(() => {
+      expect([...started].sort()).toEqual(["aoi", "haru", "navigator"]);
+    });
+    expect(directorStarted).toBe(false);
+
+    releaseRoles();
+    const result = await turn;
+
+    expect(directorStarted).toBe(true);
+    expect(result.status).toBe("resolved");
+    expect(result.runtime.navigator).toMatchObject({
+      source: "fallback",
+      error: "navigator failed independently",
+    });
+    expect(result.runtime.haru.source).toBe("mock");
+    expect(result.runtime.aoi.source).toBe("mock");
   });
 
   it("passes the selected profile and personality to both agents and exposes their chosen goals", async () => {

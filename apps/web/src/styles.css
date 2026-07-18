@@ -716,6 +716,10 @@ a:focus-visible,
   animation: characterTalk 520ms ease-in-out infinite alternate;
 }
 
+.scene-character.is-acting .character-sprite {
+  animation: characterAction 720ms cubic-bezier(.2,.8,.25,1) infinite;
+}
+
 .scene-nameplate {
   width: 78px;
   margin: 0 auto;
@@ -813,6 +817,18 @@ a:focus-visible,
 }
 
 .speech-aoi small { color: #b34f6b; }
+
+.scene-speech.is-action {
+  background: #fff1a8;
+  border-color: #574b25;
+}
+
+.scene-speech.is-action::after {
+  background: #fff1a8;
+  border-color: #574b25;
+}
+
+.scene-speech.is-action small { color: #9c5c16; }
 
 .scene-speech p {
   margin: 3px 0 0;
@@ -2074,6 +2090,12 @@ a:focus-visible,
   to { transform: translateY(-3px) rotate(1deg); }
 }
 
+@keyframes characterAction {
+  0%,100% { transform: translateY(0) rotate(0) scale(1); }
+  35% { transform: translateY(-7px) rotate(-4deg) scale(1.05); }
+  65% { transform: translateY(-3px) rotate(4deg) scale(1.03); }
+}
+
 @keyframes thinkBounce {
   0%,100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
@@ -2222,7 +2244,8 @@ a:focus-visible,
     transform: translateX(-64px) !important;
   }
 
-  .scene-character.is-conversing .character-sprite {
+  .scene-character.is-conversing .character-sprite,
+  .scene-character.is-acting .character-sprite {
     animation: none !important;
     transform: none !important;
   }

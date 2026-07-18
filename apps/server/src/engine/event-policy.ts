@@ -3,6 +3,7 @@ import type {
   CharacterId,
   EventConversationLine,
   EventDefinition,
+  EventStoryBeat,
   GameState,
   ResolvedEvent,
   StatDelta,
@@ -10,6 +11,9 @@ import type {
 import {
   EVENT_CONVERSATION_MAX_LINES,
   EVENT_CONVERSATION_TEXT_MAX_LENGTH,
+  EVENT_STORY_BEAT_CONTENT_MAX_LENGTH,
+  EVENT_STORY_BEAT_LOCATION_MAX_LENGTH,
+  eventStoryBeatsSchema,
   mutableStatKeys,
 } from "@roommates/shared";
 
@@ -248,7 +252,12 @@ function safeScene(
 ): ResolvedEvent["scene"] {
   const scene = { ...(event.scene ?? {}) };
   for (const id of ["haru", "aoi"] as const) {
-    if (cooperative.has(decisions[id].decision)) continue;
+    if (cooperative.has(decisions[id].decision)) {
+      if (!scene[id]?.trim() && originalLocations?.[id]?.trim()) {
+        scene[id] = originalLocations[id];
+      }
+      continue;
+    }
     const other = id === "haru" ? "aoi" : "haru";
     const original = originalLocations?.[id]?.trim();
     const participatingTarget = cooperative.has(decisions[other].decision)
@@ -263,7 +272,230 @@ function safeScene(
         ? original
         : "自室";
   }
+  for (const id of ["haru", "aoi"] as const) {
+    const location = scene[id]?.trim().slice(0, EVENT_STORY_BEAT_LOCATION_MAX_LENGTH).trim();
+    if (location) scene[id] = location;
+    else delete scene[id];
+  }
   return Object.keys(scene).length > 0 ? scene : undefined;
+}
+
+function storyText(value: string, fallback: string): string {
+  const normalized = value.trim().slice(0, EVENT_STORY_BEAT_CONTENT_MAX_LENGTH).trim();
+  return normalized || fallback;
+}
+
+function storyLocation(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim().slice(0, EVENT_STORY_BEAT_LOCATION_MAX_LENGTH).trim();
+  return normalized || fallback;
+}
+
+/**
+ * Pick a nearby, narratively useful waypoint outside the final room. Keeping
+ * this distinct from the committed scene guarantees that even a one-location
+ * Director response becomes a visible journey instead of an in-place walk.
+ */
+function storyStagingLocation(finalLocation: string): string {
+  const stagingByZone: Record<string, string> = {
+    kitchen: "ダイニングの食卓",
+    dining: "キッチンの調理台",
+    living: "ダイニングの食卓",
+    balcony: "リビングの窓際",
+    entry: "廊下",
+    bathroom: "洗面所",
+    washroom: "廊下",
+    hallway: "玄関のドア側",
+  };
+  return stagingByZone[locationZone(finalLocation)] ?? "廊下";
+}
+
+function fallbackStoryBeats(
+  event: ResolvedEvent,
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+  conversation: EventConversationLine[],
+  scene: ResolvedEvent["scene"],
+): EventStoryBeat[] {
+  const haruJoins = cooperative.has(decisions.haru.decision);
+  const aoiJoins = cooperative.has(decisions.aoi.decision);
+  const haruLocation = storyLocation(scene?.haru, "Haruの自室");
+  const aoiLocation = storyLocation(scene?.aoi, "Aoiの自室");
+  const sharedDestination = haruJoins && aoiJoins && haruLocation === aoiLocation;
+  const story: EventStoryBeat[] = sharedDestination
+    ? [
+        { kind: "move", actor: "both", location: storyStagingLocation(haruLocation) },
+        { kind: "dialogue", actor: conversation[0]!.speaker, text: conversation[0]!.text },
+        { kind: "dialogue", actor: conversation[1]!.speaker, text: conversation[1]!.text },
+        { kind: "move", actor: "both", location: haruLocation },
+      ]
+    : [
+        { kind: "move", actor: "haru", location: haruLocation },
+        { kind: "move", actor: "aoi", location: aoiLocation },
+        { kind: "dialogue", actor: conversation[0]!.speaker, text: conversation[0]!.text },
+        { kind: "dialogue", actor: conversation[1]!.speaker, text: conversation[1]!.text },
+      ];
+  const actionActor = haruJoins && aoiJoins
+    ? "both"
+    : haruJoins
+      ? "haru"
+      : aoiJoins
+        ? "aoi"
+        : "haru";
+  const actionText = actionActor === "both"
+    ? `${decisions.haru.action}。${decisions.aoi.action}`
+    : decisions[actionActor].action;
+  story.push({
+    kind: "action",
+    actor: actionActor,
+    action: storyText(actionText, storyText(event.narration, "それぞれの時間を過ごす")),
+  });
+  const remainingSlots = 8 - story.length;
+  for (const line of conversation.slice(2, 2 + remainingSlots)) {
+    story.push({ kind: "dialogue", actor: line.speaker, text: line.text });
+  }
+  return story.slice(0, 8);
+}
+
+/**
+ * AppServer output is intentionally tolerant for compatibility. If a model
+ * returns only one destination, retain its dialogue/action but introduce a
+ * staging waypoint and a second move immediately before the action.
+ */
+function ensureCooperativeJourney(
+  beats: EventStoryBeat[],
+  finalLocation: string,
+): EventStoryBeat[] | undefined {
+  if (hasNarrativeJourney(beats)) return beats;
+  // A malformed multi-move draft is safer to replace than to guess which
+  // destination should own each existing action or line.
+  if (beats.filter((beat) => beat.kind === "move").length !== 1) return undefined;
+  if (beats.length >= 8) return undefined;
+
+  const actionIndex = beats.findIndex((beat) => beat.kind === "action");
+  if (actionIndex < 0) return undefined;
+  const preActionMoves = beats
+    .map((beat, index) => beat.kind === "move" && index < actionIndex ? index : -1)
+    .filter((index) => index >= 0);
+  if (preActionMoves.length === 0) return undefined;
+
+  const stagingLocation = storyStagingLocation(finalLocation);
+  if (stagingLocation === finalLocation) return undefined;
+  const staged = beats.map((beat, index): EventStoryBeat =>
+    preActionMoves.includes(index) && beat.kind === "move"
+      ? { ...beat, location: stagingLocation }
+      : beat,
+  );
+  const stagedJourney: EventStoryBeat[] = [
+    ...staged.slice(0, actionIndex),
+    { kind: "move", actor: "both", location: finalLocation },
+    ...staged.slice(actionIndex),
+  ];
+  return hasNarrativeJourney(stagedJourney) ? stagedJourney : undefined;
+}
+
+/**
+ * Consecutive per-character moves form one movement stage. A complete journey
+ * needs two distinct stages, with dialogue or action at every destination.
+ */
+function hasNarrativeJourney(beats: EventStoryBeat[]): boolean {
+  const stages: Array<{ start: number; end: number; locations: string[] }> = [];
+  for (let index = 0; index < beats.length; index += 1) {
+    const beat = beats[index];
+    if (beat?.kind !== "move") continue;
+    const previous = stages.at(-1);
+    if (previous && previous.end === index - 1) {
+      previous.end = index;
+      previous.locations.push(beat.location);
+    } else {
+      stages.push({ start: index, end: index, locations: [beat.location] });
+    }
+  }
+  if (stages.length < 2) return false;
+  if (new Set(stages.flatMap((stage) => stage.locations)).size < 2) return false;
+  return stages.every((stage, index) => {
+    const nextStart = stages[index + 1]?.start ?? beats.length;
+    return beats.slice(stage.end + 1, nextStart).some((beat) => beat.kind !== "move");
+  });
+}
+
+function lastMoveIndexFor(beats: EventStoryBeat[], id: CharacterId): number {
+  for (let index = beats.length - 1; index >= 0; index -= 1) {
+    const beat = beats[index];
+    if (beat?.kind === "move" && (beat.actor === id || beat.actor === "both")) return index;
+  }
+  return -1;
+}
+
+function safeStoryBeats(
+  event: ResolvedEvent,
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+  conversation: EventConversationLine[],
+  scene: ResolvedEvent["scene"],
+): EventStoryBeat[] {
+  const haruJoins = cooperative.has(decisions.haru.decision);
+  const aoiJoins = cooperative.has(decisions.aoi.decision);
+  const bothJoin = haruJoins && aoiJoins;
+  let dialogueIndex = 0;
+  const authored = (event.storyBeats ?? []).flatMap((beat): EventStoryBeat[] => {
+    if (beat.kind === "move") {
+      if (beat.actor === "both" && !bothJoin) return [];
+      const actor = beat.actor;
+      const safeTarget = actor !== "both" && !cooperative.has(decisions[actor].decision)
+        ? scene?.[actor]
+        : beat.location;
+      return [{
+        kind: "move",
+        actor: beat.actor,
+        location: storyLocation(safeTarget, beat.actor === "aoi" ? "Aoiの自室" : "Haruの自室"),
+      }];
+    }
+    if (beat.kind === "dialogue") {
+      const line = conversation[dialogueIndex];
+      dialogueIndex += 1;
+      return line ? [{ kind: "dialogue", actor: line.speaker, text: line.text }] : [];
+    }
+    if (beat.actor === "both" && !bothJoin) return [];
+    const action = beat.actor !== "both" && !cooperative.has(decisions[beat.actor].decision)
+      ? decisions[beat.actor].action
+      : beat.action;
+    return [{
+      kind: "action",
+      actor: beat.actor,
+      action: storyText(action, "自分のペースで時間を過ごす"),
+    }];
+  });
+
+  if (dialogueIndex < 3) {
+    return fallbackStoryBeats(event, decisions, conversation, scene);
+  }
+
+  const haruMove = lastMoveIndexFor(authored, "haru");
+  const aoiMove = lastMoveIndexFor(authored, "aoi");
+  if (haruMove < 0 || aoiMove < 0) {
+    return fallbackStoryBeats(event, decisions, conversation, scene);
+  }
+  const haruFinal = storyLocation(scene?.haru, "Haruの自室");
+  const aoiFinal = storyLocation(scene?.aoi, "Aoiの自室");
+  const haruBeat = authored[haruMove];
+  const aoiBeat = authored[aoiMove];
+  if (haruBeat?.kind !== "move" || aoiBeat?.kind !== "move") {
+    return fallbackStoryBeats(event, decisions, conversation, scene);
+  }
+  if ((haruBeat.actor === "both" || aoiBeat.actor === "both") && haruFinal !== aoiFinal) {
+    return fallbackStoryBeats(event, decisions, conversation, scene);
+  }
+  haruBeat.location = haruFinal;
+  aoiBeat.location = aoiFinal;
+
+  const normalized = bothJoin && haruFinal === aoiFinal
+    ? ensureCooperativeJourney(authored, haruFinal)
+    : authored;
+  if (!normalized) {
+    return fallbackStoryBeats(event, decisions, conversation, scene);
+  }
+  const parsed = eventStoryBeatsSchema.safeParse(normalized);
+  return parsed.success
+    ? parsed.data
+    : fallbackStoryBeats(event, decisions, conversation, scene);
 }
 
 export function constrainResolvedEvent(
@@ -313,14 +545,17 @@ export function constrainResolvedEvent(
     branch === "bothParticipate"
       ? event.narration
       : `${definition.branches[branch]} ${event.narration}`.trim();
+  const conversation = safeConversation(event, decisions);
+  const scene = safeScene(event, decisions, options.originalLocations);
 
   return {
     ...event,
     narration,
     haruDialogue: decisions.haru.dialogue,
     aoiDialogue: decisions.aoi.dialogue,
-    conversation: safeConversation(event, decisions),
-    scene: safeScene(event, decisions, options.originalLocations),
+    conversation,
+    storyBeats: safeStoryBeats(event, decisions, conversation, scene),
+    scene,
     effects: { haru: haruEffects, aoi: aoiEffects },
     memory: {
       ...event.memory,
