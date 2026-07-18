@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
@@ -23,14 +23,14 @@
         "assetId": "haru-bed",
         "roomId": "haru_room",
         "anchorId": "haru_bed",
-        "pivot": { "x": 550, "y": 213 },
+        "floorContact": { "x": 3.5, "y": 5.5 },
         "displayScale": 0.9
       },
       {
         "instanceId": "haru-storage-shelf",
         "assetId": "storage-shelf",
         "roomId": "haru_room",
-        "pivot": { "x": 620, "y": 205 },
+        "floorContact": { "x": 5.5, "y": 4 },
         "displayScale": 0.72
       },
       {
@@ -38,14 +38,14 @@
         "assetId": "work-desk",
         "roomId": "haru_room",
         "anchorId": "haru_desk",
-        "pivot": { "x": 725, "y": 225 },
+        "floorContact": { "x": 7.5, "y": 2.5 },
         "displayScale": 0.8
       },
       {
         "instanceId": "haru-desk-chair",
         "assetId": "desk-chair",
         "roomId": "haru_room",
-        "pivot": { "x": 670, "y": 255 },
+        "floorContact": { "x": 6.5, "y": 3.5 },
         "displayScale": 0.72
       },
       {
@@ -53,7 +53,7 @@
         "assetId": "aoi-bed",
         "roomId": "aoi_room",
         "anchorId": "aoi_bed",
-        "pivot": { "x": 750, "y": 313 },
+        "floorContact": { "x": 11.5, "y": 5.5 },
         "displayScale": 0.9
       },
       {
@@ -61,21 +61,21 @@
         "assetId": "work-desk",
         "roomId": "aoi_room",
         "anchorId": "aoi_desk",
-        "pivot": { "x": 925, "y": 325 },
+        "floorContact": { "x": 15.5, "y": 2.5 },
         "displayScale": 0.8
       },
       {
         "instanceId": "aoi-desk-chair",
         "assetId": "desk-chair",
         "roomId": "aoi_room",
-        "pivot": { "x": 870, "y": 355 },
+        "floorContact": { "x": 14.5, "y": 3.5 },
         "displayScale": 0.72
       },
       {
         "instanceId": "balcony-laundry-basket",
         "assetId": "laundry-basket",
         "roomId": "balcony",
-        "pivot": { "x": 350, "y": 420 },
+        "floorContact": { "x": 8, "y": 18 },
         "displayScale": 0.72
       },
       {
@@ -83,28 +83,28 @@
         "assetId": "dining-table",
         "roomId": "dining",
         "anchorId": "dining_table",
-        "pivot": { "x": 600, "y": 425 },
+        "floorContact": { "x": 13, "y": 13 },
         "displayScale": 0.95
       },
       {
         "instanceId": "dining-chair-west",
         "assetId": "dining-chair",
         "roomId": "dining",
-        "pivot": { "x": 485, "y": 455 },
+        "floorContact": { "x": 11, "y": 14 },
         "displayScale": 0.72
       },
       {
         "instanceId": "dining-chair-east",
         "assetId": "dining-chair",
         "roomId": "dining",
-        "pivot": { "x": 655, "y": 455 },
+        "floorContact": { "x": 14, "y": 12 },
         "displayScale": 0.72
       },
       {
         "instanceId": "living-floor-lamp",
         "assetId": "floor-lamp",
         "roomId": "living",
-        "pivot": { "x": 820, "y": 515 },
+        "floorContact": { "x": 21, "y": 12 },
         "displayScale": 0.7
       },
       {
@@ -112,28 +112,28 @@
         "assetId": "sofa",
         "roomId": "living",
         "anchorId": "living_sofa",
-        "pivot": { "x": 900, "y": 525 },
+        "floorContact": { "x": 23, "y": 11 },
         "displayScale": 0.9
       },
       {
         "instanceId": "living-low-table",
         "assetId": "low-table",
         "roomId": "living",
-        "pivot": { "x": 725, "y": 545 },
+        "floorContact": { "x": 20, "y": 14 },
         "displayScale": 0.9
       },
       {
         "instanceId": "living-tv-console",
         "assetId": "tv-console",
         "roomId": "living",
-        "pivot": { "x": 1010, "y": 555 },
+        "floorContact": { "x": 18, "y": 16 },
         "displayScale": 0.76
       },
       {
         "instanceId": "living-potted-plant",
         "assetId": "potted-plant",
         "roomId": "living",
-        "pivot": { "x": 965, "y": 570 },
+        "floorContact": { "x": 24, "y": 9 },
         "displayScale": 0.72
       }
     ]

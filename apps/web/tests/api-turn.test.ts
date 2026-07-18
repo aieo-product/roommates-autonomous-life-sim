@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CHARACTER_SETTINGS } from "@roommates/shared";
-import { runTurn } from "../src/api.js";
+import { INITIAL_GAME_STATE, normalizeGameState, runTurn } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -61,5 +61,62 @@ describe("runTurn SSE handling", () => {
     )).resolves.toBeUndefined();
 
     expect(events).toEqual(["turn.completed"]);
+  });
+});
+
+describe("App Server event normalization", () => {
+  it("keeps a Director conversation from a nested event payload", () => {
+    const normalized = normalizeGameState({
+      data: {
+        state: {
+          status: "resolved",
+          day: 2,
+          phase: "evening",
+          revision: 5,
+          directorResult: {
+            id: "app-server-event",
+            director: {
+              eventTitle: "夕食の相談",
+              narration: "ふたりはキッチンへ移動した。",
+              conversation: [
+                { speaker: "haru", text: "今日は何を作ろうか。" },
+                { speaker: "aoi", text: "温かいものがいいな。" },
+                { speaker: "haru", text: "じゃあ一緒にスープを作ろう。" },
+              ],
+            },
+          },
+        },
+      },
+    }, INITIAL_GAME_STATE);
+
+    expect(normalized.currentEvent?.conversation).toEqual([
+      { speaker: "haru", text: "今日は何を作ろうか。" },
+      { speaker: "aoi", text: "温かいものがいいな。" },
+      { speaker: "haru", text: "じゃあ一緒にスープを作ろう。" },
+    ]);
+  });
+
+  it("accepts snake-case conversation and legacy line aliases", () => {
+    const normalized = normalizeGameState({
+      state: {
+        status: "resolved",
+        eventLog: [{
+          id: "snake-event",
+          day: 3,
+          phase: "night",
+          event_title: "夜の会話",
+          narration: "静かな会話が続いた。",
+          event_conversation: [
+            { character: "Aoi", dialogue: " 今日はありがとう。 " },
+            { person: "haru", line: "こちらこそ。" },
+          ],
+        }],
+      },
+    }, INITIAL_GAME_STATE);
+
+    expect(normalized.eventLog[0]?.conversation).toEqual([
+      { speaker: "aoi", text: "今日はありがとう。" },
+      { speaker: "haru", text: "こちらこそ。" },
+    ]);
   });
 });

@@ -30,6 +30,11 @@ export class MockDirectorAgent implements DirectorAgent {
     if (!together) {
       const oneJoins = haruJoins || aoiJoins;
       const base = pressure ? effects.pressure : effects.rest;
+      const acknowledgement = haruJoins
+        ? { speaker: "haru" as const, text: "わかった。今日はそれぞれのペースで過ごそう。" }
+        : aoiJoins
+          ? { speaker: "aoi" as const, text: "わかった。今日はそれぞれのペースで過ごそう。" }
+          : { speaker: "haru" as const, text: "うん。今日はそれぞれの時間を大切にしよう。" };
       return {
         eventTitle: oneJoins ? "すれ違ったタイミング" : "それぞれの静かな時間",
         narration: oneJoins
@@ -37,6 +42,11 @@ export class MockDirectorAgent implements DirectorAgent {
           : "二人は同じ部屋にいながら、それぞれの時間を過ごした。何も起こさないことも、ひとつの選択だった。",
         haruDialogue: input.haruDecision.dialogue,
         aoiDialogue: input.aoiDecision.dialogue,
+        conversation: [
+          { speaker: "haru", text: input.haruDecision.dialogue || "今は自分の時間を過ごすね。" },
+          { speaker: "aoi", text: input.aoiDecision.dialogue || "私も自分のペースで過ごすね。" },
+          acknowledgement,
+        ],
         effects: {
           haru: scale(base, haruJoins ? 0.3 : 0.8),
           aoi: scale(base, aoiJoins ? 0.3 : 0.8),
@@ -69,6 +79,12 @@ export class MockDirectorAgent implements DirectorAgent {
       narration: `二人は提案をそのまま命令としてではなく、自分たちなりのきっかけとして選び取った。${input.haruDecision.action}Haruと、${input.aoiDecision.action}Aoiの間に、少しだけ自然な空気が流れた。`,
       haruDialogue: input.haruDecision.dialogue,
       aoiDialogue: input.aoiDecision.dialogue,
+      conversation: [
+        { speaker: "haru", text: input.haruDecision.dialogue || "一緒にやってみようか。" },
+        { speaker: "aoi", text: input.aoiDecision.dialogue || "うん、やってみよう。" },
+        { speaker: "haru", text: "それじゃ、できるところから始めよう。" },
+        { speaker: "aoi", text: "うん。二人のペースで進めよう。" },
+      ],
       effects: { haru: base, aoi: scale(base, tag === "cook" ? 1.1 : 1) },
       memory: {
         title: titles[tag],

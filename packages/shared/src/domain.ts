@@ -15,6 +15,14 @@ export type RelationshipLabel = (typeof relationshipLabels)[number];
 export const decisions = ["ACCEPT", "DECLINE", "MODIFY", "IGNORE", "INITIATE"] as const;
 export type DecisionKind = (typeof decisions)[number];
 export type CharacterId = "haru" | "aoi";
+export const eventConversationSpeakers = ["haru", "aoi"] as const;
+export const EVENT_CONVERSATION_MIN_LINES = 3;
+export const EVENT_CONVERSATION_MAX_LINES = 6;
+export const EVENT_CONVERSATION_TEXT_MAX_LENGTH = 160;
+export type EventConversationLine = {
+  speaker: (typeof eventConversationSpeakers)[number];
+  text: string;
+};
 export type CoreAgentId = CharacterId | "director";
 export type AgentId = CoreAgentId | "navigator";
 export type AgentSource = "app_server" | "mock" | "fallback";
@@ -230,6 +238,11 @@ export type ResolvedEvent = {
   navigatorMessage?: string;
   haruDialogue: string;
   aoiDialogue: string;
+  /**
+   * Public post-event exchange. Optional only for persisted save compatibility;
+   * newly resolved turns are normalized to 3-6 lines by the server.
+   */
+  conversation?: EventConversationLine[];
   effects: Record<CharacterId, StatDelta>;
   memory: {
     title: string;
@@ -291,6 +304,7 @@ export type EventLogEntry = {
   aoiAction?: string;
   haruDialogue?: string;
   aoiDialogue?: string;
+  conversation?: EventConversationLine[];
   haruPublicReason?: string;
   aoiPublicReason?: string;
   scene?: Partial<Record<CharacterId, string>>;

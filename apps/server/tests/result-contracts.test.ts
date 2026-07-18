@@ -1,6 +1,8 @@
 import {
   createInitialGameState,
+  directorResolvedEventSchema,
   eventLogEntrySchema,
+  resolvedEventSchema,
   gameResultSchema,
   gameStateSchema,
   type GameState,
@@ -215,6 +217,48 @@ const readyResult = {
 };
 
 describe("GameState v2 persistence contracts", () => {
+  it("keeps legacy events without conversation while validating new Director exchanges", () => {
+    const legacyEvent = {
+      eventTitle: "静かな朝",
+      narration: "二人はそれぞれの朝を過ごした。",
+      haruDialogue: "おはよう。",
+      aoiDialogue: "おはよう。",
+      effects: { haru: {}, aoi: {} },
+      memory: {
+        title: "静かな朝",
+        summary: "短い挨拶を交わした",
+        emotionalImpact: 1,
+        importance: 2,
+      },
+    };
+    const conversation = [
+      { speaker: "haru" as const, text: "おはよう。" },
+      { speaker: "aoi" as const, text: "おはよう。よく眠れた？" },
+      { speaker: "haru" as const, text: "うん。今日はゆっくり始めよう。" },
+    ];
+
+    expect(resolvedEventSchema.parse(legacyEvent)).toEqual(legacyEvent);
+    expect(directorResolvedEventSchema.safeParse(legacyEvent).success).toBe(false);
+    expect(
+      directorResolvedEventSchema.parse({ ...legacyEvent, conversation }).conversation,
+    ).toEqual(conversation);
+    expect(
+      directorResolvedEventSchema.safeParse({
+        ...legacyEvent,
+        conversation: conversation.slice(0, 2),
+      }).success,
+    ).toBe(false);
+    expect(
+      directorResolvedEventSchema.safeParse({
+        ...legacyEvent,
+        conversation: [
+          ...conversation,
+          { speaker: "aoi", text: "あ".repeat(161) },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
   it("migrates a persisted v1 state and removes private decision summaries", () => {
     const initial = createInitialGameState("legacy-save");
     const legacySave = {

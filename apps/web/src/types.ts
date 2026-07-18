@@ -47,6 +47,11 @@ export interface AgentDecision {
   publicReason?: string;
 }
 
+export type EventConversationTurn = {
+  speaker: "haru" | "aoi";
+  text: string;
+};
+
 export interface Memory {
   id: string;
   sourceEventId?: string;
@@ -77,6 +82,7 @@ export interface GameEvent extends ResultEventLogEntry {
   narration: string;
   haruDialogue?: string;
   aoiDialogue?: string;
+  conversation?: EventConversationTurn[];
   haruDecision?: DecisionType;
   aoiDecision?: DecisionType;
   haruAction?: string;

@@ -141,6 +141,11 @@ describe("MockDirectorAgent", () => {
     expect(event.narration).toContain("無理に同じ行動をすることはなかった");
     expect(event.effects.aoi.energy).toBeGreaterThan(0);
     expect(event.memory.summary).toContain("無理に従わず");
+    expect(event.conversation).toHaveLength(3);
+    expect(event.conversation?.[1]).toEqual({
+      speaker: "aoi",
+      text: "今日はやめておくね。",
+    });
   });
 
   it("creates a cooperative tag-specific event when both independently join", async () => {
@@ -158,5 +163,9 @@ describe("MockDirectorAgent", () => {
     expect(event.eventTitle).toContain("共同料理");
     expect(event.effects.haru.affection).toBeGreaterThan(0);
     expect(event.scene).toEqual({ haru: "キッチン", aoi: "キッチン" });
+    expect(event.conversation).toHaveLength(4);
+    expect(new Set(event.conversation?.map((line) => line.speaker))).toEqual(
+      new Set(["haru", "aoi"]),
+    );
   });
 });
