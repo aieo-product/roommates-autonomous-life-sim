@@ -67,4 +67,21 @@ describe("Dekopin web presentation", () => {
     expect(app).toContain("デコピンが反映したイベント");
     expect(css).toContain("image-rendering: pixelated");
   });
+
+  it("shows character execution state without a decision badge in speech bubbles", () => {
+    const app = readFileSync(new URL("../../web/src/App.tsx", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../../web/src/styles.css", import.meta.url), "utf8");
+    const sceneStart = app.indexOf("function SceneCharacter");
+    const sceneEnd = app.indexOf("function ApartmentStage", sceneStart);
+    const scene = app.slice(sceneStart, sceneEnd);
+
+    expect(scene).toContain("character-running-indicator");
+    expect(scene).toContain("、判断中。選択");
+    expect(scene).toContain("aria-busy={thinking ? true : undefined}");
+    expect(scene).toContain('className="character-running-object" aria-hidden="true"');
+    expect(scene).toContain("<strong>判断中</strong>");
+    expect(scene).not.toContain("DECISION_LABELS[decision.decision]");
+    expect(css).toContain("@keyframes agentRunningDot");
+    expect(css).not.toContain(".scene-speech span");
+  });
 });
