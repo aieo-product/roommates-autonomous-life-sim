@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { resetRequestSchema, turnRequestSchema, type StreamEvent } from "@roommates/shared";
+import { characterSettingsSchema, resetRequestSchema, turnRequestSchema, type StreamEvent } from "@roommates/shared";
 import { config } from "./config.js";
 import { GameConflictError, type GameEngine } from "./engine/game-engine.js";
 
@@ -56,6 +56,7 @@ export function createApp(engine: GameEngine) {
         parsed.data.idempotencyKey,
         parsed.data.revision,
         (event) => sse(response, event),
+        parsed.data.characterSettings,
       );
     } catch (error) {
       sse(response, { type: "error", message: errorMessage(error) });
@@ -89,7 +90,12 @@ export function createApp(engine: GameEngine) {
   app.post("/api/game/fast-forward", async (request, response, next) => {
     try {
       const turns = typeof request.body?.turns === "number" ? request.body.turns : 8;
-      response.json(await engine.fastForward(turns));
+      const parsedSettings = characterSettingsSchema.safeParse(request.body?.characterSettings);
+      if (request.body?.characterSettings !== undefined && !parsedSettings.success) {
+        response.status(400).json({ error: "個性設定が正しくありません" });
+        return;
+      }
+      response.json(await engine.fastForward(turns, parsedSettings.success ? parsedSettings.data : undefined));
     } catch (error) {
       next(error);
     }

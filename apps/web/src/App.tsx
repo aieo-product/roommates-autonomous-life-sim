@@ -36,6 +36,8 @@ import type {
   RuntimeInfo,
   StreamMessage,
 } from "./types";
+import { PersonalityStudio } from "./personality/PersonalityStudio";
+import { useCharacterSettings } from "./personality/useCharacterSettings";
 
 type InspectorTab = "status" | "schedule" | "memories";
 type StageStatus = "waiting" | "active" | "complete";
@@ -69,7 +71,10 @@ const PHASES: { id: Phase; label: string; short: string; time: string; icon: str
   { id: "night", label: "夜", short: "夜", time: "22:00", icon: "☾" },
 ];
 
-const PEOPLE: Record<CharacterId, { name: string; job: string; age: number }> = {
+type PersonInfo = { name: string; job: string; age: number };
+type People = Record<CharacterId, PersonInfo>;
+
+const PEOPLE: People = {
   haru: { name: "Haru", job: "Web Engineer", age: 27 },
   aoi: { name: "Aoi", job: "Designer", age: 26 },
 };
@@ -206,12 +211,14 @@ function PhaseRail({ game }: { game: GameState }) {
 
 function ResidentChip({
   person,
+  info,
   state,
   selected,
   thinking,
   onSelect,
 }: {
   person: CharacterId;
+  info: PersonInfo;
   state: CharacterState;
   selected: boolean;
   thinking: boolean;
@@ -221,7 +228,7 @@ function ResidentChip({
     <button type="button" className={`resident-chip resident-${person} ${selected ? "is-selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
       <PixelPortrait person={person} thinking={thinking} />
       <span className="resident-chip-copy">
-        <span><strong>{PEOPLE[person].name}</strong><small>{state.mood}</small></span>
+        <span><strong>{info.name}</strong><small>{state.mood}</small></span>
         <span className="chip-bars">
           <i className="chip-energy" style={{ "--value": `${state.energy}%` } as CSSProperties} />
           <i className="chip-stress" style={{ "--value": `${state.stress}%` } as CSSProperties} />
@@ -315,6 +322,7 @@ function FurnitureLayer() {
 
 function SceneCharacter({
   person,
+  name,
   point,
   selected,
   thinking,
@@ -323,6 +331,7 @@ function SceneCharacter({
   onSelect,
 }: {
   person: CharacterId;
+  name: string;
   point: Point;
   selected: boolean;
   thinking: boolean;
@@ -338,7 +347,7 @@ function SceneCharacter({
       transform={`translate(${point.x} ${point.y})`}
       role="button"
       tabIndex={0}
-      aria-label={`${PEOPLE[person].name}を選択`}
+      aria-label={`${name}を選択`}
       onClick={activate}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -362,7 +371,7 @@ function SceneCharacter({
         <path className="character-arm arm-right" d="M20-27L33 2l-9 5-13-24z" />
       </g>
       <foreignObject x="-45" y="28" width="90" height="30" className="nameplate-object">
-        <div className="scene-nameplate">{PEOPLE[person].name}</div>
+        <div className="scene-nameplate">{name}</div>
       </foreignObject>
       {thinking && (
         <foreignObject x="-34" y="-122" width="68" height="40">
@@ -372,7 +381,7 @@ function SceneCharacter({
       {!thinking && dialogue && (
         <foreignObject x={bubbleX} y="-142" width="208" height="94" className="speech-object">
           <div className={`scene-speech speech-${person}`}>
-            <small>{PEOPLE[person].name}</small>
+            <small>{name}</small>
             <p>{clipText(dialogue, 46)}</p>
             {decision && <span>{DECISION_LABELS[decision.decision]}</span>}
           </div>
@@ -384,6 +393,7 @@ function SceneCharacter({
 
 function ApartmentStage({
   game,
+  people,
   stages,
   selectedPerson,
   currentEvent,
@@ -391,6 +401,7 @@ function ApartmentStage({
   onSelectPerson,
 }: {
   game: GameState;
+  people: People;
   stages: TurnStages;
   selectedPerson: CharacterId;
   currentEvent?: GameEvent;
@@ -412,7 +423,7 @@ function ApartmentStage({
 
   return (
     <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""}`}>
-      <svg viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HaruとAoiが暮らす2LDKを南西側の斜め上から見た全景">
+      <svg viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${people.haru.name}と${people.aoi.name}が暮らす2LDKを南西側の斜め上から見た全景`}>
         <defs>
           <pattern id="floor-grid" width="50" height="25" patternUnits="userSpaceOnUse">
             <path d="M25 0L50 12.5 25 25 0 12.5z" fill="none" stroke="rgba(44,63,86,.11)" strokeWidth="1" />
@@ -463,8 +474,8 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} decision={game.decisions.haru} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} decision={game.decisions.aoi} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} decision={game.decisions.haru} onSelect={() => onSelectPerson("haru")} />
+            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} decision={game.decisions.aoi} onSelect={() => onSelectPerson("aoi")} />
           </g>
         </g>
       </svg>
@@ -521,16 +532,17 @@ function EventCard({ event, resolving, lastSuggestion }: { event?: GameEvent; re
 
 function CharacterInspector({
   person,
+  info,
   state,
   decision,
   thinking,
 }: {
   person: CharacterId;
+  info: PersonInfo;
   state: CharacterState;
   decision?: AgentDecision;
   thinking: boolean;
 }) {
-  const info = PEOPLE[person];
   return (
     <section className={`inspector-character character-${person}`}>
       <div className="inspector-profile">
@@ -559,7 +571,7 @@ function CharacterInspector({
   );
 }
 
-function SchedulePanel({ game, onUseCue }: { game: GameState; onUseCue: (value: string) => void }) {
+function SchedulePanel({ game, people, onUseCue }: { game: GameState; people: People; onUseCue: (value: string) => void }) {
   const activeIndex = phaseIndex(game.shared.phase);
   return (
     <section className="schedule-panel">
@@ -577,9 +589,9 @@ function SchedulePanel({ game, onUseCue }: { game: GameState; onUseCue: (value: 
               {(["haru", "aoi"] as CharacterId[]).map((person) => {
                 const plan = planFor(person, phase.id, game[person], game.shared.phase);
                 return (
-                  <button type="button" className={`schedule-item schedule-${person}`} key={person} onClick={() => onUseCue(`${PEOPLE[person].name}の「${plan.title}」に、ふたりで取り組んでみたら？`)} title="この予定からきっかけ文を作る">
+                  <button type="button" className={`schedule-item schedule-${person}`} key={person} onClick={() => onUseCue(`${people[person].name}の「${plan.title}」に、ふたりで取り組んでみたら？`)} title="この予定からきっかけ文を作る">
                     <span className="plan-icon" aria-hidden="true">{plan.icon}</span>
-                    <span><small>{PEOPLE[person].name}</small><strong>{plan.title}</strong><em>{plan.location}</em></span>
+                    <span><small>{people[person].name}</small><strong>{plan.title}</strong><em>{plan.location}</em></span>
                     {index === activeIndex && <i>NOW</i>}
                   </button>
                 );
@@ -680,6 +692,19 @@ function LogDrawer({
 }
 
 export default function App() {
+  const characterSettings = useCharacterSettings();
+  const people = useMemo<People>(() => ({
+    haru: {
+      name: characterSettings.savedSettings.characters.haru.profile.name,
+      job: characterSettings.savedSettings.characters.haru.profile.occupation,
+      age: characterSettings.savedSettings.characters.haru.profile.age,
+    },
+    aoi: {
+      name: characterSettings.savedSettings.characters.aoi.profile.name,
+      job: characterSettings.savedSettings.characters.aoi.profile.occupation,
+      age: characterSettings.savedSettings.characters.aoi.profile.age,
+    },
+  }), [characterSettings.savedSettings]);
   const [game, setGame] = useState<GameState>(INITIAL_GAME_STATE);
   const [suggestion, setSuggestion] = useState("");
   const [lastSuggestion, setLastSuggestion] = useState("");
@@ -694,7 +719,14 @@ export default function App() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("status");
   const [logOpen, setLogOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
+  const [personalityOpen, setPersonalityOpen] = useState(false);
+  const personalityButtonRef = useRef<HTMLButtonElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
+
+  const closePersonality = useCallback(() => {
+    setPersonalityOpen(false);
+    window.requestAnimationFrame(() => personalityButtonRef.current?.focus());
+  }, []);
 
   const refreshGame = useCallback(async (signal?: AbortSignal) => {
     const payload = await getGame(signal);
@@ -785,7 +817,13 @@ export default function App() {
     setStages({ haru: "active", aoi: "waiting", director: "waiting" });
     turnAbortRef.current = new AbortController();
     try {
-      await runTurn(cue, game.revision, applyStreamMessage, turnAbortRef.current.signal);
+      await runTurn(
+        cue,
+        game.revision,
+        characterSettings.savedSettings,
+        applyStreamMessage,
+        turnAbortRef.current.signal,
+      );
       await refreshGame();
       setSuggestion("");
     } catch (error) {
@@ -814,7 +852,7 @@ export default function App() {
     setActionBusy(kind);
     setNotice("");
     try {
-      const payload = await (kind === "advance" ? advanceGame() : kind === "reset" ? resetGame() : fastForwardGame());
+      const payload = await (kind === "advance" ? advanceGame() : kind === "reset" ? resetGame() : fastForwardGame(characterSettings.savedSettings));
       if (payload !== undefined) setGame((previous) => normalizeGameState(payload, kind === "reset" ? INITIAL_GAME_STATE : previous));
       else await refreshGame();
       if (kind === "reset") {
@@ -860,6 +898,7 @@ export default function App() {
         <div className="header-stat"><small>MEMORY</small><strong>{game.shared.sharedMemories.length.toString().padStart(2, "0")}</strong></div>
         <div className="header-meta">
           <RuntimeBadge runtime={game.runtime} offline={offline} />
+          <button ref={personalityButtonRef} className="personality-open-button" type="button" aria-haspopup="dialog" onClick={() => setPersonalityOpen(true)}><span aria-hidden="true">◆</span>個性設定</button>
           <button className={`header-log-button ${logOpen ? "is-open" : ""}`} type="button" onClick={() => setLogOpen((open) => !open)}><span aria-hidden="true">▤</span>生活ログ</button>
           <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
         </div>
@@ -868,6 +907,8 @@ export default function App() {
       {notice && <div className="notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
       {initialLoading && <div className="loading-banner"><span /><p>ふたりの生活を読み込んでいます…</p></div>}
 
+      {personalityOpen && <PersonalityStudio controller={characterSettings} onClose={closePersonality} />}
+
       {game.ending && (
         <div className="ending-overlay" role="dialog" aria-modal="true" aria-labelledby="ending-title"><section className="ending-card"><span className="ending-stars" aria-hidden="true">✦ ♡ ✦</span><small>THE END · DAY 7</small><h2 id="ending-title">{game.shared.relationshipLabel === "couple" ? "ふたりは、恋人になった。" : "ふたりが選んだ、これから。"}</h2><p>{game.ending}</p><button type="button" onClick={() => void runAction("reset")}>もう一度、見守る</button></section></div>
       )}
@@ -875,10 +916,10 @@ export default function App() {
       <main id="game" className="game-layout">
         <section className="world-column" aria-label="ふたりの生活画面">
           <div className="world-stage-wrap">
-            <ApartmentStage game={game} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} resolving={resolving} onSelectPerson={selectCharacter} />
+            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} resolving={resolving} onSelectPerson={selectCharacter} />
             <div className="resident-hud" aria-label="住人の状態">
-              <ResidentChip person="haru" state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
-              <ResidentChip person="aoi" state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
+              <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
+              <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
             </div>
             <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
             <EventCard event={latestEvent} resolving={resolving} lastSuggestion={lastSuggestion} />
@@ -924,8 +965,8 @@ export default function App() {
             ))}
           </div>
           <div className="inspector-body">
-            {inspectorTab === "status" && <CharacterInspector person={selectedPerson} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
-            {inspectorTab === "schedule" && <SchedulePanel game={game} onUseCue={useScheduleCue} />}
+            {inspectorTab === "status" && <CharacterInspector person={selectedPerson} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
+            {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} onUseCue={useScheduleCue} />}
             {inspectorTab === "memories" && <MemoryPanel game={game} onOpenLog={() => setLogOpen(true)} />}
           </div>
           <DebugDetails game={game} />

@@ -41,6 +41,18 @@ flowchart LR
 - [Producer Score v1](./docs/result-scoring-v1.md) — 決定的な採点ルール、根拠、coverage、テストベクトル。
 - [GameState v2](./docs/game-state-v2.md) — 全28ターンの正本ログ、Result状態、privacy、migration。
 
+## Character Studio
+
+ゲーム画面の「個性設定」から、HaruとAoiのプロフィールと10項目の個性値を個別に編集できます。個性値は0〜100で検証され、同じ提案でも受諾・修正・拒否・自発行動の傾向や台詞、行動理由へ違いが出ます。
+
+- 名前、年齢、職業、人物紹介、好き／苦手、生活習慣、恋愛観、話し方を編集
+- 10項目のスライダーと二人の比較表示
+- キャラクター単位または全体を初期プリセットへ復元
+- `localStorage`の`roommates.character-settings.v1`へゲーム状態と分離して保存
+- 各ターンに同じ検証済み設定を送り、MockとCodex App Serverの両方で利用
+
+ゲームをリセットしてもCharacter Studioの保存内容は残ります。保存済みJSONが壊れている場合は、安全に初期プリセットへ戻します。
+
 ## Codex App Serverをゲームランタイムとして使う
 
 Codex App Serverは開発支援ではなく、ゲーム中の意思決定ランタイムです。

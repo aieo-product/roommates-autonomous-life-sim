@@ -178,6 +178,7 @@ export type GameSnapshot = {
 export type CharacterDecisionInput = {
   turnId: string;
   characterId: CharacterId;
+  character: import("./personality.js").CharacterDefinition;
   snapshot: GameSnapshot;
   self: CharacterState;
   otherKnownInfo: Pick<CharacterState, "mood" | "location" | "currentGoal">;

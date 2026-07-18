@@ -1,14 +1,16 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
+import { getDefaultCharacterSettings } from "@roommates/shared";
 import { createApp } from "../src/app.js";
 import { GameEngine } from "../src/engine/game-engine.js";
 import { MemoryGameRepository } from "../src/persistence/repository.js";
 import { StaticAgentCoordinator } from "./helpers.js";
 
 async function testApp() {
-  const engine = new GameEngine(new MemoryGameRepository(), new StaticAgentCoordinator());
+  const agents = new StaticAgentCoordinator();
+  const engine = new GameEngine(new MemoryGameRepository(), agents);
   await engine.initialize();
-  return { app: createApp(engine), engine };
+  return { app: createApp(engine), engine, agents };
 }
 
 describe("game API", () => {
@@ -31,13 +33,16 @@ describe("game API", () => {
   });
 
   it("streams a complete turn, advances, and resets", async () => {
-    const { app } = await testApp();
+    const { app, agents } = await testApp();
+    const characterSettings = getDefaultCharacterSettings();
+    characterSettings.characters.haru.profile.name = "春";
     const turn = await request(app)
       .post("/api/game/turn")
       .send({
         suggestion: "一緒に夕食を作ってみたら？",
         idempotencyKey: "api-test-turn",
         revision: 0,
+        characterSettings,
       });
 
     expect(turn.status).toBe(200);
@@ -45,6 +50,7 @@ describe("game API", () => {
     expect(turn.text).toContain("event: agent.thinking");
     expect(turn.text).toContain("event: director.completed");
     expect(turn.text).toContain("event: turn.completed");
+    expect(agents.inputs.haru?.character.profile.name).toBe("春");
 
     const resolved = await request(app).get("/api/game");
     expect(resolved.body.status).toBe("resolved");
@@ -65,6 +71,18 @@ describe("game API", () => {
     const { app } = await testApp();
 
     expect((await request(app).post("/api/game/turn").send({})).status).toBe(400);
+    const invalidSettings = getDefaultCharacterSettings();
+    invalidSettings.characters.aoi.personality.initiative = 101;
+    expect(
+      (
+        await request(app).post("/api/game/turn").send({
+          suggestion: "映画を見よう",
+          idempotencyKey: "invalid-settings",
+          revision: 0,
+          characterSettings: invalidSettings,
+        })
+      ).status,
+    ).toBe(400);
     expect(
       (
         await request(app).post("/api/game/turn").send({

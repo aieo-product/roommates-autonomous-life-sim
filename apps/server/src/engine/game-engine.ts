@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import type {
   CharacterDecisionInput,
   CharacterId,
+  CharacterSettings,
   GameSnapshot,
   GameState,
   Phase,
   StreamEvent,
 } from "@roommates/shared";
-import { createInitialGameState } from "@roommates/shared";
+import { DEFAULT_CHARACTER_SETTINGS, createInitialGameState } from "@roommates/shared";
 import type { AgentCoordinator } from "../agents/coordinator.js";
 import type { GameRepository } from "../persistence/repository.js";
 import {
@@ -73,6 +74,7 @@ export class GameEngine {
     idempotencyKey: string,
     revision: number,
     emit: Emit = () => undefined,
+    characterSettings: CharacterSettings = DEFAULT_CHARACTER_SETTINGS,
   ): Promise<GameState> {
     const previous = this.completed.get(idempotencyKey);
     if (previous) return structuredClone(previous);
@@ -110,6 +112,7 @@ export class GameEngine {
         return {
           turnId,
           characterId: id,
+          character: structuredClone(characterSettings.characters[id]),
           snapshot,
           self: snapshot.characters[id],
           otherKnownInfo: {
@@ -182,6 +185,8 @@ export class GameEngine {
       const positive = resolved.memory.emotionalImpact > 0;
       nextCharacters.haru = decorateCharacterState(nextCharacters.haru, "haru", positive);
       nextCharacters.aoi = decorateCharacterState(nextCharacters.aoi, "aoi", positive);
+      nextCharacters.haru.currentGoal = haru.value.action;
+      nextCharacters.aoi.currentGoal = aoi.value.action;
       const isLastTurn = before.shared.day === 7 && before.shared.phase === "night";
       const nextState: GameState = {
         ...before,
@@ -256,7 +261,10 @@ export class GameEngine {
     return this.getState();
   }
 
-  async fastForward(turns = 8): Promise<GameState> {
+  async fastForward(
+    turns = 8,
+    characterSettings: CharacterSettings = DEFAULT_CHARACTER_SETTINGS,
+  ): Promise<GameState> {
     const presets = [
       "一緒に夕食を作ってみたら？",
       "今日は二人で映画を見よう",
@@ -266,7 +274,13 @@ export class GameEngine {
     for (let index = 0; index < Math.max(1, Math.min(12, turns)); index += 1) {
       if (this.state.status === "ended") break;
       if (this.state.status === "resolved") await this.advance();
-      await this.resolveTurn(presets[index % presets.length]!, `fast-${randomUUID()}`, this.state.revision);
+      await this.resolveTurn(
+        presets[index % presets.length]!,
+        `fast-${randomUUID()}`,
+        this.state.revision,
+        undefined,
+        characterSettings,
+      );
     }
     return this.getState();
   }

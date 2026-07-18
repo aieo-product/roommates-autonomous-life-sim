@@ -1,5 +1,6 @@
 import type {
   CharacterAgent,
+  CharacterDefinition,
   CharacterDecision,
   CharacterDecisionInput,
   CharacterId,
@@ -45,23 +46,54 @@ function dialogue(id: CharacterId, decision: DecisionKind, tag: ProposalTag): st
   return id === "haru" ? "うん、やってみようか。" : "いいね。楽しそう！";
 }
 
+function personalizedDialogue(
+  id: CharacterId,
+  decision: DecisionKind,
+  tag: ProposalTag,
+  character: CharacterDefinition,
+): string {
+  const base = dialogue(id, decision, tag);
+  if (character.personality.expressiveness >= 70) {
+    return base.replace(/。$/, "！");
+  }
+  if (character.personality.expressiveness <= 40 && !base.startsWith("……")) {
+    return `……${base}`;
+  }
+  return base;
+}
+
 export class MockCharacterAgent implements CharacterAgent {
   constructor(private readonly id: CharacterId) {}
 
   async decide(input: CharacterDecisionInput): Promise<CharacterDecision> {
     const tag = primaryTag(input);
     const self = input.self;
+    const { personality, profile } = input.character;
     const pressure = input.suggestion.tags.includes("pressure");
     const key = `${input.snapshot.seed}:${input.snapshot.shared.day}:${input.snapshot.shared.phase}:${this.id}:${input.suggestion.text}`;
 
     if (input.suggestion.kind === "observe") {
-      const initiative = self.energy * 0.25 + self.affection * 0.22 + self.trust * 0.18 - self.stress * 0.2 + jitter(key, -8, 8);
+      const initiative =
+        self.energy * 0.18 +
+        self.affection * 0.18 +
+        self.trust * 0.14 -
+        self.stress * 0.2 +
+        personality.initiative * 0.24 +
+        personality.sociability * 0.12 -
+        personality.valuesPartnerInitiative * 0.16 +
+        jitter(key, -8, 8);
       const decision: DecisionKind = initiative >= 34 ? "INITIATE" : "IGNORE";
       return {
         decision,
-        action: decision === "INITIATE" ? (this.id === "haru" ? "Aoiに温かい飲み物を淹れる" : "Haruをベランダへ誘う") : "自分のペースで休む",
-        dialogue: dialogue(this.id, decision, "rest"),
-        publicReason: decision === "INITIATE" ? "同じ家で自然に過ごしたいから" : "今日は静かな時間が必要だから",
+        action:
+          decision === "INITIATE"
+            ? `${profile.likes[0]}をきっかけに相手へ声をかける`
+            : `${profile.lifeStyle.slice(0, 40)}という自分のペースを守る`,
+        dialogue: personalizedDialogue(this.id, decision, "rest", input.character),
+        publicReason:
+          decision === "INITIATE"
+            ? `${profile.likes[0]}を一緒に楽しみたいから`
+            : `疲れたときは${personality.solitudeWhenTired >= 60 ? "一人の時間" : "静かな時間"}が必要だから`,
         internalSummary: decision === "INITIATE" ? "命令されなくても、相手と少し近づきたい" : "無理をすると相手にも気を遣わせそう",
         expectedEffects: decision === "INITIATE" ? { energy: -2, stress: -2 } : { energy: 6, stress: -5 },
       };
@@ -74,23 +106,36 @@ export class MockCharacterAgent implements CharacterAgent {
       self.trust * 0.12 +
       self.affection * 0.08 +
       (affinity[this.id][tag] ?? 0) +
+      (personality.cooperativeness - 50) * 0.16 +
+      (personality.sociability - 50) * 0.1 +
+      (personality.compassion - 50) * 0.08 +
       jitter(key, -8, 8);
-    if (pressure) score -= 18;
-    if (self.energy < 30 && !["rest", "apology"].includes(tag)) score -= 18;
+    if (tag === "clean") score += (personality.cleanliness - 50) * 0.24;
+    if (tag === "confession") {
+      score += (personality.initiative - 50) * 0.18;
+      score -= (personality.romanticCaution - 50) * 0.28;
+    }
+    if (pressure) score -= 12 + personality.independence * 0.1;
+    if (self.energy < 30 && !["rest", "apology"].includes(tag)) {
+      score -= 8 + personality.solitudeWhenTired * 0.16;
+    }
     if (input.snapshot.shared.phase === "night" && ["movie", "talk"].includes(tag)) score += 7;
 
     const decision: DecisionKind = score >= 67 ? "ACCEPT" : score >= 50 ? "MODIFY" : score >= 32 ? "DECLINE" : "IGNORE";
-    const action = decision === "DECLINE" || decision === "IGNORE" ? "提案には参加せず、自分の時間を過ごす" : actions[tag];
+    const action =
+      decision === "DECLINE" || decision === "IGNORE"
+        ? `${profile.dislikes[0]}を避け、自分の時間を過ごす`
+        : actions[tag];
     return {
       decision,
       action,
-      dialogue: dialogue(this.id, decision, tag),
+      dialogue: personalizedDialogue(this.id, decision, tag, input.character),
       publicReason:
         decision === "ACCEPT"
-          ? "今なら二人で楽しめそうだから"
+          ? `${profile.likes[0]}のように、二人で楽しめそうだから`
           : decision === "MODIFY"
-            ? "自分の余力に合う形なら試せそうだから"
-            : "今の気分と体力を優先したいから",
+            ? `「${profile.romanceView.slice(0, 45)}」という自分の考えに合う形へ調整したいから`
+            : `${profile.dislikes[0]}を避け、今の気分と体力を優先したいから`,
       internalSummary:
         decision === "ACCEPT" || decision === "MODIFY"
           ? this.id === "haru"
