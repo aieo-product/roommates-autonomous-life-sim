@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type {
   AgentResultReflection,
   CharacterDecision,
@@ -202,7 +201,7 @@ export class GameEngine {
       throw new Error(`Unknown event definition: ${suggestion.eventDefinitionId}`);
     }
     this.resolving = true;
-    const turnId = `${before.shared.day}-${before.shared.phase}-${revision + 1}-${randomUUID().slice(0, 8)}`;
+    const turnId = `${before.shared.day}-${before.shared.phase}-${revision + 1}-${globalThis.crypto.randomUUID().slice(0, 8)}`;
     const snapshot = deepFreeze<GameSnapshot>({
       seed: before.seed,
       revision: before.revision,
@@ -742,7 +741,7 @@ export class GameEngine {
       if (this.state.status === "resolved") await this.advance();
       await this.resolveTurn(
         presets[index % presets.length]!,
-        `fast-${randomUUID()}`,
+        `fast-${globalThis.crypto.randomUUID()}`,
         this.state.revision,
         () => undefined,
         characterSettings,

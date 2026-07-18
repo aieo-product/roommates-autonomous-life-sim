@@ -10,6 +10,11 @@
   "scripts": {
     "dev": "concurrently -k -n server,web -c magenta,cyan \"npm run dev -w @roommates/server\" \"npm run dev -w @roommates/web\"",
     "build": "npm run build -w @roommates/shared && npm run build -w @roommates/server && npm run build -w @roommates/web",
+    "build:sites": "npm run build -w @roommates/shared && npm run build -w @roommates/web && npm run build:worker -w @roommates/server && node scripts/assemble-sites.mjs",
+    "package:sites": "bash scripts/package-sites.sh",
+    "prepare:sites": "npm run build:sites && npm run package:sites",
+    "check:sites": "npm run typecheck && npm test && npm run prepare:sites",
+    "db:generate": "drizzle-kit generate",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "check": "npm run typecheck && npm test && npm run build",
@@ -18,8 +23,13 @@
   "engines": {
     "node": ">=20"
   },
+  "dependencies": {
+    "drizzle-orm": "0.45.2"
+  },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260718.1",
     "concurrently": "^9.1.2",
+    "drizzle-kit": "0.31.10",
     "typescript": "^5.8.3"
   }
 }
