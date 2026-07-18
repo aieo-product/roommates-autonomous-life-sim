@@ -3,6 +3,7 @@
 - Status: Accepted
 - Issue: [#22 全ログとAgent選択から7日間の総集編・プロデュース評価を表示する](https://github.com/aieo-product/teamOtaniHackathon/issues/22)
 - Related: [#10 ガードレールと基本イベント](https://github.com/aieo-product/teamOtaniHackathon/issues/10) / [#18 最終選択](https://github.com/aieo-product/teamOtaniHackathon/issues/18) / [#20 イベントEpic](https://github.com/aieo-product/teamOtaniHackathon/issues/20)
+- Normative contracts: [Producer Score v1](./result-scoring-v1.md) / [GameState v2](./game-state-v2.md)
 
 ## 採用案
 
@@ -93,6 +94,8 @@ Haru/Aoiごとに次を表示する。
 
 ## スコア契約
 
+具体的なrule ID、基礎点、加減点、cap、coverage、固定テストベクトルは[Producer Score v1](./result-scoring-v1.md)を正本とする。
+
 総合点は5軸の合計100点とする。
 
 | 軸 | 配点 | 判定対象 |
@@ -140,6 +143,8 @@ Haru/Aoiごとに次を表示する。
 同一イベントを複数枠へ採用しない。同点時はmemory importance、感情影響の絶対値、relationship変化、早いturn、event IDの順で固定する。
 
 ## 共有データ契約
+
+永続化schema、段落単位の根拠、Resultの状態union、privacy、migration、idempotencyは[GameState v2](./game-state-v2.md)を正本とする。以下は体験設計から見た概略型である。
 
 現行`EventLogEntry`の`haruReaction / aoiReaction`文字列だけでは再計算できないため、GameStateのversionを上げ、ターン解決時に構造化履歴を保存する。
 
@@ -219,7 +224,7 @@ type AgentResultReflection = {
   turningPointEventLogId: string | null;
   messageToProducer: string;
   reflectionVersion: string;
-  source: AgentSource;
+  runtime: RuntimeAgentState;
 };
 
 type ResultNarrative = {
