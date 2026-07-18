@@ -1,5 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
+  "projection": {
+    "type": "isometric-cutaway",
+    "tileRatio": "2:1",
+    "cameraDirection": "south-west-to-north-east",
+    "origin": "top-left"
+  },
   "frameSize": {
     "width": 128,
     "height": 128
@@ -8,18 +14,52 @@
     "width": 64,
     "height": 64
   },
+  "pivot": {
+    "x": 64,
+    "y": 118
+  },
+  "logicalTileFootprint": {
+    "width": 1,
+    "height": 1
+  },
+  "placementClearanceTiles": {
+    "width": 2,
+    "height": 2
+  },
   "sheet": {
     "width": 384,
     "height": 512,
     "columns": 3,
     "rows": 4
   },
-  "directions": [
-    "front",
-    "left",
-    "right",
-    "back"
+  "directionOrder": [
+    "south",
+    "east",
+    "north",
+    "west"
   ],
+  "directions": {
+    "south": {
+      "worldVector": { "x": 0, "y": 1 },
+      "screenVector": { "x": -1, "y": 0.5 },
+      "facing": "south-west"
+    },
+    "east": {
+      "worldVector": { "x": 1, "y": 0 },
+      "screenVector": { "x": 1, "y": 0.5 },
+      "facing": "south-east"
+    },
+    "north": {
+      "worldVector": { "x": 0, "y": -1 },
+      "screenVector": { "x": 1, "y": -0.5 },
+      "facing": "north-east"
+    },
+    "west": {
+      "worldVector": { "x": -1, "y": 0 },
+      "screenVector": { "x": -1, "y": -0.5 },
+      "facing": "north-west"
+    }
+  },
   "steps": [
     "step-left",
     "idle",
