@@ -720,20 +720,50 @@ a:focus-visible,
 .scene-haru .scene-nameplate { background: #377f9a; }
 .scene-aoi .scene-nameplate { background: #b95970; }
 
-.thinking-cloud {
-  width: 58px;
-  padding: 6px 8px 8px;
-  color: var(--ink);
-  background: #fffdf3;
+.character-running-object { overflow: visible; }
+
+.character-running-indicator {
+  width: 116px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 9px;
+  color: #fff;
+  background: #274c68;
   border: 3px solid var(--ink);
   border-radius: 18px;
   box-shadow: 3px 3px 0 rgba(33,48,72,.28);
-  font-size: 17px;
+  font-size: 10px;
   font-weight: 1000;
   line-height: 1;
-  text-align: center;
-  animation: thinkBounce 1s infinite;
 }
+
+.indicator-aoi { background: #934f68; }
+
+.running-signal {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  background: #78f0b2;
+  border: 1px solid rgba(0,0,0,.32);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(120,240,178,.18);
+  animation: livePulse 1s ease-in-out infinite;
+}
+
+.running-dots { display: flex; align-items: center; gap: 2px; }
+.running-dots i {
+  width: 3px;
+  height: 3px;
+  display: block;
+  background: currentColor;
+  border-radius: 50%;
+  animation: agentRunningDot 1s ease-in-out infinite;
+}
+.running-dots i:nth-child(2) { animation-delay: .14s; }
+.running-dots i:nth-child(3) { animation-delay: .28s; }
 
 .scene-speech {
   position: relative;
@@ -775,19 +805,6 @@ a:focus-visible,
   font-size: 12px;
   font-weight: 800;
   line-height: 1.45;
-}
-
-.scene-speech span {
-  position: absolute;
-  top: 5px;
-  right: 6px;
-  padding: 2px 5px;
-  color: #57431f;
-  background: var(--yellow);
-  border: 1px solid #96701e;
-  border-radius: 8px;
-  font-size: 8px;
-  font-weight: 1000;
 }
 
 .stage-caption,
@@ -2041,6 +2058,11 @@ a:focus-visible,
 @keyframes thinkBounce {
   0%,100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
+}
+
+@keyframes agentRunningDot {
+  0%, 60%, 100% { opacity: .35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
 }
 
 @keyframes ringRotate {

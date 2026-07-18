@@ -317,7 +317,6 @@ function SceneCharacter({
   selected,
   thinking,
   dialogue,
-  decision,
   onSelect,
 }: {
   person: CharacterId;
@@ -326,7 +325,6 @@ function SceneCharacter({
   selected: boolean;
   thinking: boolean;
   dialogue?: string;
-  decision?: AgentDecision;
   onSelect: () => void;
 }) {
   const bubbleX = point.x > 950 || person === "haru" ? -216 : 38;
@@ -337,7 +335,8 @@ function SceneCharacter({
       transform={`translate(${point.x} ${point.y})`}
       role="button"
       tabIndex={0}
-      aria-label={`${name}を選択`}
+      aria-label={thinking ? `${name}、判断中。選択` : `${name}を選択`}
+      aria-busy={thinking ? true : undefined}
       onClick={activate}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -357,8 +356,12 @@ function SceneCharacter({
         <div className="scene-nameplate">{name}</div>
       </foreignObject>
       {thinking && (
-        <foreignObject x="-34" y="-122" width="68" height="40">
-          <div className="thinking-cloud">•••</div>
+        <foreignObject x="-62" y="-130" width="124" height="48" className="character-running-object" aria-hidden="true">
+          <div className={`character-running-indicator indicator-${person}`}>
+            <span className="running-signal" aria-hidden="true" />
+            <strong>判断中</strong>
+            <span className="running-dots" aria-hidden="true"><i /><i /><i /></span>
+          </div>
         </foreignObject>
       )}
       {!thinking && dialogue && (
@@ -366,7 +369,6 @@ function SceneCharacter({
           <div className={`scene-speech speech-${person}`}>
             <small>{name}</small>
             <p>{clipText(dialogue, 46)}</p>
-            {decision && <span>{DECISION_LABELS[decision.decision]}</span>}
           </div>
         </foreignObject>
       )}
@@ -457,8 +459,8 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} decision={game.decisions.haru} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} decision={game.decisions.aoi} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} onSelect={() => onSelectPerson("haru")} />
+            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} onSelect={() => onSelectPerson("aoi")} />
           </g>
         </g>
       </svg>
