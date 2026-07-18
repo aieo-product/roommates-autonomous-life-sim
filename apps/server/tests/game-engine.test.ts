@@ -8,6 +8,8 @@ import type {
   CharacterDecisionInput,
   CharacterId,
   DirectorInput,
+  NavigatorAgentOutput,
+  NavigatorInput,
   ResolvedEvent,
   StreamEvent,
 } from "@roommates/shared";
@@ -49,11 +51,44 @@ describe("GameEngine", () => {
     expect(result.eventLog[0]).toMatchObject({
       eventDefinitionId: "shared-cooking",
       cueSafetyFlags: [],
+      navigatorMessage: "デコピンが二人へきっかけを届けるね。",
+      navigatorResponse: {
+        characterId: "navigator",
+        characterName: "デコピン",
+        eventDefinitionId: "shared-cooking",
+        eventTitle: "一緒に料理する",
+        outcome: "selected",
+      },
+      haruDecision: "ACCEPT",
+      aoiDecision: "ACCEPT",
+      haruAction: acceptedDecision.action,
+      aoiAction: acceptedDecision.action,
+      haruDialogue: acceptedDecision.dialogue,
+      aoiDialogue: acceptedDecision.dialogue,
+      haruPublicReason: acceptedDecision.publicReason,
+      aoiPublicReason: acceptedDecision.publicReason,
+      scene: resolvedEvent.scene,
     });
+    expect(result.shared.sharedMemories[0]?.sourceEventId).toBe(result.eventLog[0]?.id);
+    expect(result.eventLog[0]?.memoryId).toBe(result.shared.sharedMemories[0]?.id);
     expect(result.lastEvent?.eventTitle).toBe(resolvedEvent.eventTitle);
-    expect(result.characters.haru.lastDecision).toEqual(acceptedDecision);
+    expect(result.lastEvent?.navigatorMessage).toBe("デコピンが二人へきっかけを届けるね。");
+    expect(result.navigator).toMatchObject({
+      characterName: "デコピン",
+      message: "デコピンが二人へきっかけを届けるね。",
+      eventDefinitionId: "shared-cooking",
+    });
+    expect(result.characters.haru.lastDecision).toEqual({
+      decision: acceptedDecision.decision,
+      action: acceptedDecision.action,
+      dialogue: acceptedDecision.dialogue,
+      publicReason: acceptedDecision.publicReason,
+    });
+    expect(result.characters.haru).not.toHaveProperty("internalSummary");
     expect(streamed.map((event) => event.type)).toEqual([
       "turn.started",
+      "navigator.thinking",
+      "navigator.completed",
       "agent.thinking",
       "agent.thinking",
       "agent.completed",
@@ -73,6 +108,17 @@ describe("GameEngine", () => {
     expect(Object.isFrozen(safeSuggestion.tags)).toBe(true);
     expect(Object.isFrozen(safeSuggestion.cue.safetyFlags)).toBe(true);
     expect(Object.isFrozen(safeSuggestion.alternatives)).toBe(true);
+    expect(agents.navigatorInput?.resolvedSuggestion).toBe(safeSuggestion);
+    expect(Object.isFrozen(agents.navigatorInput)).toBe(true);
+    expect(streamed.find((event) => event.type === "navigator.completed")).toMatchObject({
+      agent: "navigator",
+      message: "デコピンが二人へきっかけを届けるね。",
+      data: {
+        navigatorMessage: "デコピンが二人へきっかけを届けるね。",
+        eventDefinitionId: "shared-cooking",
+        eventTitle: "一緒に料理する",
+      },
+    });
   });
 
   it("persists the selected event and cue safety flags", async () => {
@@ -87,6 +133,52 @@ describe("GameEngine", () => {
     expect(result.eventLog.at(-1)).toMatchObject({
       eventDefinitionId: "shared-cooking",
       cueSafetyFlags: ["prompt_injection"],
+    });
+  });
+
+  it("keeps the server-resolved event authoritative over navigator prose", async () => {
+    const agents = new StaticAgentCoordinator({}, resolvedEvent, {
+      message: "別のイベントにしよう。",
+    });
+    const { engine } = await engineWith(agents);
+
+    const result = await engine.resolveTurn(
+      "一緒に夕食を作ってみたら？",
+      "turn-key-navigator-authority",
+      0,
+    );
+
+    expect(result.navigator).toMatchObject({
+      message: "別のイベントにしよう。",
+      eventDefinitionId: "shared-cooking",
+      eventTitle: "一緒に料理する",
+    });
+    expect(result.eventLog.at(-1)).toMatchObject({
+      eventDefinitionId: "shared-cooking",
+      navigatorResponse: { eventDefinitionId: "shared-cooking" },
+    });
+  });
+
+  it("continues the core turn with deterministic copy when the navigator throws", async () => {
+    const agents = new StaticAgentCoordinator();
+    vi.spyOn(agents, "navigate").mockRejectedValue(new Error("navigator failed"));
+    const { engine } = await engineWith(agents);
+
+    const result = await engine.resolveTurn(
+      "一緒に夕食を作ってみたら？",
+      "turn-key-navigator-failure",
+      0,
+    );
+
+    expect(result.status).toBe("resolved");
+    expect(result.eventLog).toHaveLength(1);
+    expect(result.navigator).toMatchObject({
+      message: "了解！ 「一緒に料理する」のきっかけとして二人へ届けるね。",
+      eventDefinitionId: "shared-cooking",
+    });
+    expect(result.runtime.navigator).toMatchObject({
+      source: "fallback",
+      error: "navigator failed",
     });
   });
 
@@ -139,6 +231,58 @@ describe("GameEngine", () => {
     }
   });
 
+  it("records the clamped after-before delta for every mutable stat", async () => {
+    const initial = createInitialGameState("applied-effects-boundary");
+    Object.assign(initial.characters.haru.state, {
+      energy: 99,
+      stress: 1,
+      affection: 99,
+      trust: 1,
+      romanticAwareness: 99,
+    });
+    Object.assign(initial.characters.aoi.state, {
+      energy: 1,
+      stress: 99,
+      affection: 1,
+      trust: 99,
+      romanticAwareness: 1,
+    });
+    const boundaryEvent: ResolvedEvent = {
+      ...resolvedEvent,
+      effects: {
+        haru: { energy: 100, stress: -100, affection: 100, trust: -100, romanticAwareness: 100 },
+        aoi: { energy: -100, stress: 100, affection: -100, trust: 100, romanticAwareness: -100 },
+      },
+    };
+    const repository = new MemoryGameRepository();
+    await repository.save(initial);
+    const engine = new GameEngine(
+      repository,
+      new StaticAgentCoordinator({}, boundaryEvent),
+    );
+    await engine.initialize();
+
+    const state = await engine.resolveTurn(
+      "何も提案せず見守る",
+      "turn-key-applied-effects-boundary",
+      0,
+    );
+    const applied = state.eventLog.at(-1)?.appliedEffects;
+
+    expect(state.eventLog.at(-1)?.eventDefinitionId).toBe("observe-rest");
+    expect(applied).toEqual({
+      haru: { energy: 1, stress: -1, affection: 1, trust: -1, romanticAwareness: 1 },
+      aoi: { energy: -1, stress: 1, affection: -1, trust: 1, romanticAwareness: -1 },
+    });
+    for (const character of ["haru", "aoi"] as const) {
+      for (const key of mutableStatKeys) {
+        expect(applied?.[character][key]).toBe(
+          state.characters[character].state[key] - initial.characters[character].state[key],
+        );
+      }
+    }
+  });
+
   it("locks an unavailable morning movie, selects its fallback, and streams the lock", async () => {
     const { engine } = await engineWith();
     const streamed: StreamEvent[] = [];
@@ -151,6 +295,10 @@ describe("GameEngine", () => {
     );
 
     expect(result.eventLog.at(-1)?.eventDefinitionId).toBe("observe-rest");
+    expect(result.navigator).toMatchObject({
+      eventDefinitionId: "observe-rest",
+      outcome: "locked_fallback",
+    });
     expect(streamed.find((event) => event.type === "turn.started")).toMatchObject({
       data: {
         eventDefinitionId: "observe-rest",
@@ -265,9 +413,43 @@ describe("GameEngine", () => {
     await expect(first).resolves.toMatchObject({ status: "resolved", revision: 1 });
   });
 
+  it("does not persist a partial navigator response when the turn fails", async () => {
+    class FailingAfterNavigatorCoordinator implements AgentCoordinator {
+      async navigate(
+        _input: NavigatorInput,
+      ): Promise<AgentResult<NavigatorAgentOutput>> {
+        return mockResult({ message: "二人へ届けるね。" });
+      }
+
+      async decide(
+        _id: CharacterId,
+        _input: CharacterDecisionInput,
+      ): Promise<AgentResult<CharacterDecision>> {
+        throw new Error("character failed");
+      }
+
+      async resolve(_input: DirectorInput): Promise<AgentResult<ResolvedEvent>> {
+        return mockResult(structuredClone(resolvedEvent));
+      }
+    }
+
+    const { engine } = await engineWith(new FailingAfterNavigatorCoordinator());
+
+    await expect(
+      engine.resolveTurn("一緒に料理しよう", "failed-after-navigator", 0),
+    ).rejects.toThrow("character failed");
+    expect(engine.getState()).toMatchObject({
+      revision: 0,
+      status: "awaiting_suggestion",
+      eventLog: [],
+    });
+    expect(engine.getState().navigator).toBeUndefined();
+  });
+
   it("returns the cached result for a repeated idempotency key", async () => {
     const agents = new StaticAgentCoordinator();
     const decide = vi.spyOn(agents, "decide");
+    const navigate = vi.spyOn(agents, "navigate");
     const { engine } = await engineWith(agents);
     const first = await engine.resolveTurn("映画を見よう", "same-key", 0);
 
@@ -275,5 +457,21 @@ describe("GameEngine", () => {
 
     expect(repeated).toEqual(first);
     expect(decide).toHaveBeenCalledTimes(2);
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses deterministic navigator copy during fast-forward without invoking the agent", async () => {
+    const agents = new StaticAgentCoordinator();
+    const navigate = vi.spyOn(agents, "navigate");
+    const { engine } = await engineWith(agents);
+
+    const result = await engine.fastForward(2);
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(result.navigator).toMatchObject({
+      characterName: "デコピン",
+      message: expect.any(String),
+    });
+    expect(result.runtime.navigator?.source).toBe("mock");
   });
 });

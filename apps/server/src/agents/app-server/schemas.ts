@@ -6,7 +6,61 @@ const statProperties = {
   romanticAwareness: { type: "number", minimum: -100, maximum: 100 },
 };
 
+export const reflectionOutputSchema = {
+  type: "object",
+  properties: {
+    characterId: { type: "string", enum: ["haru", "aoi"] },
+    seasonImpression: { type: "string", minLength: 80, maxLength: 160 },
+    notableEventComments: {
+      type: "array",
+      maxItems: 4,
+      items: {
+        type: "object",
+        properties: {
+          eventLogId: { type: "string", minLength: 1, maxLength: 200 },
+          comment: { type: "string", minLength: 1, maxLength: 240 },
+        },
+        required: ["eventLogId", "comment"],
+        additionalProperties: false,
+      },
+    },
+    bestMomentEventLogId: {
+      anyOf: [
+        { type: "string", minLength: 1, maxLength: 200 },
+        { type: "null" },
+      ],
+    },
+    turningPointEventLogId: {
+      anyOf: [
+        { type: "string", minLength: 1, maxLength: 200 },
+        { type: "null" },
+      ],
+    },
+    messageToProducer: { type: "string", minLength: 1, maxLength: 240 },
+    reflectionVersion: { type: "string", enum: ["reflection-v1"] },
+  },
+  required: [
+    "characterId",
+    "seasonImpression",
+    "notableEventComments",
+    "bestMomentEventLogId",
+    "turningPointEventLogId",
+    "messageToProducer",
+    "reflectionVersion",
+  ],
+  additionalProperties: false,
+};
+
 const statDelta = { type: "object", properties: statProperties, additionalProperties: false };
+
+export const navigatorOutputSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string", minLength: 1, maxLength: 240 },
+  },
+  required: ["message"],
+  additionalProperties: false,
+};
 
 export const characterOutputSchema = {
   type: "object",

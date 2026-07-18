@@ -2,7 +2,7 @@ import type { GameState } from "./domain.js";
 
 export function createInitialGameState(seed = "demo-heart"): GameState {
   return {
-    version: 1,
+    version: 2,
     seed,
     revision: 0,
     status: "awaiting_suggestion",
@@ -43,6 +43,7 @@ export function createInitialGameState(seed = "demo-heart"): GameState {
     runtime: {
       haru: { source: "mock" },
       aoi: { source: "mock" },
+      navigator: { source: "mock" },
       director: { source: "mock" },
     },
   };

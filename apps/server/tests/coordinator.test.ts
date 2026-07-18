@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   AppServerAdapter,
 } from "../src/agents/coordinator.js";
-import type { CharacterDecisionInput, DirectorInput, GameSnapshot } from "@roommates/shared";
+import type {
+  CharacterDecisionInput,
+  DirectorInput,
+  GameSnapshot,
+  NavigatorInput,
+} from "@roommates/shared";
 import { createInitialGameState } from "@roommates/shared";
 import { ResilientAgentCoordinator } from "../src/agents/coordinator.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
@@ -38,6 +43,16 @@ function characterInput(): CharacterDecisionInput {
   };
 }
 
+function navigatorInput(): NavigatorInput {
+  return {
+    turnId: "turn-navigator",
+    rawInput: "一緒に料理をしよう",
+    day: 1,
+    phase: "morning",
+    resolvedSuggestion: sanitizeSuggestion("一緒に料理をしよう"),
+  };
+}
+
 describe("ResilientAgentCoordinator", () => {
   it("retries invalid structured output once and safely falls back", async () => {
     const decide = vi.fn(async () => ({ value: { decision: "NOT_VALID" }, threadId: "thread-haru" }));
@@ -69,5 +84,44 @@ describe("ResilientAgentCoordinator", () => {
 
     expect(decide).not.toHaveBeenCalled();
     expect(result.runtime.source).toBe("mock");
+  });
+
+  it("falls back from an invalid navigator envelope without disabling other agents", async () => {
+    const navigate = vi.fn(async () => ({
+      value: {
+        message: "イベントを変えるね。",
+        eventDefinitionId: "untrusted-event",
+      },
+      threadId: "thread-navigator",
+    }));
+    const decide = vi.fn(async () => ({
+      value: {
+        decision: "ACCEPT",
+        action: "一緒に料理をする",
+        dialogue: "やってみよう。",
+        publicReason: "今なら楽しめそうだから",
+        internalSummary: "少し興味がある",
+        expectedEffects: {},
+      },
+      threadId: "thread-haru",
+    }));
+    const real: AppServerAdapter = {
+      navigate,
+      decide,
+      resolve: vi.fn(),
+      shutdown: vi.fn(async () => undefined),
+    };
+    const coordinator = new ResilientAgentCoordinator("auto", 100, real);
+
+    const navigator = await coordinator.navigate(navigatorInput());
+    const character = await coordinator.decide("haru", characterInput());
+
+    expect(navigate).toHaveBeenCalledTimes(2);
+    expect(navigator.runtime.source).toBe("fallback");
+    expect(navigator.value).toEqual({
+      message: "了解！ 「一緒に料理する」のきっかけとして二人へ届けるね。",
+    });
+    expect(decide).toHaveBeenCalledTimes(1);
+    expect(character.runtime.source).toBe("app_server");
   });
 });

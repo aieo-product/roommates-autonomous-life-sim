@@ -1,3 +1,9 @@
+import type {
+  ResultEnding,
+  ResultEventLogEntry,
+  ResultScreenData,
+} from "./result/types.js";
+
 export type Phase = "morning" | "afternoon" | "evening" | "night";
 
 export type RelationshipLabel =
@@ -39,11 +45,11 @@ export interface AgentDecision {
   action: string;
   dialogue?: string;
   publicReason?: string;
-  internalSummary?: string;
 }
 
 export interface Memory {
   id: string;
+  sourceEventId?: string;
   day: number;
   phase: string;
   title: string;
@@ -61,16 +67,28 @@ export interface SharedState {
   sharedMemories: Memory[];
 }
 
-export interface GameEvent {
+export interface GameEvent extends ResultEventLogEntry {
   id: string;
   eventDefinitionId?: string;
+  memoryId?: string;
   day: number;
   phase: Phase;
   eventTitle: string;
   narration: string;
   haruDialogue?: string;
   aoiDialogue?: string;
+  haruDecision?: DecisionType;
+  aoiDecision?: DecisionType;
+  haruAction?: string;
+  aoiAction?: string;
+  haruPublicReason?: string;
+  aoiPublicReason?: string;
+  scene?: {
+    haru?: string;
+    aoi?: string;
+  };
   suggestion?: string;
+  navigatorMessage?: string;
   timestamp?: string;
 }
 
@@ -84,6 +102,8 @@ export interface RuntimeInfo {
 }
 
 export interface GameState {
+  version: 2;
+  seed: string;
   revision: number;
   status: "awaiting_suggestion" | "resolving" | "resolved" | "ended";
   haru: CharacterState;
@@ -96,7 +116,8 @@ export interface GameState {
   currentEvent?: GameEvent;
   eventLog: GameEvent[];
   runtime: RuntimeInfo;
-  ending?: string;
+  ending?: ResultEnding | string;
+  result?: ResultScreenData;
   completed: boolean;
 }
 

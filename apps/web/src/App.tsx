@@ -26,11 +26,20 @@ import {
   type CharacterId,
   type Point,
 } from "./room-layout";
+import { buildMemoryArticle, type MemoryArticle } from "./memory-article";
+import { ResultScreen, type ResultEventLogEntry } from "./result";
+import {
+  DEKOPIN_NAME,
+  getDekopinPresentation,
+  type DekopinPresentation,
+} from "./dekopin";
+import dekopinSpriteUrl from "../../../assets/characters/navigator/walk-cycle.png";
 import type {
   AgentDecision,
   CharacterState,
   GameEvent,
   GameState,
+  Memory,
   MetricKey,
   Phase,
   RuntimeInfo,
@@ -42,6 +51,7 @@ type StageStatus = "waiting" | "active" | "complete";
 type LogFilter = "all" | "haru" | "aoi" | "event";
 
 type TurnStages = {
+  navigator: StageStatus;
   haru: StageStatus;
   aoi: StageStatus;
   director: StageStatus;
@@ -108,6 +118,7 @@ const DECISION_LABELS: Record<AgentDecision["decision"], string> = {
 };
 
 const WAITING_STAGES: TurnStages = {
+  navigator: "waiting",
   haru: "waiting",
   aoi: "waiting",
   director: "waiting",
@@ -131,6 +142,11 @@ const phaseIndex = (phase: Phase): number => PHASES.findIndex((item) => item.id 
 const clipText = (value: string, limit = 48): string =>
   value.length > limit ? `${value.slice(0, limit)}…` : value;
 
+const createRunSeed = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `run-${crypto.randomUUID()}`
+    : `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+
 function RuntimeBadge({ runtime, offline }: { runtime: RuntimeInfo; offline: boolean }) {
   const mode = offline ? "offline" : runtime.mode;
   const content = {
@@ -145,6 +161,23 @@ function RuntimeBadge({ runtime, offline }: { runtime: RuntimeInfo; offline: boo
       <i aria-hidden="true" />
       {content[1]}
     </span>
+  );
+}
+
+function DekopinGuide({ presentation }: { presentation: DekopinPresentation }) {
+  return (
+    <div className={`dekopin-guide is-${presentation.mood}`}>
+      <span className="dekopin-avatar" aria-hidden="true">
+        <span className="dekopin-sprite-window">
+          <img className="dekopin-sprite-sheet" src={dekopinSpriteUrl} alt="" />
+        </span>
+        <i />
+      </span>
+      <span className="dekopin-copy">
+        <span><b id="dekopin-title">{DEKOPIN_NAME}</b><small>{presentation.statusLabel}</small></span>
+        <p aria-live="polite">{presentation.message}</p>
+      </span>
+    </div>
   );
 }
 
@@ -321,6 +354,7 @@ function SceneCharacter({
   dialogue,
   decision,
   onSelect,
+  interactive = true,
 }: {
   person: CharacterId;
   point: Point;
@@ -329,25 +363,26 @@ function SceneCharacter({
   dialogue?: string;
   decision?: AgentDecision;
   onSelect: () => void;
+  interactive?: boolean;
 }) {
   const bubbleX = point.x > 950 || person === "haru" ? -216 : 38;
   const activate = () => onSelect();
   return (
     <g
-      className={`scene-character scene-${person} ${selected ? "is-selected" : ""} ${thinking ? "is-thinking" : ""}`}
+      className={`scene-character scene-${person} ${selected && interactive ? "is-selected" : ""} ${thinking ? "is-thinking" : ""} ${interactive ? "is-interactive" : ""}`}
       transform={`translate(${point.x} ${point.y})`}
-      role="button"
-      tabIndex={0}
-      aria-label={`${PEOPLE[person].name}を選択`}
-      onClick={activate}
-      onKeyDown={(event) => {
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `${PEOPLE[person].name}を選択` : undefined}
+      onClick={interactive ? activate : undefined}
+      onKeyDown={interactive ? (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           activate();
         }
-      }}
+      } : undefined}
     >
-      {selected && <ellipse className="selection-ring" cx="0" cy="20" rx="30" ry="14" />}
+      {selected && interactive && <ellipse className="selection-ring" cx="0" cy="20" rx="30" ry="14" />}
       <ellipse className="character-shadow" cx="0" cy="18" rx="21" ry="9" />
       <g className="character-sprite">
         <path className="character-leg leg-left" d="M-13 4h11v25h-13z" />
@@ -389,6 +424,9 @@ function ApartmentStage({
   currentEvent,
   resolving,
   onSelectPerson,
+  capture = false,
+  idPrefix = "live-stage",
+  ariaLabel,
 }: {
   game: GameState;
   stages: TurnStages;
@@ -396,7 +434,16 @@ function ApartmentStage({
   currentEvent?: GameEvent;
   resolving: boolean;
   onSelectPerson: (person: CharacterId) => void;
+  capture?: boolean;
+  idPrefix?: string;
+  ariaLabel?: string;
 }) {
+  const safePrefix = idPrefix.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const floorGridId = `${safePrefix}-floor-grid`;
+  const skyDayId = `${safePrefix}-sky-day`;
+  const skyNightId = `${safePrefix}-sky-night`;
+  const focusGlowId = `${safePrefix}-focus-glow`;
+  const mapShadowId = `${safePrefix}-map-shadow`;
   const eventRoom = game.status === "resolved" || game.status === "ended"
     ? roomForEvent(currentEvent)
     : undefined;
@@ -409,28 +456,35 @@ function ApartmentStage({
   const aoiPoint = characterAnchor("aoi", game.aoi);
   const haruDialogue = game.decisions.haru?.dialogue ?? currentEvent?.haruDialogue;
   const aoiDialogue = game.decisions.aoi?.dialogue ?? currentEvent?.aoiDialogue;
+  const skyFill = game.shared.phase === "night"
+    ? `url(#${skyNightId})`
+    : game.shared.phase === "evening"
+      ? "#efb887"
+      : game.shared.phase === "afternoon"
+        ? "#9ddfdc"
+        : `url(#${skyDayId})`;
 
   return (
-    <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""}`}>
-      <svg viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label="HaruとAoiが暮らす2LDKを南西側の斜め上から見た全景">
+    <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""} ${capture ? "is-capture" : ""}`}>
+      <svg viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label={ariaLabel ?? "HaruとAoiが暮らす2LDKを南西側の斜め上から見た全景"}>
         <defs>
-          <pattern id="floor-grid" width="50" height="25" patternUnits="userSpaceOnUse">
+          <pattern id={floorGridId} width="50" height="25" patternUnits="userSpaceOnUse">
             <path d="M25 0L50 12.5 25 25 0 12.5z" fill="none" stroke="rgba(44,63,86,.11)" strokeWidth="1" />
           </pattern>
-          <linearGradient id="sky-day" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={skyDayId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#8ddcf0" /><stop offset="1" stopColor="#dff6ec" />
           </linearGradient>
-          <linearGradient id="sky-night" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={skyNightId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#26345f" /><stop offset="1" stopColor="#53698a" />
           </linearGradient>
-          <filter id="focus-glow" x="-30%" y="-30%" width="160%" height="160%">
+          <filter id={focusGlowId} x="-30%" y="-30%" width="160%" height="160%">
             <feDropShadow dx="0" dy="0" stdDeviation="9" floodColor="#ffe37a" floodOpacity=".9" />
           </filter>
-          <filter id="map-shadow" x="-20%" y="-20%" width="150%" height="160%">
+          <filter id={mapShadowId} x="-20%" y="-20%" width="150%" height="160%">
             <feDropShadow dx="0" dy="14" stdDeviation="14" floodColor="#182d38" floodOpacity=".32" />
           </filter>
         </defs>
-        <rect className="world-sky" x="0" y="0" width="1280" height="720" />
+        <rect className="world-sky" x="0" y="0" width="1280" height="720" style={{ fill: skyFill }} />
         <g className="sky-details" aria-hidden="true">
           <circle className="sky-orb" cx="1068" cy="104" r="38" />
           <path className="cloud cloud-one" d="M151 135c8-25 43-29 57-9 20-15 50-1 47 24H137c-3-7 2-13 14-15z" />
@@ -441,13 +495,13 @@ function ApartmentStage({
         <g
           className="apartment-map"
           style={{ transformOrigin: `${focusPoint.x}px ${focusPoint.y}px` }}
-          filter="url(#map-shadow)"
+          filter={`url(#${mapShadowId})`}
         >
           <g className="room-floors">
             {ROOM_ZONES.map((zone) => (
               <g className={`room-zone room-${zone.id} ${zone.id === focusRoom ? "is-focus" : ""} ${eventRoom && zone.id !== eventRoom ? "is-muted" : ""}`} key={zone.id}>
-                <polygon points={zone.points} filter={eventRoom && zone.id === eventRoom ? "url(#focus-glow)" : undefined} />
-                <polygon className="floor-grid" points={zone.points} fill="url(#floor-grid)" />
+                <polygon points={zone.points} filter={eventRoom && zone.id === eventRoom ? `url(#${focusGlowId})` : undefined} />
+                <polygon className="floor-grid" points={zone.points} fill={`url(#${floorGridId})`} />
                 <text x={zone.labelPoint.x} y={zone.labelPoint.y}>{zone.label}</text>
               </g>
             ))}
@@ -463,20 +517,85 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} decision={game.decisions.haru} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} decision={game.decisions.aoi} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" point={haruPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} dialogue={haruDialogue} decision={game.decisions.haru} onSelect={() => onSelectPerson("haru")} interactive={!capture} />
+            <SceneCharacter person="aoi" point={aoiPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} dialogue={aoiDialogue} decision={game.decisions.aoi} onSelect={() => onSelectPerson("aoi")} interactive={!capture} />
           </g>
         </g>
       </svg>
-      <div className="stage-caption"><span className="live-dot" /><b>ROOM VIEW</b><small>2LDK · 全景カメラ</small></div>
-      <div className="camera-note">操作：住人を選んで様子を見る</div>
+      <div className="stage-caption"><span className="live-dot" /><b>{capture ? "EVENT CAPTURE" : "ROOM VIEW"}</b><small>{capture ? "その時のふたり" : "2LDK · 全景カメラ"}</small></div>
+      <div className="camera-note">{capture ? "記録された位置からシーンを再現" : "操作：住人を選んで様子を見る"}</div>
     </div>
+  );
+}
+
+const resultDecisionFor = (
+  event: ResultEventLogEntry,
+  person: CharacterId,
+): AgentDecision | undefined => {
+  const structured = event.decisions?.[person];
+  if (structured) return structured;
+
+  const decision = person === "haru" ? event.haruDecision : event.aoiDecision;
+  const action = person === "haru" ? event.haruAction : event.aoiAction;
+  if (!decision || !action) return undefined;
+  return {
+    decision,
+    action,
+    dialogue: person === "haru" ? event.haruDialogue : event.aoiDialogue,
+    publicReason: person === "haru" ? event.haruPublicReason : event.aoiPublicReason,
+  };
+};
+
+/** Recreates the same top-down game view used by memory articles for a result event. */
+export function ResultEventCapture({
+  event,
+  game = INITIAL_GAME_STATE,
+}: {
+  event: ResultEventLogEntry;
+  game?: GameState;
+}) {
+  const inferredRoom = roomForEvent(event as GameEvent) ?? "living";
+  const haruSnapshot = event.after?.characters.haru ?? event.statesAfter?.haru;
+  const aoiSnapshot = event.after?.characters.aoi ?? event.statesAfter?.aoi;
+  const haruLocation = event.scene?.haru ?? haruSnapshot?.location ?? inferredRoom;
+  const aoiLocation = event.scene?.aoi ?? aoiSnapshot?.location ?? inferredRoom;
+  const haruDecision = resultDecisionFor(event, "haru");
+  const aoiDecision = resultDecisionFor(event, "aoi");
+  const captureEvent: GameEvent = {
+    ...event,
+    haruDialogue: haruDecision?.dialogue ?? event.haruDialogue,
+    aoiDialogue: aoiDecision?.dialogue ?? event.aoiDialogue,
+    scene: { haru: haruLocation, aoi: aoiLocation },
+  };
+  const captureGame: GameState = {
+    ...game,
+    status: "resolved",
+    haru: { ...game.haru, ...haruSnapshot, location: haruLocation },
+    aoi: { ...game.aoi, ...aoiSnapshot, location: aoiLocation },
+    shared: { ...game.shared, day: event.day, phase: event.phase },
+    decisions: { haru: haruDecision, aoi: aoiDecision },
+    currentEvent: captureEvent,
+  };
+
+  return (
+    <ApartmentStage
+      game={captureGame}
+      stages={WAITING_STAGES}
+      selectedPerson="haru"
+      currentEvent={captureEvent}
+      resolving={false}
+      onSelectPerson={() => undefined}
+      capture
+      idPrefix={`result-capture-${event.id}`}
+      ariaLabel={`${event.eventTitle}の保存キャプチャ。${haruLocation}にHaru、${aoiLocation}にAoi。`}
+    />
   );
 }
 
 function ResolutionProgress({ stages, active, message }: { stages: TurnStages; active: boolean; message: string }) {
   if (!active) return null;
   const items = [
+    { key: "navigator" as const, name: DEKOPIN_NAME },
     { key: "haru" as const, name: "Haru" },
     { key: "aoi" as const, name: "Aoi" },
     { key: "director" as const, name: "できごと" },
@@ -494,7 +613,17 @@ function ResolutionProgress({ stages, active, message }: { stages: TurnStages; a
   );
 }
 
-function EventCard({ event, resolving, lastSuggestion }: { event?: GameEvent; resolving: boolean; lastSuggestion: string }) {
+function EventCard({
+  event,
+  resolving,
+  lastSuggestion,
+  navigatorMessage,
+}: {
+  event?: GameEvent;
+  resolving: boolean;
+  lastSuggestion: string;
+  navigatorMessage?: string;
+}) {
   if (!event && !resolving) {
     return (
       <div className="event-card event-welcome">
@@ -507,14 +636,19 @@ function EventCard({ event, resolving, lastSuggestion }: { event?: GameEvent; re
     return (
       <div className="event-card event-live">
         <span className="event-icon">…</span>
-        <div><small>PRODUCER CUE</small><h2>ふたりが考えています</h2><p>{clipText(lastSuggestion, 62)}</p></div>
+        <div><small>DEKOPIN · EVENT UPDATE</small><h2>デコピンが反映しています</h2><p>{clipText(lastSuggestion, 62)}</p></div>
       </div>
     );
   }
   return (
     <div className="event-card">
       <span className="event-icon">★</span>
-      <div><small>いま起きたこと · DAY {event?.day}</small><h2>{event?.eventTitle}</h2><p>{clipText(event?.narration ?? "", 74)}</p></div>
+      <div>
+        <small>デコピンが反映したイベント · DAY {event?.day}</small>
+        <h2>{event?.eventTitle}</h2>
+        <p>{clipText(event?.narration ?? "", 74)}</p>
+        {navigatorMessage && <p className="event-dekopin-message"><b>{DEKOPIN_NAME}</b>「{clipText(navigatorMessage, 64)}」</p>}
+      </div>
     </div>
   );
 }
@@ -593,7 +727,7 @@ function SchedulePanel({ game, onUseCue }: { game: GameState; onUseCue: (value: 
   );
 }
 
-function MemoryPanel({ game, onOpenLog }: { game: GameState; onOpenLog: () => void }) {
+function MemoryPanel({ game, onOpenMemory }: { game: GameState; onOpenMemory: (memory: Memory) => void }) {
   const memories = [...game.shared.sharedMemories].reverse();
   return (
     <section className="memories-panel">
@@ -604,7 +738,7 @@ function MemoryPanel({ game, onOpenLog }: { game: GameState; onOpenLog: () => vo
           {memories.map((memory) => (
             <li key={memory.id}>
               <span className={memory.emotionalImpact >= 0 ? "memory-good" : "memory-bad"}>{memory.emotionalImpact >= 0 ? "✦" : "!"}</span>
-              <div><small>DAY {memory.day} · IMPORTANCE {memory.importance}</small><h3>{memory.title}</h3><p>{memory.summary}</p><button type="button" onClick={onOpenLog}>この日の記録を見る ›</button></div>
+              <div><small>DAY {memory.day} · IMPORTANCE {memory.importance}</small><h3>{memory.title}</h3><p>{memory.summary}</p><button type="button" onClick={() => onOpenMemory(memory)}>ふたりの記事を読む <span aria-hidden="true">›</span></button></div>
             </li>
           ))}
         </ol>
@@ -612,6 +746,206 @@ function MemoryPanel({ game, onOpenLog }: { game: GameState; onOpenLog: () => vo
         <div className="empty-memories"><span aria-hidden="true">◇</span><h3>まだ思い出はありません</h3><p>心に残った出来事が、ここへコレクションされます。</p></div>
       )}
     </section>
+  );
+}
+
+function MemoryArticleModal({
+  article,
+  game,
+  onClose,
+}: {
+  article: MemoryArticle;
+  game: GameState;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const phase = PHASES.find((item) => item.id === article.phase) ?? PHASES[0];
+  const articleId = article.memory.id.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const makeDecision = (person: CharacterId): AgentDecision | undefined => {
+    const detail = article[person];
+    if (!detail.decision) return undefined;
+    return {
+      decision: detail.decision,
+      action: detail.action ?? "",
+      dialogue: detail.dialogue,
+      publicReason: detail.publicReason,
+    };
+  };
+  const captureGame: GameState = {
+    ...game,
+    status: "resolved",
+    shared: {
+      ...game.shared,
+      day: article.memory.day,
+      phase: article.phase,
+    },
+    haru: { ...game.haru, location: article.scene.haru },
+    aoi: { ...game.aoi, location: article.scene.aoi },
+    decisions: {
+      haru: makeDecision("haru"),
+      aoi: makeDecision("aoi"),
+    },
+    currentEvent: article.event,
+  };
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      )).filter((element) => !element.hasAttribute("hidden"));
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="memory-article-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="memory-article-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="memory-article-title"
+        ref={dialogRef}
+        tabIndex={-1}
+      >
+        <header className="memory-article-header">
+          <div className="memory-article-kicker"><span>✦</span><small>ROOMMATES LIFE ARTICLE</small></div>
+          <div className="memory-article-heading">
+            <div>
+              <span className="article-day-badge">DAY {article.memory.day}</span>
+              <span className="article-phase-badge">{phase.icon} {phase.label} · {phase.time}</span>
+            </div>
+            <h2 id="memory-article-title">{article.memory.title}</h2>
+          </div>
+          <button ref={closeRef} className="memory-article-close" type="button" onClick={onClose} aria-label="思い出の記事を閉じる">×</button>
+        </header>
+
+        <div className="memory-article-scroll">
+          <section className="memory-article-hero" aria-label="イベント時のゲームキャプチャ">
+            <div className="memory-capture-frame">
+              <ApartmentStage
+                game={captureGame}
+                stages={WAITING_STAGES}
+                selectedPerson="haru"
+                currentEvent={article.event}
+                resolving={false}
+                onSelectPerson={() => undefined}
+                capture
+                idPrefix={`memory-${articleId}`}
+              />
+            </div>
+            <aside className="memory-article-lead">
+              <div className={`capture-status ${article.captureIsExact ? "is-exact" : "is-reconstructed"}`}>
+                <span aria-hidden="true">{article.captureIsExact ? "●" : "◇"}</span>
+                <div><small>EVENT CAPTURE</small><b>{article.captureIsExact ? "当時のシーン記録" : "記録からシーンを再現"}</b></div>
+              </div>
+              <p className="memory-article-summary">{article.memory.summary}</p>
+              <dl className="memory-article-facts">
+                <div><dt>心への影響</dt><dd className={article.memory.emotionalImpact >= 0 ? "is-positive" : "is-negative"}>{article.memory.emotionalImpact >= 0 ? "+" : ""}{article.memory.emotionalImpact}</dd></div>
+                <div><dt>大切さ</dt><dd>{article.memory.importance} / 10</dd></div>
+                <div><dt>場所</dt><dd>{article.scene.haru === article.scene.aoi ? article.scene.haru : `${article.scene.haru} / ${article.scene.aoi}`}</dd></div>
+              </dl>
+            </aside>
+          </section>
+
+          <section className="memory-article-section memory-context-section">
+            <div className="article-section-title"><span>01</span><div><small>WHAT HAPPENED</small><h3>この時のできごと</h3></div></div>
+            {article.event?.suggestion && <div className="article-cue"><small>デコピンへの指示</small><p>{article.event.suggestion}</p></div>}
+            {article.event?.navigatorMessage && <div className="article-dekopin-response"><small>{DEKOPIN_NAME}の応答</small><p>「{article.event.navigatorMessage}」</p></div>}
+            <p className="article-narration">{article.event?.narration ?? article.memory.summary}</p>
+            {!article.event && <p className="article-archive-note">古いセーブのため、思い出に残っている要約から記事を復元しています。</p>}
+          </section>
+
+          <section className="memory-article-section">
+            <div className="article-section-title"><span>02</span><div><small>THEIR ACTIONS</small><h3>ふたりがしたこと</h3></div></div>
+            <div className="memory-actions-grid">
+              {(["haru", "aoi"] as CharacterId[]).map((person) => {
+                const detail = article[person];
+                return (
+                  <article className={`memory-action-card action-${person}`} key={person}>
+                    <div className="memory-person-heading">
+                      <PixelPortrait person={person} />
+                      <div><small>{PEOPLE[person].job.toUpperCase()}</small><h4>{PEOPLE[person].name}</h4></div>
+                      {detail.decision && <span className={`decision-chip chip-${detail.decision.toLowerCase()}`}>{DECISION_LABELS[detail.decision]}</span>}
+                    </div>
+                    <strong>{detail.action || "この時の行動記録は残っていません"}</strong>
+                    {detail.publicReason && <p><small>そうした理由</small>{detail.publicReason}</p>}
+                    <footer><span aria-hidden="true">⌂</span>{detail.location}</footer>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="memory-article-section memory-dialogue-section">
+            <div className="article-section-title"><span>03</span><div><small>ACTUAL CONVERSATION</small><h3>実際に交わした会話</h3></div></div>
+            {article.haru.dialogue || article.aoi.dialogue ? (
+              <div className="memory-transcript" aria-label="当時の会話記録">
+                {(["haru", "aoi"] as CharacterId[]).map((person) => {
+                  const dialogue = article[person].dialogue;
+                  return dialogue ? (
+                    <blockquote className={`memory-dialogue dialogue-${person}`} key={person}>
+                      <PixelPortrait person={person} />
+                      <div><small>{PEOPLE[person].name}</small><p>「{dialogue}」</p></div>
+                    </blockquote>
+                  ) : (
+                    <p className="dialogue-missing" key={person}>{PEOPLE[person].name} の発言記録はありません。</p>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="memory-dialogue-empty"><span aria-hidden="true">⌁</span><div><b>この会話は記録されていません</b><p>古い思い出には会話データがありません。これから作られる思い出では、実際の発言をここで振り返れます。</p></div></div>
+            )}
+          </section>
+        </div>
+
+        <footer className="memory-article-footer">
+          <span>MEMORY No. {article.memory.id}</span>
+          <button type="button" onClick={onClose}>思い出にもどる</button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
@@ -634,11 +968,13 @@ function DebugDetails({ game }: { game: GameState }) {
 
 function LogDrawer({
   events,
+  navigatorResponses,
   filter,
   onFilter,
   onClose,
 }: {
   events: GameEvent[];
+  navigatorResponses: Record<string, string>;
   filter: LogFilter;
   onFilter: (filter: LogFilter) => void;
   onClose: () => void;
@@ -662,18 +998,24 @@ function LogDrawer({
         <button type="button" className="drawer-close" onClick={onClose} aria-label="ログを閉じる">×</button>
       </header>
       <div className="log-list">
-        {visible.length ? visible.map((event) => (
+        {visible.length ? visible.map((event) => {
+          const navigatorMessage = event.navigatorMessage
+            ?? navigatorResponses[event.id]
+            ?? navigatorResponses[event.eventTitle];
+          return (
           <article className="log-entry" key={event.id}>
             <div className="log-time"><b>DAY {event.day}</b><span>{PHASES.find((phase) => phase.id === event.phase)?.label ?? event.phase}</span></div>
             <div className="log-copy">
               <small>★ できごと</small><h3>{event.eventTitle}</h3>
-              {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>きっかけ</b>{event.suggestion}</p>}
+              {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>デコピンへの指示</b>{event.suggestion}</p>}
               {filter !== "haru" && filter !== "aoi" && <p>{event.narration}</p>}
+              {filter !== "haru" && filter !== "aoi" && navigatorMessage && <blockquote className="quote-dekopin"><b>{DEKOPIN_NAME}</b>「{navigatorMessage}」</blockquote>}
               {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>Haru</b>「{event.haruDialogue}」</blockquote>}
               {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>Aoi</b>「{event.aoiDialogue}」</blockquote>}
             </div>
           </article>
-        )) : <div className="empty-log"><span>⌁</span><h3>まだ記録はありません</h3><p>生活が進むと、ここから出来事を振り返れます。</p></div>}
+          );
+        }) : <div className="empty-log"><span>⌁</span><h3>まだ記録はありません</h3><p>生活が進むと、ここから出来事を振り返れます。</p></div>}
       </div>
     </section>
   );
@@ -689,11 +1031,14 @@ export default function App() {
   const [offline, setOffline] = useState(false);
   const [actionBusy, setActionBusy] = useState<"advance" | "reset" | "fast" | null>(null);
   const [streamMessage, setStreamMessage] = useState("");
+  const [navigatorMessage, setNavigatorMessage] = useState("");
+  const [navigatorResponses, setNavigatorResponses] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [selectedPerson, setSelectedPerson] = useState<CharacterId>("haru");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("status");
   const [logOpen, setLogOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
+  const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
 
   const refreshGame = useCallback(async (signal?: AbortSignal) => {
@@ -728,7 +1073,8 @@ export default function App() {
     if (displayMessage) setStreamMessage(displayMessage);
 
     if (normalizedType === "turn.started") {
-      setStages({ haru: "active", aoi: "waiting", director: "waiting" });
+      setNavigatorMessage("");
+      setStages({ navigator: "active", haru: "waiting", aoi: "waiting", director: "waiting" });
       const safeSuggestion = record(payload);
       const lock = record(safeSuggestion.lock);
       const cue = record(safeSuggestion.cue);
@@ -746,9 +1092,16 @@ export default function App() {
     if (normalizedType === "agent.thinking") {
       setStages((previous) => ({
         ...previous,
-        ...(agent === "haru" ? { haru: "active" as const } : {}),
-        ...(agent === "aoi" ? { haru: previous.haru === "waiting" ? "active" as const : previous.haru, aoi: "active" as const } : {}),
+        ...(agent === "haru" ? { navigator: "complete" as const, haru: "active" as const } : {}),
+        ...(agent === "aoi" ? { navigator: "complete" as const, haru: previous.haru === "waiting" ? "active" as const : previous.haru, aoi: "active" as const } : {}),
       }));
+    }
+    if (
+      normalizedType === "navigator.thinking"
+      || (normalizedType === "agent.thinking" && agent === "navigator")
+    ) {
+      setNavigatorMessage(displayMessage || "指示を受け取ったよ。ふたりの意思を確認しているところ…");
+      setStages((previous) => ({ ...previous, navigator: "active" }));
     }
     if (normalizedType === "agent.completed") {
       setStages((previous) => ({
@@ -763,9 +1116,42 @@ export default function App() {
       }
     }
     if (normalizedType === "director.resolving" || normalizedType === "director.completed") {
-      setStages({ haru: "complete", aoi: "complete", director: normalizedType === "director.completed" ? "complete" : "active" });
+      setStages({ navigator: "complete", haru: "complete", aoi: "complete", director: normalizedType === "director.completed" ? "complete" : "active" });
     }
-    if (normalizedType === "turn.completed") setStages({ haru: "complete", aoi: "complete", director: "complete" });
+    if (
+      normalizedType === "navigator.completed"
+      || (normalizedType === "agent.completed" && agent === "navigator")
+    ) {
+      const response = displayMessage || stringValue(
+        record(payload).navigatorMessage,
+        record(payload).navigator_message,
+        record(payload).response,
+      );
+      const eventTitle = stringValue(
+        record(payload).eventTitle,
+        record(payload).event_title,
+        envelope.eventTitle,
+      );
+      const eventId = stringValue(record(payload).eventId, record(payload).event_id, envelope.eventId);
+      if (response) {
+        setNavigatorMessage(response);
+        setNavigatorResponses((previous) => ({
+          ...previous,
+          ...(eventTitle ? { [eventTitle]: response } : {}),
+          ...(eventId ? { [eventId]: response } : {}),
+        }));
+      }
+      setStages((previous) => ({ ...previous, navigator: "complete" }));
+    }
+    if (normalizedType === "turn.completed") setStages({ navigator: "complete", haru: "complete", aoi: "complete", director: "complete" });
+    if (normalizedType === "result.generating" || normalizedType === "result.completed") {
+      setGame((previous) => normalizeGameState({
+        status: "ended",
+        ending: record(payload).ending,
+        result: payload,
+      }, previous));
+      return;
+    }
     if (normalizedType === "warning") setNotice(displayMessage || "一部のエージェントがモックへ切り替わりました");
     if (normalizedType === "error") setNotice(displayMessage || "ターン処理でエラーが発生しました");
     if (Object.keys(record(payload)).length) setGame((previous) => normalizeGameState(payload, previous));
@@ -780,9 +1166,10 @@ export default function App() {
     }
     setNotice("");
     setLastSuggestion(cue);
+    setNavigatorMessage("");
     setResolving(true);
     setStreamMessage("同じ瞬間のスナップショットを準備しています…");
-    setStages({ haru: "active", aoi: "waiting", director: "waiting" });
+    setStages({ navigator: "active", haru: "waiting", aoi: "waiting", director: "waiting" });
     turnAbortRef.current = new AbortController();
     try {
       await runTurn(cue, game.revision, applyStreamMessage, turnAbortRef.current.signal);
@@ -809,21 +1196,27 @@ export default function App() {
     }
   };
 
-  const runAction = async (kind: "advance" | "reset" | "fast") => {
+  const runAction = async (
+    kind: "advance" | "reset" | "fast",
+    resetSeed?: string,
+  ) => {
     if (resolving || actionBusy) return;
     setActionBusy(kind);
     setNotice("");
     try {
-      const payload = await (kind === "advance" ? advanceGame() : kind === "reset" ? resetGame() : fastForwardGame());
+      const payload = await (kind === "advance" ? advanceGame() : kind === "reset" ? resetGame(resetSeed) : fastForwardGame());
       if (payload !== undefined) setGame((previous) => normalizeGameState(payload, kind === "reset" ? INITIAL_GAME_STATE : previous));
       else await refreshGame();
       if (kind === "reset") {
         setSuggestion("");
         setLastSuggestion("");
+        setNavigatorMessage("");
+        setNavigatorResponses({});
         setStages(WAITING_STAGES);
         setSelectedPerson("haru");
         setInspectorTab("status");
         setLogOpen(false);
+        setSelectedMemoryId(null);
       }
       setOffline(false);
     } catch (error) {
@@ -838,6 +1231,44 @@ export default function App() {
     return game.currentEvent ? [game.currentEvent] : [];
   }, [game.currentEvent, game.eventLog]);
   const latestEvent = game.currentEvent ?? eventLog[eventLog.length - 1];
+  const latestNavigatorMessage = latestEvent
+    ? latestEvent.navigatorMessage
+      ?? navigatorResponses[latestEvent.id]
+      ?? navigatorResponses[latestEvent.eventTitle]
+      ?? navigatorMessage
+    : navigatorMessage;
+  const dekopinPresentation = useMemo(
+    () => getDekopinPresentation({
+      resolving,
+      offline,
+      draft: suggestion,
+      streamMessage: navigatorMessage || streamMessage,
+      event: latestEvent
+        ? {
+            eventTitle: latestEvent.eventTitle,
+            narration: latestEvent.narration,
+            navigatorMessage: latestNavigatorMessage || undefined,
+          }
+        : undefined,
+      sessionMessage: latestNavigatorMessage,
+    }),
+    [
+      latestEvent,
+      latestNavigatorMessage,
+      navigatorMessage,
+      offline,
+      resolving,
+      streamMessage,
+      suggestion,
+    ],
+  );
+  const selectedMemory = selectedMemoryId
+    ? game.shared.sharedMemories.find((memory) => memory.id === selectedMemoryId)
+    : undefined;
+  const selectedMemoryArticle = useMemo(
+    () => selectedMemory ? buildMemoryArticle(selectedMemory, eventLog) : undefined,
+    [eventLog, selectedMemory],
+  );
   const canAdvance = !resolving && !actionBusy && !offline && game.status !== "awaiting_suggestion" && !game.completed;
   const activePhase = PHASES.find((phase) => phase.id === game.shared.phase) ?? PHASES[0];
 
@@ -851,9 +1282,49 @@ export default function App() {
     setNotice("予定から「きっかけ」を作りました。送る前に編集できます。");
   };
 
+  const openMemoryArticle = useCallback((memory: Memory) => {
+    setSelectedMemoryId(memory.id);
+    setLogOpen(false);
+  }, []);
+  const closeMemoryArticle = useCallback(() => setSelectedMemoryId(null), []);
+
+  const showResult = game.status === "ended" || (game.completed && Boolean(game.ending));
+  if (showResult) {
+    const restartLegacySave = (seed: string) => {
+      if (window.confirm("現在のEnding表示を終了して、ゲームを最初から始めますか？")) {
+        void runAction("reset", seed);
+      }
+    };
+    return (
+      <div className={`app phase-theme-${game.shared.phase}`}>
+        {notice && <div className="notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+        {initialLoading && <div className="loading-banner"><span /><p>リザルトを読み込んでいます…</p></div>}
+        <ResultScreen
+          game={game}
+          onRestartSameSeed={() => runAction("reset", game.seed)}
+          onRestartNewSeed={() => runAction("reset", createRunSeed())}
+          renderEventCapture={(event) => <ResultEventCapture event={event} game={game} />}
+        />
+        {!game.result && (
+          <aside className="result-actions" aria-label="旧セーブデータから再スタート">
+            <div>
+              <p className="result-section-label">LEGACY SAVE</p>
+              <h2>総集編のないセーブデータです</h2>
+              <p>保存済みのEndingは表示したまま、同じseedまたは新しいseedで次の7日間を始められます。</p>
+            </div>
+            <div>
+              <button type="button" onClick={() => restartLegacySave(game.seed)} disabled={actionBusy === "reset"}>同じseedでもう一度</button>
+              <button type="button" className="is-primary" onClick={() => restartLegacySave(createRunSeed())} disabled={actionBusy === "reset"}>新しいseedで始める</button>
+            </div>
+          </aside>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className={`app phase-theme-${game.shared.phase}`}>
-      <header className="topbar">
+      <header className="topbar" aria-hidden={selectedMemoryArticle ? true : undefined} inert={selectedMemoryArticle ? true : undefined}>
         <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark"><i /><i /><b>♡</b></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
         <PhaseRail game={game} />
         <div className="header-stat relationship-status"><small>RELATIONSHIP</small><strong><span aria-hidden="true">♥</span>{RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div>
@@ -865,14 +1336,10 @@ export default function App() {
         </div>
       </header>
 
-      {notice && <div className="notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+      {notice && <div className="notice" role="alert" aria-hidden={selectedMemoryArticle ? true : undefined} inert={selectedMemoryArticle ? true : undefined}><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
       {initialLoading && <div className="loading-banner"><span /><p>ふたりの生活を読み込んでいます…</p></div>}
 
-      {game.ending && (
-        <div className="ending-overlay" role="dialog" aria-modal="true" aria-labelledby="ending-title"><section className="ending-card"><span className="ending-stars" aria-hidden="true">✦ ♡ ✦</span><small>THE END · DAY 7</small><h2 id="ending-title">{game.shared.relationshipLabel === "couple" ? "ふたりは、恋人になった。" : "ふたりが選んだ、これから。"}</h2><p>{game.ending}</p><button type="button" onClick={() => void runAction("reset")}>もう一度、見守る</button></section></div>
-      )}
-
-      <main id="game" className="game-layout">
+      <main id="game" className="game-layout" aria-hidden={selectedMemoryArticle ? true : undefined} inert={selectedMemoryArticle ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
           <div className="world-stage-wrap">
             <ApartmentStage game={game} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} resolving={resolving} onSelectPerson={selectCharacter} />
@@ -881,28 +1348,28 @@ export default function App() {
               <ResidentChip person="aoi" state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
             </div>
             <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
-            <EventCard event={latestEvent} resolving={resolving} lastSuggestion={lastSuggestion} />
+            <EventCard event={latestEvent} resolving={resolving} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} />
           </div>
 
-          <section className="interaction-dock" aria-labelledby="producer-title">
+          <section className="interaction-dock" aria-labelledby="dekopin-title">
             <button type="button" className="latest-log-strip" onClick={() => setLogOpen(true)}>
               <span className="log-clock">{activePhase.time}</span><span className="log-star">★</span>
               <span className="latest-log-copy"><small>最新の生活ログ</small><b>{latestEvent?.eventTitle ?? "共同生活がはじまりました"}</b><em>{latestEvent?.haruDialogue ? `「${clipText(latestEvent.haruDialogue, 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
               <span className="open-log-label">振り返る <b>⌃</b></span>
             </button>
             <div className="producer-row">
-              <div className="producer-label"><span>PRODUCER'S CUE</span><h2 id="producer-title">ふたりへのきっかけ</h2></div>
+              <DekopinGuide presentation={dekopinPresentation} />
               <div className="preset-menu">
-                <label htmlFor="preset-select">提案例</label>
+                <label htmlFor="preset-select">指示例</label>
                 <select id="preset-select" value="" onChange={(event) => setSuggestion(event.target.value)} disabled={resolving || game.completed}>
                   <option value="">選ぶ…</option>{PRESETS.map((preset) => <option value={preset} key={preset}>{preset}</option>)}
                 </select>
               </div>
               <form className="suggestion-form" onSubmit={handleSubmit}>
-                <label htmlFor="suggestion" className="sr-only">ふたりへの提案</label>
+                <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
                 <textarea id="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={resolving || game.completed || offline} placeholder="例：今日は一緒に夕食を作ってみたら？" />
                 <span className="character-count">{suggestion.length}/240</span>
-                <button className="submit-cue" type="submit" disabled={resolving || game.completed || offline || !suggestion.trim()}><span>{resolving ? "考え中…" : "きっかけを届ける"}</span><b aria-hidden="true">▶</b></button>
+                <button className="submit-cue" type="submit" disabled={resolving || game.completed || offline || !suggestion.trim()}><span>{resolving ? "反映中…" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
               </form>
               <div className="dock-actions">
                 <button className="watch-button" type="button" onClick={() => void submitSuggestion("何も提案せず見守る")} disabled={resolving || game.completed || offline}><span aria-hidden="true">◉</span>見守る</button>
@@ -912,7 +1379,7 @@ export default function App() {
             </div>
           </section>
 
-          {logOpen && <LogDrawer events={eventLog} filter={logFilter} onFilter={setLogFilter} onClose={() => setLogOpen(false)} />}
+          {logOpen && <LogDrawer events={eventLog} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={() => setLogOpen(false)} />}
         </section>
 
         <aside className="inspector-panel">
@@ -926,11 +1393,12 @@ export default function App() {
           <div className="inspector-body">
             {inspectorTab === "status" && <CharacterInspector person={selectedPerson} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
             {inspectorTab === "schedule" && <SchedulePanel game={game} onUseCue={useScheduleCue} />}
-            {inspectorTab === "memories" && <MemoryPanel game={game} onOpenLog={() => setLogOpen(true)} />}
+            {inspectorTab === "memories" && <MemoryPanel game={game} onOpenMemory={openMemoryArticle} />}
           </div>
           <DebugDetails game={game} />
         </aside>
       </main>
+      {selectedMemoryArticle && <MemoryArticleModal article={selectedMemoryArticle} game={game} onClose={closeMemoryArticle} />}
     </div>
   );
 }

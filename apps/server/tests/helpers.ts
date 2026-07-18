@@ -9,6 +9,8 @@ import type {
   CharacterDecisionInput,
   CharacterId,
   DirectorInput,
+  NavigatorAgentOutput,
+  NavigatorInput,
   ResolvedEvent,
 } from "@roommates/shared";
 
@@ -44,11 +46,20 @@ export function mockResult<T>(value: T): AgentResult<T> {
 }
 export class StaticAgentCoordinator implements AgentCoordinator {
   readonly inputs: Partial<Record<CharacterId, CharacterDecisionInput>> = {};
+  navigatorInput?: NavigatorInput;
 
   constructor(
     private readonly decisions: Partial<Record<CharacterId, CharacterDecision>> = {},
     private readonly event: ResolvedEvent = resolvedEvent,
+    private readonly navigatorOutput: NavigatorAgentOutput = {
+      message: "デコピンが二人へきっかけを届けるね。",
+    },
   ) {}
+
+  async navigate(input: NavigatorInput): Promise<AgentResult<NavigatorAgentOutput>> {
+    this.navigatorInput = input;
+    return mockResult(this.navigatorOutput);
+  }
 
   async decide(
     id: CharacterId,

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
@@ -62,8 +62,8 @@
   },
   "interactionModel": {
     "playerRepresentation": "not-rendered",
-    "commandTargetCharacterId": "producer",
-    "supportCharacterId": "navigator"
+    "commandTargetCharacterId": "navigator",
+    "commandTargetCharacterName": "デコピン"
   },
   "animationPresets": {
     "walk": {
@@ -92,16 +92,9 @@
       "sheet": "mizuhara-aoi/walk-cycle.png"
     },
     {
-      "id": "producer",
-      "name": "プロデューサー",
-      "role": "player-command-agent",
-      "animationPreset": "walk",
-      "sheet": "producer/walk-cycle.png"
-    },
-    {
       "id": "navigator",
-      "name": "ナビゲーター",
-      "role": "game-flow-support",
+      "name": "デコピン",
+      "role": "player-command-agent",
       "animationPreset": "hover",
       "relativeVisualHeight": 0.85,
       "sheet": "navigator/walk-cycle.png"
