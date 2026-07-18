@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "concurrently -k -n server,web -c magenta,cyan \"npm run dev -w @roommates/server\" \"npm run dev -w @roommates/web\"",
+    "dev:agent-worker": "npm run dev:agent-worker -w @roommates/server",
     "build": "npm run build -w @roommates/shared && npm run build -w @roommates/server && npm run build -w @roommates/web",
     "build:sites": "npm run build -w @roommates/shared && npm run build -w @roommates/web && npm run build:worker -w @roommates/server && node scripts/assemble-sites.mjs",
     "package:sites": "bash scripts/package-sites.sh",

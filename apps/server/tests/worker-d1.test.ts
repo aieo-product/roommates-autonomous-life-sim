@@ -21,8 +21,15 @@ import {
   type D1StatementBinding,
 } from "../src/persistence/d1-repository.js";
 import {
+  MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS,
+  SSE_KEEPALIVE_INTERVAL_MS,
   stateForRead,
+  stateForHealth,
   WORKER_STATE_LEASE_MS,
+  workerAgentCoordinatorTimeoutMs,
+  workerAgentMode,
+  workerAgentProbeTimeoutMs,
+  workerAgentTimeoutMs,
 } from "../src/worker.js";
 
 type StoredRow = {
@@ -260,6 +267,82 @@ function resolvingState(seed: string): GameState {
 }
 
 describe("D1 Worker recovery and isolation", () => {
+  it("keeps the recovery lease above every supported Agent Worker operation", () => {
+    const maximumCoordinatorTimeout = workerAgentCoordinatorTimeoutMs({
+      AGENT_WORKER_TIMEOUT_MS: "999999",
+      AGENT_WORKER_PROBE_TIMEOUT_MS: "999999",
+    });
+    const maximumConfiguredBudget = maximumCoordinatorTimeout * 2 * 4;
+
+    expect(MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS).toBe(
+      maximumConfiguredBudget,
+    );
+    expect(WORKER_STATE_LEASE_MS).toBeGreaterThan(
+      MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS,
+    );
+    expect(WORKER_STATE_LEASE_MS).toBeGreaterThanOrEqual(20 * 60_000);
+  });
+
+  it("uses an SSE keepalive interval within the proxy-safe range", () => {
+    expect(SSE_KEEPALIVE_INTERVAL_MS).toBeGreaterThanOrEqual(10_000);
+    expect(SSE_KEEPALIVE_INTERVAL_MS).toBeLessThanOrEqual(15_000);
+  });
+
+  it("enables the remote Agent Worker only when its URL is configured", () => {
+    expect(workerAgentMode()).toBe("mock");
+    expect(workerAgentMode({ AGENT_WORKER_URL: "   " })).toBe("mock");
+    expect(
+      workerAgentMode({
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "secret",
+      }),
+    ).toBe("auto");
+    expect(
+      workerAgentMode({ AGENT_WORKER_URL: "https://agent.example.test" }),
+    ).toBe("mock");
+    expect(
+      workerAgentMode({
+        AGENT_WORKER_URL: "http://agent.example.test",
+        AGENT_WORKER_TOKEN: "secret",
+      }),
+    ).toBe("mock");
+    expect(
+      workerAgentMode({ AGENT_WORKER_URL: "http://127.0.0.1:3002" }),
+    ).toBe("auto");
+  });
+
+  it("uses a short bounded readiness probe timeout", () => {
+    expect(workerAgentProbeTimeoutMs()).toBe(2_000);
+    expect(
+      workerAgentProbeTimeoutMs({ AGENT_WORKER_PROBE_TIMEOUT_MS: "10" }),
+    ).toBe(250);
+    expect(
+      workerAgentProbeTimeoutMs({ AGENT_WORKER_PROBE_TIMEOUT_MS: "99999" }),
+    ).toBe(10_000);
+  });
+
+  it("lets the adapter timeout before the coordinator timeout", () => {
+    const env = {
+      AGENT_WORKER_TIMEOUT_MS: "12000",
+      AGENT_WORKER_PROBE_TIMEOUT_MS: "3000",
+    };
+
+    expect(workerAgentCoordinatorTimeoutMs(env)).toBe(
+      workerAgentTimeoutMs(env) + workerAgentProbeTimeoutMs(env) + 5_000,
+    );
+  });
+
+  it("uses a 60 second remote timeout and clamps unsafe overrides", () => {
+    expect(workerAgentTimeoutMs()).toBe(60_000);
+    expect(workerAgentTimeoutMs({ AGENT_WORKER_TIMEOUT_MS: "invalid" })).toBe(
+      60_000,
+    );
+    expect(workerAgentTimeoutMs({ AGENT_WORKER_TIMEOUT_MS: "25" })).toBe(1_000);
+    expect(workerAgentTimeoutMs({ AGENT_WORKER_TIMEOUT_MS: "999999" })).toBe(
+      120_000,
+    );
+  });
+
   it("recovers a stale resolving checkpoint and persists the awaiting state", async () => {
     const database = new FakeD1Database();
     const sessionId = "stale-resolving";
@@ -279,6 +362,18 @@ describe("D1 Worker recovery and isolation", () => {
     expect(database.readState(sessionId)).toMatchObject({
       status: "awaiting_suggestion",
     });
+  });
+
+  it("keeps health checks read-only even for a stale resolving checkpoint", async () => {
+    const database = new FakeD1Database();
+    const sessionId = "health-stale-resolving";
+    database.seed(sessionId, resolvingState("health-stale"), 4, 1_000);
+
+    const state = await stateForHealth(database, sessionId);
+
+    expect(state.status).toBe("resolving");
+    expect(database.updateAttempts.get(sessionId)).toBeUndefined();
+    expect(database.readState(sessionId)?.status).toBe("resolving");
   });
 
   it("keeps generation single-flight per session without blocking another session", async () => {

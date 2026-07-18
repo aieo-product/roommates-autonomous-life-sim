@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx src/index.ts",
-    "build": "tsup src/index.ts --format esm --platform node --target node20 --out-dir dist --clean",
+    "dev:agent-worker": "node --import tsx src/agent-worker.ts",
+    "build": "tsup src/index.ts src/agent-worker.ts --format esm --platform node --target node20 --out-dir dist --clean",
     "build:worker": "node -e \"import('tsup').then(({ build }) => build({ entry: { index: 'src/worker.ts' }, format: ['esm'], platform: 'neutral', target: 'es2022', outDir: '../../dist/server', clean: true, splitting: false, minify: true, noExternal: ['@roommates/shared', 'zod'] }))\"",
     "start": "node dist/index.js",
+    "start:agent-worker": "node dist/agent-worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },

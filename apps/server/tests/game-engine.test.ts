@@ -220,9 +220,15 @@ describe("GameEngine", () => {
 
     const reset = await engine.reset("fresh-demo-seed");
 
-    const expected = createInitialGameState("fresh-demo-seed");
+    const expected = {
+      ...createInitialGameState("fresh-demo-seed"),
+      agentEpoch: 1,
+    };
     expect(reset).toEqual(expected);
     expect(engine.getState()).toEqual(expected);
+
+    const resetAgain = await engine.reset("another-seed");
+    expect(resetAgain.agentEpoch).toBe(2);
   });
 
   it("enforces the selected event effect budget before committing state", async () => {

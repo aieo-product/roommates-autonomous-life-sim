@@ -606,6 +606,7 @@ const gameStateV2Schema = z
   .object({
     version: z.literal(2),
     seed: text,
+    agentEpoch: z.number().int().nonnegative().optional(),
     revision: z.number().int().nonnegative(),
     status: z.enum(["awaiting_suggestion", "resolving", "resolved", "ended"]),
     turnId: z.string().optional(),

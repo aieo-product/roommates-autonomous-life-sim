@@ -13,6 +13,8 @@ export function defaultAppServerTimeoutMs(mode: AgentMode): number {
 }
 
 const configuredAgentMode = agentMode(process.env.AGENT_MODE);
+const configuredAgentWorkerUrl =
+  process.env.AGENT_WORKER_URL?.trim() || undefined;
 
 export const config = {
   port: Number(process.env.PORT ?? 3001),
@@ -23,8 +25,16 @@ export const config = {
       ? join(homedir(), ".codex/plugins/.plugin-appserver/codex")
       : "codex"),
   timeoutMs: Number(
-    process.env.APP_SERVER_TIMEOUT_MS ??
-      defaultAppServerTimeoutMs(configuredAgentMode),
+    process.env.AGENT_WORKER_TIMEOUT_MS ??
+      process.env.APP_SERVER_TIMEOUT_MS ??
+      (configuredAgentWorkerUrl
+        ? 60_000
+        : defaultAppServerTimeoutMs(configuredAgentMode)),
+  ),
+  agentWorkerUrl: configuredAgentWorkerUrl,
+  agentWorkerToken: process.env.AGENT_WORKER_TOKEN,
+  agentWorkerProbeTimeoutMs: Number(
+    process.env.AGENT_WORKER_PROBE_TIMEOUT_MS ?? 2_000,
   ),
   stateFile: resolve(process.env.GAME_STATE_FILE ?? "./apps/server/data/game-state.json"),
   persist: process.env.NODE_ENV !== "test",

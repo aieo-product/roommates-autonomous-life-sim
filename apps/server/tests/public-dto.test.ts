@@ -70,6 +70,7 @@ describe("public DTO projection", () => {
 
     expect(projected.characters.haru.lastDecision).toEqual(publicDecision);
     expect(projected.runtime.haru).toEqual({ source: "app_server", latencyMs: 42 });
+    expect(projected).not.toHaveProperty("agentEpoch");
     expect(projected.result.reflections.haru.runtime).toEqual({
       source: "fallback",
       latencyMs: 17,

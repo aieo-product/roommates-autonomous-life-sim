@@ -172,7 +172,12 @@ export class GameEngine {
 
   async reset(seed?: string): Promise<GameState> {
     if (this.resolving) throw new GameConflictError("ターン処理中はリセットできません");
-    this.state = createInitialGameState(seed ?? "demo-heart");
+    await this.agents.resetContext?.();
+    const nextAgentEpoch = (this.state.agentEpoch ?? 0) + 1;
+    this.state = {
+      ...createInitialGameState(seed ?? "demo-heart"),
+      agentEpoch: nextAgentEpoch,
+    };
     this.completed.clear();
     await this.repository.clear();
     await this.repository.save(this.state);
