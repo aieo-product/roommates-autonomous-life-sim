@@ -48,10 +48,30 @@ describe("GameEngine", () => {
     expect(result.eventLog).toHaveLength(1);
     expect(result.eventLog[0]).toMatchObject({
       eventDefinitionId: "shared-cooking",
+      eventCategory: "cook",
+      cooldownPhases: 2,
       cueSafetyFlags: [],
+      decisions: {
+        haru: {
+          decision: acceptedDecision.decision,
+          action: acceptedDecision.action,
+          dialogue: acceptedDecision.dialogue,
+          publicReason: acceptedDecision.publicReason,
+        },
+      },
+      before: { shared: { relationshipLabel: "roommates" } },
+      after: { shared: { memoryIds: [expect.stringMatching(/^memory-/)] } },
+      runtimeSources: { haru: "mock", aoi: "mock", director: "mock" },
     });
+    expect(result.eventLog[0]?.memory?.sourceEventId).toBe(result.eventLog[0]?.id);
     expect(result.lastEvent?.eventTitle).toBe(resolvedEvent.eventTitle);
-    expect(result.characters.haru.lastDecision).toEqual(acceptedDecision);
+    expect(result.characters.haru.lastDecision).toEqual({
+      decision: acceptedDecision.decision,
+      action: acceptedDecision.action,
+      dialogue: acceptedDecision.dialogue,
+      publicReason: acceptedDecision.publicReason,
+    });
+    expect(JSON.stringify(result)).not.toContain("internalSummary");
     expect(streamed.map((event) => event.type)).toEqual([
       "turn.started",
       "agent.thinking",
@@ -297,5 +317,36 @@ describe("GameEngine", () => {
 
     expect(repeated).toEqual(first);
     expect(decide).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains all 28 structured turn records through the seven-day ending", async () => {
+    const { engine } = await engineWith();
+
+    for (let turn = 0; turn < 28; turn += 1) {
+      if (engine.getState().status === "resolved") await engine.advance();
+      await engine.resolveTurn(
+        "一緒に夕食を作ってみたら？",
+        `full-run-${turn}`,
+        engine.getState().revision,
+      );
+    }
+
+    const state = engine.getState();
+    expect(state.status).toBe("ended");
+    expect(state.eventLog).toHaveLength(28);
+    expect(
+      state.eventLog.every(
+        (entry) =>
+          entry.turnId &&
+          entry.eventCategory &&
+          entry.cooldownPhases !== undefined &&
+          entry.decisions &&
+          entry.before &&
+          entry.after &&
+          entry.memory?.sourceEventId === entry.id &&
+          entry.runtimeSources,
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(state.eventLog)).not.toContain("internalSummary");
   });
 });

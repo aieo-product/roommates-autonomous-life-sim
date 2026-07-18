@@ -26,11 +26,14 @@ import {
   type CharacterId,
   type Point,
 } from "./room-layout";
+import { buildMemoryArticle, type MemoryArticle } from "./memory-article";
+import { ResultScreen } from "./result";
 import type {
   AgentDecision,
   CharacterState,
   GameEvent,
   GameState,
+  Memory,
   MetricKey,
   Phase,
   RuntimeInfo,
@@ -135,6 +138,11 @@ const phaseIndex = (phase: Phase): number => PHASES.findIndex((item) => item.id 
 
 const clipText = (value: string, limit = 48): string =>
   value.length > limit ? `${value.slice(0, limit)}…` : value;
+
+const createRunSeed = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? `run-${crypto.randomUUID()}`
+    : `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 
 function RuntimeBadge({ runtime, offline }: { runtime: RuntimeInfo; offline: boolean }) {
   const mode = offline ? "offline" : runtime.mode;
@@ -605,7 +613,13 @@ function SchedulePanel({ game, people, onUseCue }: { game: GameState; people: Pe
   );
 }
 
-function MemoryPanel({ game, onOpenLog }: { game: GameState; onOpenLog: () => void }) {
+function MemoryPanel({
+  game,
+  onOpenMemory,
+}: {
+  game: GameState;
+  onOpenMemory: (memory: Memory) => void;
+}) {
   const memories = [...game.shared.sharedMemories].reverse();
   return (
     <section className="memories-panel">
@@ -616,7 +630,7 @@ function MemoryPanel({ game, onOpenLog }: { game: GameState; onOpenLog: () => vo
           {memories.map((memory) => (
             <li key={memory.id}>
               <span className={memory.emotionalImpact >= 0 ? "memory-good" : "memory-bad"}>{memory.emotionalImpact >= 0 ? "✦" : "!"}</span>
-              <div><small>DAY {memory.day} · IMPORTANCE {memory.importance}</small><h3>{memory.title}</h3><p>{memory.summary}</p><button type="button" onClick={onOpenLog}>この日の記録を見る ›</button></div>
+              <div><small>DAY {memory.day} · IMPORTANCE {memory.importance}</small><h3>{memory.title}</h3><p>{memory.summary}</p><button type="button" onClick={() => onOpenMemory(memory)}>ふたりの記事を読む <span aria-hidden="true">›</span></button></div>
             </li>
           ))}
         </ol>
@@ -624,6 +638,123 @@ function MemoryPanel({ game, onOpenLog }: { game: GameState; onOpenLog: () => vo
         <div className="empty-memories"><span aria-hidden="true">◇</span><h3>まだ思い出はありません</h3><p>心に残った出来事が、ここへコレクションされます。</p></div>
       )}
     </section>
+  );
+}
+
+function MemoryArticleModal({
+  article,
+  people,
+  onClose,
+}: {
+  article: MemoryArticle;
+  people: People;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const phase = PHASES.find((item) => item.id === article.phase) ?? PHASES[0];
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const controls = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+        ),
+      );
+      if (!controls.length) return;
+      const firstControl = controls[0];
+      const lastControl = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === firstControl) {
+        event.preventDefault();
+        lastControl?.focus();
+      } else if (!event.shiftKey && document.activeElement === lastControl) {
+        event.preventDefault();
+        firstControl?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [onClose]);
+
+  const characterStory = (person: CharacterId) => {
+    const detail = article[person];
+    const name = people[person].name;
+    return (
+      <section className={`memory-character-story is-${person}`}>
+        <header><PixelPortrait person={person} /><div><small>{name.toUpperCase()} VIEW</small><h3>{name}が選んだこと</h3></div></header>
+        {detail.decision && <span className="memory-decision-badge">{DECISION_LABELS[detail.decision]}</span>}
+        <p className="memory-action">{detail.action || "公開された行動の記録はありません。"}</p>
+        {detail.dialogue && <blockquote>「{detail.dialogue}」</blockquote>}
+        {detail.publicReason && <p className="memory-public-reason"><strong>その時の理由</strong>{detail.publicReason}</p>}
+      </section>
+    );
+  };
+
+  return (
+    <div
+      className="memory-article-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <article
+        className="memory-article-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="memory-article-title"
+        ref={dialogRef}
+        tabIndex={-1}
+      >
+        <header className="memory-article-header">
+          <div className="memory-article-date"><span>DAY</span><strong>{article.memory.day}</strong><small>{phase.icon} {phase.label}</small></div>
+          <div><p>ROOMMATES LIFE ARCHIVE</p><h2 id="memory-article-title">{article.memory.title}</h2><span>記憶の重要度 {article.memory.importance} / 10</span></div>
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="思い出の記事を閉じる">×</button>
+        </header>
+
+        <div className={`memory-article-scene phase-${article.phase}`}>
+          <div className="memory-scene-person is-haru"><PixelPortrait person="haru" /><strong>{people.haru.name}</strong><span>{article.scene.haru}</span></div>
+          <div className="memory-scene-heart" aria-hidden="true">✦</div>
+          <div className="memory-scene-person is-aoi"><PixelPortrait person="aoi" /><strong>{people.aoi.name}</strong><span>{article.scene.aoi}</span></div>
+          <small>{article.captureIsExact ? "保存された位置から再現" : "出来事から場所を再構成"}</small>
+        </div>
+
+        <div className="memory-article-body">
+          <section className="memory-article-lead">
+            <p className="memory-kicker">MEMORY STORY</p>
+            <h3>{article.event?.eventTitle ?? article.memory.title}</h3>
+            <p>{article.event?.narration || article.memory.summary}</p>
+            {article.event?.suggestion && <p className="memory-producer-cue"><strong>Producerのきっかけ</strong>{article.event.suggestion}</p>}
+          </section>
+          <div className="memory-character-columns">
+            {characterStory("haru")}
+            {characterStory("aoi")}
+          </div>
+          <footer>
+            <span aria-hidden="true">✦</span>
+            <p>{article.memory.summary}</p>
+            {!article.event && <small>この記憶に対応する公開イベントログがないため、保存された記憶だけを表示しています。</small>}
+          </footer>
+        </div>
+      </article>
+    </div>
   );
 }
 
@@ -719,6 +850,7 @@ export default function App() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("status");
   const [logOpen, setLogOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
+  const [activeMemory, setActiveMemory] = useState<Memory>();
   const [personalityOpen, setPersonalityOpen] = useState(false);
   const personalityButtonRef = useRef<HTMLButtonElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
@@ -758,6 +890,29 @@ export default function App() {
     const agent = stringValue(envelope.agent, record(payload).agent).toLowerCase();
     const displayMessage = stringValue(envelope.message, record(payload).message);
     if (displayMessage) setStreamMessage(displayMessage);
+
+    if (normalizedType === "result.generating" || normalizedType === "result.completed") {
+      const resultPayload = Object.keys(record(record(payload).result)).length
+        ? record(payload).result
+        : payload;
+      setGame((previous) => normalizeGameState({ result: resultPayload }, previous));
+      setStreamMessage(
+        displayMessage ||
+        (normalizedType === "result.generating"
+          ? "7日間の評価と総集編を作っています…"
+          : "リザルトが完成しました"),
+      );
+      return;
+    }
+    if (normalizedType === "agent.reflecting" || normalizedType === "agent.reflected") {
+      setStreamMessage(
+        displayMessage ||
+        (normalizedType === "agent.reflecting"
+          ? "ふたりに7日間の感想を聞いています…"
+          : "ふたりの感想を受け取りました"),
+      );
+      return;
+    }
 
     if (normalizedType === "turn.started") {
       setStages({ haru: "active", aoi: "waiting", director: "waiting" });
@@ -847,12 +1002,19 @@ export default function App() {
     }
   };
 
-  const runAction = async (kind: "advance" | "reset" | "fast") => {
+  const runAction = async (
+    kind: "advance" | "reset" | "fast",
+    resetSeed = game.seed,
+  ) => {
     if (resolving || actionBusy) return;
     setActionBusy(kind);
     setNotice("");
     try {
-      const payload = await (kind === "advance" ? advanceGame() : kind === "reset" ? resetGame() : fastForwardGame(characterSettings.savedSettings));
+      const payload = await (kind === "advance"
+        ? advanceGame()
+        : kind === "reset"
+          ? resetGame(resetSeed)
+          : fastForwardGame(characterSettings.savedSettings));
       if (payload !== undefined) setGame((previous) => normalizeGameState(payload, kind === "reset" ? INITIAL_GAME_STATE : previous));
       else await refreshGame();
       if (kind === "reset") {
@@ -862,6 +1024,7 @@ export default function App() {
         setSelectedPerson("haru");
         setInspectorTab("status");
         setLogOpen(false);
+        setActiveMemory(undefined);
       }
       setOffline(false);
     } catch (error) {
@@ -875,6 +1038,10 @@ export default function App() {
     if (game.eventLog.length) return game.eventLog;
     return game.currentEvent ? [game.currentEvent] : [];
   }, [game.currentEvent, game.eventLog]);
+  const memoryArticle = useMemo(
+    () => activeMemory ? buildMemoryArticle(activeMemory, eventLog) : undefined,
+    [activeMemory, eventLog],
+  );
   const latestEvent = game.currentEvent ?? eventLog[eventLog.length - 1];
   const canAdvance = !resolving && !actionBusy && !offline && game.status !== "awaiting_suggestion" && !game.completed;
   const activePhase = PHASES.find((phase) => phase.id === game.shared.phase) ?? PHASES[0];
@@ -888,6 +1055,36 @@ export default function App() {
     setSuggestion(value);
     setNotice("予定から「きっかけ」を作りました。送る前に編集できます。");
   };
+
+  const restartSameSeed = () => runAction("reset", game.seed);
+  const restartNewSeed = () => runAction("reset", createRunSeed());
+  const showResult = game.status === "ended" || (game.completed && Boolean(game.ending));
+
+  if (showResult) {
+    return (
+      <div className="result-app-shell">
+        {notice && <div className="notice result-notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+        {!game.result && (
+          <aside className="legacy-result-guide" role="status" aria-labelledby="legacy-result-title">
+            <div>
+              <small>LEGACY SAVE</small>
+              <h2 id="legacy-result-title">この7日間は旧形式で保存されています</h2>
+              <p>結末と生活ログは残っていますが、Producer評価と二人の振り返りに必要な構造化データがありません。新しいrunから完全なリザルトを作れます。</p>
+            </div>
+            <div>
+              <button type="button" onClick={() => void restartSameSeed()} disabled={Boolean(actionBusy)}>同じseedで始め直す</button>
+              <button type="button" className="is-primary" onClick={() => void restartNewSeed()} disabled={Boolean(actionBusy)}>新しいseedで始める</button>
+            </div>
+          </aside>
+        )}
+        <ResultScreen
+          game={game}
+          onRestartSameSeed={restartSameSeed}
+          onRestartNewSeed={restartNewSeed}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`app phase-theme-${game.shared.phase}`}>
@@ -908,10 +1105,7 @@ export default function App() {
       {initialLoading && <div className="loading-banner"><span /><p>ふたりの生活を読み込んでいます…</p></div>}
 
       {personalityOpen && <PersonalityStudio controller={characterSettings} onClose={closePersonality} />}
-
-      {game.ending && (
-        <div className="ending-overlay" role="dialog" aria-modal="true" aria-labelledby="ending-title"><section className="ending-card"><span className="ending-stars" aria-hidden="true">✦ ♡ ✦</span><small>THE END · DAY 7</small><h2 id="ending-title">{game.shared.relationshipLabel === "couple" ? "ふたりは、恋人になった。" : "ふたりが選んだ、これから。"}</h2><p>{game.ending}</p><button type="button" onClick={() => void runAction("reset")}>もう一度、見守る</button></section></div>
-      )}
+      {memoryArticle && <MemoryArticleModal article={memoryArticle} people={people} onClose={() => setActiveMemory(undefined)} />}
 
       <main id="game" className="game-layout">
         <section className="world-column" aria-label="ふたりの生活画面">
@@ -967,7 +1161,7 @@ export default function App() {
           <div className="inspector-body">
             {inspectorTab === "status" && <CharacterInspector person={selectedPerson} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
             {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} onUseCue={useScheduleCue} />}
-            {inspectorTab === "memories" && <MemoryPanel game={game} onOpenLog={() => setLogOpen(true)} />}
+            {inspectorTab === "memories" && <MemoryPanel game={game} onOpenMemory={setActiveMemory} />}
           </div>
           <DebugDetails game={game} />
         </aside>

@@ -75,6 +75,7 @@ export function createMemory(
 ): Memory {
   return {
     id: `memory-${turnId}`,
+    sourceEventId: `log-${turnId}`,
     day,
     phase,
     title: partial.title,

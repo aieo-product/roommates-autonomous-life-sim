@@ -2,13 +2,26 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { CharacterDecisionInput, CharacterId, DirectorInput } from "@roommates/shared";
 import type { AppServerAdapter } from "../coordinator.js";
+import type { AgentReflectionInput } from "../reflection.js";
 import { extractJson } from "./json.js";
-import { characterInstructions, characterPrompt, directorInstructions, directorPrompt } from "./prompts.js";
-import { characterOutputSchema, directorOutputSchema } from "./schemas.js";
+import {
+  characterInstructions,
+  characterPrompt,
+  directorInstructions,
+  directorPrompt,
+  reflectionInstructions,
+  reflectionPrompt,
+} from "./prompts.js";
+import {
+  characterOutputSchema,
+  directorOutputSchema,
+  reflectionOutputSchema,
+} from "./schemas.js";
 
 type RpcResponse = { id: number; result?: unknown; error?: { message?: string; code?: number } };
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
 type TurnWaiter = { texts: string[]; resolve: (value: unknown) => void; reject: (error: Error) => void };
+type AppServerRole = CharacterId | "director" | `${CharacterId}-reflection`;
 
 export class CodexAppServerClient implements AppServerAdapter {
   private process?: ChildProcessWithoutNullStreams;
@@ -16,7 +29,7 @@ export class CodexAppServerClient implements AppServerAdapter {
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private readonly turns = new Map<string, TurnWaiter>();
-  private readonly threadIds = new Map<CharacterId | "director", string>();
+  private readonly threadIds = new Map<AppServerRole, string>();
   private stderrTail = "";
 
   constructor(
@@ -33,6 +46,14 @@ export class CodexAppServerClient implements AppServerAdapter {
   async resolve(input: DirectorInput): Promise<{ value: unknown; threadId: string }> {
     const threadId = await this.thread("director");
     const value = await this.turn(threadId, directorPrompt(input), directorOutputSchema);
+    return { value, threadId };
+  }
+
+  async reflect(id: CharacterId, input: AgentReflectionInput): Promise<{ value: unknown; threadId: string }> {
+    // Keep public reflections isolated from live decision threads, which can
+    // contain private summaries from earlier turns.
+    const threadId = await this.thread(`${id}-reflection`);
+    const value = await this.turn(threadId, reflectionPrompt(input), reflectionOutputSchema);
     return { value, threadId };
   }
 
@@ -126,22 +147,41 @@ export class CodexAppServerClient implements AppServerAdapter {
     }
   }
 
-  private async thread(role: CharacterId | "director"): Promise<string> {
+  private async thread(role: AppServerRole): Promise<string> {
     await this.start();
     const existing = this.threadIds.get(role);
     if (existing) return existing;
+    const reflectionCharacter =
+      role === "haru-reflection"
+        ? "haru"
+        : role === "aoi-reflection"
+          ? "aoi"
+          : undefined;
     const result = (await this.request("thread/start", {
       cwd: this.cwd,
       approvalPolicy: "never",
       sandbox: "read-only",
       ephemeral: false,
-      baseInstructions: role === "director" ? directorInstructions : characterInstructions(role),
+      baseInstructions:
+        role === "director"
+          ? directorInstructions
+          : reflectionCharacter
+            ? reflectionInstructions(reflectionCharacter)
+            : characterInstructions(role === "haru" ? "haru" : "aoi"),
       experimentalRawEvents: false,
     })) as { thread?: { id?: string } };
     const id = result.thread?.id;
     if (!id) throw new Error("App Server did not return a thread ID");
     this.threadIds.set(role, id);
-    void this.request("thread/name/set", { threadId: id, name: `ROOMMATES · ${role === "director" ? "Director" : role === "haru" ? "Haru" : "Aoi"}` }).catch(() => undefined);
+    const threadName =
+      role === "director"
+        ? "Director"
+        : reflectionCharacter
+          ? `${reflectionCharacter === "haru" ? "Haru" : "Aoi"} Reflection`
+          : role === "haru"
+            ? "Haru"
+            : "Aoi";
+    void this.request("thread/name/set", { threadId: id, name: `ROOMMATES · ${threadName}` }).catch(() => undefined);
     return id;
   }
 

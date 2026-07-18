@@ -32,6 +32,7 @@ export type CharacterState = {
 
 export type Memory = {
   id: string;
+  sourceEventId?: string;
   day: number;
   phase: string;
   title: string;
@@ -218,15 +219,67 @@ export type RuntimeAgentState = {
   error?: string;
 };
 
+export type PublicCharacterDecision = Pick<
+  CharacterDecision,
+  "decision" | "action" | "dialogue" | "publicReason"
+>;
+
+export type TurnStateSnapshot = {
+  characters: Record<CharacterId, CharacterState>;
+  shared: {
+    relationshipLabel: RelationshipLabel;
+    unresolvedConflicts: string[];
+    memoryIds: string[];
+  };
+};
+
+export type CueInputMethod = "free_text" | "candidate" | "observe" | "fast_forward";
+export type CueResolutionOutcome = "selected" | "transformed" | "locked_fallback" | "observed";
+export type ResolutionBranch =
+  | "both_participated"
+  | "one_participated"
+  | "both_declined"
+  | "modified"
+  | "self_initiated"
+  | "fallback";
+
 export type EventLogEntry = {
   id: string;
+  turnId?: string;
   day: number;
   phase: Phase;
   eventDefinitionId: string;
+  eventCategory?: EventCategory;
+  intimacyTier?: 0 | 1 | 2 | 3;
+  cooldownPhases?: number;
   cueSafetyFlags: CueSafetyFlag[];
   suggestion: string;
   haruReaction: string;
   aoiReaction: string;
+  haruDecision?: DecisionKind;
+  aoiDecision?: DecisionKind;
+  haruAction?: string;
+  aoiAction?: string;
+  haruDialogue?: string;
+  aoiDialogue?: string;
+  haruPublicReason?: string;
+  aoiPublicReason?: string;
+  scene?: Partial<Record<CharacterId, string>>;
+  memoryId?: string;
+  cue?: ProducerCue;
+  inputMethod?: CueInputMethod;
+  requestedEventId?: string;
+  alternativesShown?: EventCandidate[];
+  lock?: EventLock;
+  cueOutcome?: CueResolutionOutcome;
+  decisions?: Record<CharacterId, PublicCharacterDecision>;
+  resolutionBranch?: ResolutionBranch;
+  before?: TurnStateSnapshot;
+  after?: TurnStateSnapshot;
+  appliedEffects?: Record<CharacterId, StatDelta>;
+  memory?: Memory;
+  conflictUpdate?: { add: string[]; resolve: string[] };
+  runtimeSources?: Record<AgentId, AgentSource>;
   eventTitle: string;
   narration: string;
   relationshipBefore: RelationshipLabel;
@@ -237,14 +290,151 @@ export type EventLogEntry = {
 export type EndingKind = "couple" | "unspoken" | "close_friends" | "roommates" | "broken";
 export type Ending = { kind: EndingKind; title: string; narration: string };
 
+export type ProducerScoreAxisId = "agency" | "wellbeing" | "care" | "pacing" | "story";
+
+export type ProducerScoreEvidence = {
+  id: string;
+  ruleId: string;
+  points: number;
+  message: string;
+  eventLogIds: string[];
+  day?: number;
+  phase?: Phase;
+};
+
+export type ProducerScoreAxis = {
+  id: ProducerScoreAxisId;
+  label: string;
+  score: number;
+  maxScore: number;
+  summary: string;
+  evidence: ProducerScoreEvidence[];
+};
+
+export type ResultHighlightKind =
+  | "relationship_turn"
+  | "self_initiated"
+  | "respected_no"
+  | "conflict_repaired"
+  | "quiet_moment"
+  | "important_memory";
+
+export type ResultHighlight = {
+  id: string;
+  kind: ResultHighlightKind;
+  headline: string;
+  reason: string;
+  eventLogIds: string[];
+  memoryId?: string;
+};
+
+export type ProducerStyle =
+  | "space_maker"
+  | "condition_reader"
+  | "relationship_mender"
+  | "pace_designer"
+  | "turning_point_editor";
+
+export type ProducerResult = {
+  overallScore: number;
+  rank: "S" | "A" | "B" | "C";
+  producerStyle: ProducerStyle;
+  scoringVersion: string;
+  axes: ProducerScoreAxis[];
+  topStrengths: ProducerScoreEvidence[];
+  improvements: ProducerScoreEvidence[];
+  highlights: ResultHighlight[];
+  keyMemoryIds: string[];
+  turningPointEventLogIds: string[];
+  statJourney?: { start: TurnStateSnapshot; end: TurnStateSnapshot };
+  coverage: {
+    ratio: number;
+    completeTurns: number;
+    expectedTurns: number;
+    missing: string[];
+  };
+  warnings: string[];
+};
+
+export type NarrativeParagraph = {
+  text: string;
+  sourceEventLogIds: string[];
+};
+
+export type DailyResultSection = {
+  day: number;
+  title: string;
+  paragraphs: NarrativeParagraph[];
+  featuredEventLogId?: string;
+};
+
+export type ResultNarrative = {
+  headline: string;
+  lead: NarrativeParagraph[];
+  daySections: DailyResultSection[];
+  closing: NarrativeParagraph[];
+  narrativeVersion: string;
+};
+
+export type AgentResultReflection = {
+  characterId: CharacterId;
+  seasonImpression: string;
+  notableEventComments: Array<{ eventLogId: string; comment: string }>;
+  bestMomentEventLogId: string | null;
+  turningPointEventLogId: string | null;
+  messageToProducer: string;
+  reflectionVersion: string;
+  runtime?: RuntimeAgentState;
+};
+
+export type ResultFailure = {
+  component: "narrative" | "haru_reflection" | "aoi_reflection";
+  reason: string;
+  retryable: boolean;
+};
+
+export type ResultGenerationIdentity = {
+  generationKey: string;
+  endingRevision: number;
+  scoringVersion: string;
+  narrativeVersion: string;
+  reflectionVersion: string;
+};
+
+export type GameResult =
+  | (ResultGenerationIdentity & {
+      status: "generating";
+      ending: Ending;
+      producer: ProducerResult;
+      startedAt: string;
+    })
+  | (ResultGenerationIdentity & {
+      status: "ready";
+      ending: Ending;
+      producer: ProducerResult;
+      narrative: ResultNarrative;
+      reflections: Record<CharacterId, AgentResultReflection>;
+      generatedAt: string;
+      dataQuality: "complete";
+    })
+  | (ResultGenerationIdentity & {
+      status: "partial";
+      ending: Ending;
+      producer: ProducerResult;
+      narrative?: ResultNarrative;
+      reflections: Partial<Record<CharacterId, AgentResultReflection>>;
+      failures: ResultFailure[];
+      generatedAt: string;
+      dataQuality: "partial";
+    });
+
 export type CharacterRecord = {
   state: CharacterState;
-  lastDecision?: CharacterDecision;
-  internalSummary?: string;
+  lastDecision?: PublicCharacterDecision;
 };
 
 export type GameState = {
-  version: 1;
+  version: 2;
   seed: string;
   revision: number;
   status: GameStatus;
@@ -254,6 +444,7 @@ export type GameState = {
   lastEvent?: ResolvedEvent;
   eventLog: EventLogEntry[];
   ending?: Ending;
+  result?: GameResult;
   runtime: Record<AgentId, RuntimeAgentState>;
 };
 
@@ -263,6 +454,10 @@ export type StreamEventName =
   | "agent.completed"
   | "director.resolving"
   | "director.completed"
+  | "result.generating"
+  | "agent.reflecting"
+  | "agent.reflected"
+  | "result.completed"
   | "turn.completed"
   | "warning"
   | "error";

@@ -11,18 +11,27 @@ import { characterDecisionSchema, resolvedEventSchema } from "@roommates/shared"
 import type { AgentMode } from "../config.js";
 import { MockCharacterAgent } from "./mock/character.js";
 import { MockDirectorAgent } from "./mock/director.js";
+import { MockReflectionAgent } from "./mock/reflection.js";
+import {
+  agentResultReflectionSchemaFor,
+  fallbackAgentReflection,
+  type AgentReflectionInput,
+  type AgentResultReflection,
+} from "./reflection.js";
 
 export type AgentResult<T> = { value: T; runtime: RuntimeAgentState };
 
 export interface AgentCoordinator {
   decide(id: CharacterId, input: CharacterDecisionInput): Promise<AgentResult<CharacterDecision>>;
   resolve(input: DirectorInput): Promise<AgentResult<ResolvedEvent>>;
+  reflect?(id: CharacterId, input: AgentReflectionInput): Promise<AgentResult<AgentResultReflection>>;
   shutdown?(): Promise<void>;
 }
 
 export interface AppServerAdapter {
   decide(id: CharacterId, input: CharacterDecisionInput): Promise<{ value: unknown; threadId: string }>;
   resolve(input: DirectorInput): Promise<{ value: unknown; threadId: string }>;
+  reflect?(id: CharacterId, input: AgentReflectionInput): Promise<{ value: unknown; threadId: string }>;
   shutdown(): Promise<void>;
 }
 
@@ -34,6 +43,10 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
     aoi: new MockCharacterAgent("aoi"),
   };
   private readonly director = new MockDirectorAgent();
+  private readonly reflections = {
+    haru: new MockReflectionAgent("haru"),
+    aoi: new MockReflectionAgent("aoi"),
+  };
   private appServerDisabledReason?: string;
 
   constructor(
@@ -60,11 +73,33 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
     );
   }
 
+  async reflect(
+    id: CharacterId,
+    input: AgentReflectionInput,
+  ): Promise<AgentResult<AgentResultReflection>> {
+    if (input.characterId !== id) {
+      throw new Error("Reflection input belongs to a different character");
+    }
+    return this.run(
+      id,
+      () => {
+        if (!this.real?.reflect) throw new Error("App Server reflection adapter is unavailable");
+        return this.real.reflect(id, input);
+      },
+      () => this.reflections[id].reflect(input),
+      agentResultReflectionSchemaFor(input) as SchemaLike<AgentResultReflection>,
+      () => Promise.resolve(fallbackAgentReflection(input)),
+      false,
+    );
+  }
+
   private async run<T>(
     _agent: AgentId,
     realCall: () => Promise<{ value: unknown; threadId: string }>,
     mockCall: () => Promise<T>,
     schema: SchemaLike<T>,
+    fallbackCall: () => Promise<T> = mockCall,
+    disableAppServerOnFailure = true,
   ): Promise<AgentResult<T>> {
     const started = Date.now();
     if (this.mode !== "mock" && this.real && !this.appServerDisabledReason) {
@@ -83,14 +118,14 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
         }
       }
       const reason = lastError instanceof Error ? lastError.message : "App Server connection failed";
-      if (this.mode === "auto") this.appServerDisabledReason = reason;
+      if (this.mode === "auto" && disableAppServerOnFailure) this.appServerDisabledReason = reason;
       return {
-        value: await mockCall(),
+        value: await fallbackCall(),
         runtime: { source: "fallback", latencyMs: Date.now() - started, error: reason.slice(0, 180) },
       };
     }
 
-    const value = await mockCall();
+    const value = this.mode === "mock" ? await mockCall() : await fallbackCall();
     return {
       value,
       runtime: {
