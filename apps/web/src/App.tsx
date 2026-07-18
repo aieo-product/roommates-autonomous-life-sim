@@ -492,12 +492,14 @@ function ResolutionProgress({ stages, active, message }: { stages: TurnStages; a
 function EventCard({
   event,
   resolving,
+  fresh,
   lastSuggestion,
   navigatorMessage,
   onOpen,
 }: {
   event?: GameEvent;
   resolving: boolean;
+  fresh: boolean;
   lastSuggestion: string;
   navigatorMessage?: string;
   onOpen?: () => void;
@@ -519,7 +521,7 @@ function EventCard({
     );
   }
   return (
-    <div className="event-card">
+    <div className={`event-card event-result ${fresh ? "is-fresh" : ""}`}>
       <span className="event-icon">★</span>
       <div>
         <small>デコピンが反映したイベント · DAY {event?.day}</small>
@@ -1043,6 +1045,7 @@ export default function App() {
   const [logOpen, setLogOpen] = useState(false);
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
   const [eventAnnouncementId, setEventAnnouncementId] = useState<string | null>(null);
+  const [freshEventId, setFreshEventId] = useState<string | null>(null);
   const [eventSuggestionFallbacks, setEventSuggestionFallbacks] = useState<Record<string, string>>({});
   const [activeMemory, setActiveMemory] = useState<Memory>();
   const [personalityOpen, setPersonalityOpen] = useState(false);
@@ -1220,6 +1223,7 @@ export default function App() {
       return;
     }
     operationRef.current = "turn";
+    setFreshEventId(null);
     setNotice("");
     setLastSuggestion(cue);
     submittedSuggestionRef.current = cue;
@@ -1278,6 +1282,7 @@ export default function App() {
       return;
     }
     operationRef.current = kind;
+    setFreshEventId(null);
     submittedSuggestionRef.current = null;
     if (kind === "fast") setNavigatorMessage("");
     setActionBusy(kind);
@@ -1388,15 +1393,25 @@ export default function App() {
     if (resolving || (game.status !== "resolved" && game.status !== "ended")) return;
     if (presentedEventIdRef.current === latestId) return;
     presentedEventIdRef.current = latestId;
-    if (submittedSuggestionRef.current) {
-      const submittedSuggestion = submittedSuggestionRef.current;
+    const submittedSuggestion = submittedSuggestionRef.current;
+    if (submittedSuggestion) {
       setEventSuggestionFallbacks((previous) => ({ ...previous, [latestId]: submittedSuggestion }));
       submittedSuggestionRef.current = null;
     }
-    setLogOpen(false);
-    setActiveMemory(undefined);
-    setPersonalityOpen(false);
-    setEventAnnouncementId(latestId);
+    if (game.status === "ended") {
+      setFreshEventId(null);
+      setLogOpen(false);
+      setActiveMemory(undefined);
+      setPersonalityOpen(false);
+      setEventAnnouncementId(latestId);
+      return;
+    }
+    if (submittedSuggestion) {
+      setFreshEventId(latestId);
+      setLogOpen(false);
+      setActiveMemory(undefined);
+      setPersonalityOpen(false);
+    }
   }, [game.status, initialLoading, latestEvent?.id, resolving]);
 
   const selectCharacter = (person: CharacterId) => {
@@ -1500,12 +1515,17 @@ export default function App() {
               <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
             </div>
             <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
-            <EventCard event={latestEvent} resolving={resolving} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
+            <EventCard event={latestEvent} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
               setLogOpen(false);
               setActiveMemory(undefined);
               setPersonalityOpen(false);
               setEventAnnouncementId(latestEvent.id);
             } : undefined} />
+            <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {freshEventId === latestEvent?.id && latestEvent
+                ? `イベントが反映されました：${latestEvent.eventTitle}。「全文を読む」で詳細を確認できます。`
+                : ""}
+            </p>
           </div>
 
           <section className="interaction-dock" aria-labelledby="dekopin-title">
