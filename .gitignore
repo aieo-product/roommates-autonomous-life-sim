@@ -12,3 +12,5 @@ apps/server/data/*.tmp
 *.tsbuildinfo
 playwright-report/
 test-results/
+.sites/
+dist/client/
