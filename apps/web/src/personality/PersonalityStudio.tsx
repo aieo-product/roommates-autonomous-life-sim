@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CharacterId } from "@roommates/shared";
+import { ResidentPortrait } from "../character-assets";
 import type { CharacterSettingsController } from "./useCharacterSettings";
 import {
   CHARACTER_ACCENTS,
@@ -141,7 +142,7 @@ function CharacterEditor({
   return (
     <section className={`personality-character personality-character-${character.id}`} aria-label={`${character.profile.name}の個性設定`}>
       <header className="personality-character-header">
-        <span className="personality-avatar" style={{ background: accent }} aria-hidden="true">{character.profile.name.slice(0, 1)}</span>
+        <ResidentPortrait person={character.id} className="personality-avatar" />
         <div><small>{character.id === "haru" ? "HARU PROFILE" : "AOI PROFILE"}</small><h3>{character.profile.name}</h3><p>{character.profile.introduction}</p></div>
         <button type="button" onClick={onReset}>この人を初期設定へ</button>
       </header>

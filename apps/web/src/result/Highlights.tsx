@@ -1,3 +1,4 @@
+import { ResidentPortrait } from "../character-assets";
 import { EvidenceLinks } from "./EvidenceLinks";
 import type {
   ResultAgentReflection,
@@ -75,7 +76,7 @@ function AgentMoment({
 
   return (
     <div className={`result-agent-moment is-${person}`}>
-      <h4><span aria-hidden="true">{person === "haru" ? "H" : "A"}</span>{CHARACTER_NAMES[person]}</h4>
+      <h4><ResidentPortrait person={person} className="result-character-avatar" />{CHARACTER_NAMES[person]}</h4>
       {decision ? (
         <>
           <p className="result-decision-kind">{DECISION_LABELS[decision.decision]}</p>

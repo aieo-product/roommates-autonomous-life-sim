@@ -1,3 +1,4 @@
+import { ResidentPortrait } from "../character-assets";
 import type {
   ResultCharacterId,
   ResultEventLogEntry,
@@ -21,10 +22,10 @@ const METRIC_KEYS: ResultMetricKey[] = ["energy", "stress", "affection", "trust"
 
 function EventDecision({ person, event }: { person: ResultCharacterId; event: ResultEventLogEntry }) {
   const decision = decisionFor(event, person);
-  if (!decision) return <p><strong>{CHARACTER_NAMES[person]}</strong> 選択データなし</p>;
+  if (!decision) return <p className="result-character-heading"><strong><ResidentPortrait person={person} className="result-character-avatar is-compact" />{CHARACTER_NAMES[person]}</strong> 選択データなし</p>;
   return (
     <div className={`result-timeline-decision is-${person}`}>
-      <p><strong>{CHARACTER_NAMES[person]}</strong><span>{DECISION_LABELS[decision.decision]}</span></p>
+      <p><strong><ResidentPortrait person={person} className="result-character-avatar is-compact" />{CHARACTER_NAMES[person]}</strong><span>{DECISION_LABELS[decision.decision]}</span></p>
       <p>{decision.action}</p>
       {decision.dialogue && <blockquote>「{decision.dialogue}」</blockquote>}
       {decision.publicReason && <small>公開理由：{decision.publicReason}</small>}
