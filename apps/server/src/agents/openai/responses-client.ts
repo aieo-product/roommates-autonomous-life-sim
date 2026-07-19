@@ -115,7 +115,10 @@ export const characterResponsesOutputSchema: JsonSchema = {
 };
 
 export class OpenAIResponsesClientError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly httpStatus?: number,
+  ) {
     super(message);
     this.name = "OpenAIResponsesClientError";
   }
@@ -470,6 +473,7 @@ export class OpenAIResponsesClient implements AppServerAdapter {
       await cancelBody(response);
       throw new OpenAIResponsesClientError(
         `OpenAI Responses request failed with status ${response.status}`,
+        response.status,
       );
     }
 

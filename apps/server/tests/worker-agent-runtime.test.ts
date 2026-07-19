@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CHARACTER_SETTINGS,
   createInitialGameState,
@@ -8,6 +8,8 @@ import { sanitizeSuggestion } from "../src/engine/suggestion.js";
 import { createWorkerAgentCoordinator } from "../src/worker.js";
 
 const SESSION_ID = "123e4567-e89b-42d3-a456-426614174000";
+
+afterEach(() => vi.restoreAllMocks());
 
 function characterInput(): CharacterDecisionInput {
   const state = createInitialGameState("worker-agent-runtime");
@@ -252,6 +254,7 @@ describe("public Worker Agent Worker runtime", () => {
   });
 
   it("cascades to OpenAI when Agent Worker returns invalid structured output", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
       const url = fetchUrl(input);
       if (url.origin === "https://agent.example.test") {
@@ -281,10 +284,18 @@ describe("public Worker Agent Worker runtime", () => {
 
     expect(result.runtime.source).toBe("openai_api");
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(warning).toHaveBeenCalledWith(
+      JSON.stringify({
+        message: "ROOMMATES agent provider failed",
+        source: "app_server",
+        kind: "invalid_structured_output",
+      }),
+    );
   });
 
   it("uses the deterministic mock when both configured providers fail", async () => {
     const openAiApiKey = "sk-test-never-expose-this";
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const fetchImpl = vi.fn<typeof fetch>(async (input) => {
       const url = fetchUrl(input);
       if (url.origin === "https://agent.example.test") {
@@ -311,6 +322,40 @@ describe("public Worker Agent Worker runtime", () => {
     );
     expect(JSON.stringify(result)).not.toContain(openAiApiKey);
     expect(JSON.stringify(result)).not.toContain("upstream secret response body");
+    const diagnostics = warning.mock.calls.map(([message]) => String(message));
+    expect(diagnostics).toContain(
+      JSON.stringify({
+        message: "ROOMMATES agent provider failed",
+        source: "app_server",
+        kind: "provider_error",
+      }),
+    );
+    expect(diagnostics).toContain(
+      JSON.stringify({
+        message: "ROOMMATES agent provider failed",
+        source: "openai_api",
+        kind: "provider_error",
+        httpStatus: 500,
+      }),
+    );
+    expect(diagnostics.join("\n")).not.toContain(openAiApiKey);
+    expect(diagnostics.join("\n")).not.toContain("worker-secret");
+    expect(diagnostics.join("\n")).not.toContain("upstream secret response body");
+  });
+
+  it("keeps falling back when the diagnostic logger fails", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {
+      throw new Error("logging unavailable");
+    });
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      { OPENAI_API_KEY: "sk-test-logger-failure" },
+      vi.fn<typeof fetch>(async () => new Response(null, { status: 429 })),
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("fallback");
   });
 
   it("falls back while unavailable and retries after a new turn coordinator is created", async () => {
