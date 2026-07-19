@@ -18,11 +18,22 @@ import type {
   AppServerAdapterResult,
   AppServerAdapterSource,
 } from "./coordinator.js";
+import { OpenAIResponsesClientError } from "./openai/responses-client.js";
 
 export type AgentProvider = {
   source: AppServerAdapterSource;
   adapter: AppServerAdapter;
 };
+
+export type ProviderFailureDiagnostic = {
+  source: AppServerAdapterSource;
+  kind: "provider_error" | "invalid_structured_output";
+  httpStatus?: number;
+};
+
+export type ProviderFailureObserver = (
+  diagnostic: ProviderFailureDiagnostic,
+) => void;
 
 type SchemaLike = {
   safeParse(input: unknown):
@@ -36,7 +47,10 @@ type SchemaLike = {
  * and credentials can never reach persisted or public runtime diagnostics.
  */
 export class ProviderCascadeAdapter implements AppServerAdapter {
-  constructor(private readonly providers: readonly AgentProvider[]) {
+  constructor(
+    private readonly providers: readonly AgentProvider[],
+    private readonly onProviderFailure?: ProviderFailureObserver,
+  ) {
     if (providers.length === 0) {
       throw new Error("At least one agent provider is required");
     }
@@ -101,14 +115,43 @@ export class ProviderCascadeAdapter implements AppServerAdapter {
       try {
         const output = await call(provider.adapter);
         const parsed = schema.safeParse(output.value);
-        if (!parsed.success) throw new Error("invalid structured output");
+        if (!parsed.success) {
+          failedProviders.push(provider.source);
+          this.reportFailure({
+            source: provider.source,
+            kind: "invalid_structured_output",
+          });
+          continue;
+        }
         return { ...output, value: parsed.data, source: provider.source };
-      } catch {
+      } catch (error) {
         failedProviders.push(provider.source);
+        const httpStatus =
+          provider.source === "openai_api" &&
+          error instanceof OpenAIResponsesClientError &&
+          Number.isInteger(error.httpStatus) &&
+          error.httpStatus !== undefined &&
+          error.httpStatus >= 100 &&
+          error.httpStatus <= 599
+            ? error.httpStatus
+            : undefined;
+        this.reportFailure({
+          source: provider.source,
+          kind: "provider_error",
+          ...(httpStatus === undefined ? {} : { httpStatus }),
+        });
       }
     }
     throw new Error(
       `Configured agent providers are unavailable: ${failedProviders.join(", ")}`,
     );
+  }
+
+  private reportFailure(diagnostic: ProviderFailureDiagnostic): void {
+    try {
+      this.onProviderFailure?.(diagnostic);
+    } catch {
+      // Observability must never interrupt the provider cascade or fallback.
+    }
   }
 }

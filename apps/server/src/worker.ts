@@ -18,7 +18,10 @@ import {
   MIN_OPENAI_RESPONSES_TIMEOUT_MS,
   OpenAIResponsesClient,
 } from "./agents/openai/responses-client.js";
-import { ProviderCascadeAdapter } from "./agents/provider-cascade.js";
+import {
+  ProviderCascadeAdapter,
+  type ProviderFailureDiagnostic,
+} from "./agents/provider-cascade.js";
 import { GameConflictError, GameEngine } from "./engine/game-engine.js";
 import {
   D1GameRepository,
@@ -332,8 +335,18 @@ export function createWorkerAgentCoordinator(
     ...(remote ? [{ source: "app_server" as const, adapter: remote }] : []),
     ...(openAi ? [{ source: "openai_api" as const, adapter: openAi }] : []),
   ];
+  const logProviderFailure = (diagnostic: ProviderFailureDiagnostic): void => {
+    console.warn(
+      JSON.stringify({
+        message: "ROOMMATES agent provider failed",
+        ...diagnostic,
+      }),
+    );
+  };
   const cascade =
-    providers.length > 0 ? new ProviderCascadeAdapter(providers) : undefined;
+    providers.length > 0
+      ? new ProviderCascadeAdapter(providers, logProviderFailure)
+      : undefined;
   return new ResilientAgentCoordinator(
     cascade ? "auto" : "mock",
     workerAgentCoordinatorTimeoutMs(env),

@@ -18,6 +18,7 @@ import {
   OPENAI_RESPONSES_ENDPOINT,
   OPENAI_RESPONSES_MAX_OUTPUT_TOKENS,
   OpenAIResponsesClient,
+  OpenAIResponsesClientError,
   characterResponsesOutputSchema,
 } from "../src/agents/openai/responses-client.js";
 import type { AgentReflectionInput } from "../src/agents/reflection.js";
@@ -306,6 +307,8 @@ describe("OpenAIResponsesClient", () => {
     );
     const error = await caughtError(clientWith(fetchMock).navigate(navigatorInput()));
 
+    expect(error).toBeInstanceOf(OpenAIResponsesClientError);
+    expect((error as OpenAIResponsesClientError).httpStatus).toBe(status);
     expect(error.message).toBe(`OpenAI Responses request failed with status ${status}`);
     expect(String(error)).not.toContain(SECRET);
     expect(String(error)).not.toContain("PRIVATE_BODY_MARKER");
