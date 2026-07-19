@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 const app = readFileSync(new URL("../../web/src/App.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../../web/src/styles.css", import.meta.url), "utf8");
 const indexHtml = readFileSync(new URL("../../web/index.html", import.meta.url), "utf8");
-const mobileStyles = styles.slice(styles.lastIndexOf("/* Smartphone layout"));
+const smartphoneStart = styles.lastIndexOf("/* Smartphone layout");
+const desktopStyles = styles.slice(0, smartphoneStart);
+const mobileStyles = styles.slice(smartphoneStart);
 
 const sourceBetween = (startToken: string, endToken: string): string => {
   const start = app.indexOf(startToken);
@@ -84,5 +86,44 @@ describe("smartphone layout contract", () => {
     expect(mobileStyles).toMatch(/\.advance-button\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/);
     expect(mobileStyles).toMatch(/\.log-drawer\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?78dvh/);
     expect(mobileStyles).toMatch(/\.log-filters button\s*\{[^}]*min-height:\s*44px;/);
+  });
+});
+
+describe("mobile map overlay control", () => {
+  it("exposes a named toggle whose pressed state matches overlay visibility", () => {
+    expect(app).toContain("const [mapOverlaysVisible, setMapOverlaysVisible] = useState(true)");
+    expect(app).toContain('className={`world-stage-wrap ${mapOverlaysVisible ? "" : "is-map-focus"}`}');
+    expect(app).toContain('className={`map-overlay-toggle ${mapOverlaysVisible ? "is-visible" : ""}`}');
+    expect(app).toContain('aria-label="マップ上の情報"');
+    expect(app).toContain("aria-pressed={mapOverlaysVisible}");
+    expect(app).toContain('aria-controls="map-overlay-layer"');
+    expect(app).toContain("setMapOverlaysVisible((visible) => !visible)");
+    expect(app).toContain('{mapOverlaysVisible ? "ON" : "OFF"}');
+  });
+
+  it("groups only fixed map overlays and leaves character playback outside", () => {
+    const layer = sourceBetween('id="map-overlay-layer"', '<p className="sr-only"');
+    expect(layer).toContain('className="resident-hud"');
+    expect(layer).toContain("<ResolutionProgress");
+    expect(layer).toContain("<EventCard");
+    expect(layer).not.toContain("<ApartmentStage");
+    expect(layer).not.toContain("<EventAnnouncementModal");
+  });
+
+  it("is mobile-only, touch sized, and cannot hide desktop overlays", () => {
+    expect(desktopStyles).toMatch(/\.map-overlay-layer\s*\{\s*display:\s*contents;/);
+    expect(desktopStyles).toMatch(/\.map-overlay-toggle\s*\{[^}]*display:\s*none;/);
+    expect(desktopStyles).not.toContain(".world-stage-wrap.is-map-focus");
+    expect(mobileStyles).toMatch(/\.map-overlay-toggle\s*\{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*44px;[\s\S]*?display:\s*inline-flex;/);
+    expect(mobileStyles).toMatch(/\.world-stage-wrap\.is-map-focus \.map-overlay-layer\s*\{\s*display:\s*none;/);
+    expect(mobileStyles).not.toMatch(/\.world-stage-wrap\.is-map-focus[^{}]*(?:interaction-dock|apartment-stage|scene-speech|event-announcement)/);
+  });
+
+  it("keeps the event detail dialog route mounted when map information is on", () => {
+    const card = sourceBetween("function EventCard", "function EventAnnouncementModal");
+    expect(card).toContain('aria-haspopup="dialog"');
+    expect(app).toMatch(/<EventCard[\s\S]*?onOpen=\{latestEvent \? \(\) => \{[\s\S]*?setEventAnnouncementId\(latestEvent\.id\)/);
+    expect(app).not.toMatch(/\{mapOverlaysVisible\s*&&\s*<EventCard/);
+    expect(app).toMatch(/<\/main>[\s\S]*?\{eventAnnouncement && \([\s\S]*?<EventAnnouncementModal/);
   });
 });
