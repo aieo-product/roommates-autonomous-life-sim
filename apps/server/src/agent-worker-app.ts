@@ -6,10 +6,12 @@ import express, {
 } from "express";
 import { z } from "zod";
 import {
+  autonomousActionCandidateSchema,
   characterDecisionSchema,
   characterDefinitionSchema,
   characterStateSchema,
   directorResolvedEventSchema,
+  eventDefinitionSchema,
   memorySchema,
   navigatorAgentOutputSchema,
   phases,
@@ -121,6 +123,7 @@ const characterDecisionInputSchema = z
     recentMemories: z.array(memoryInputSchema).max(5),
     importantMemories: z.array(memoryInputSchema).max(5),
     suggestion: safeSuggestionSchema,
+    autonomousCandidates: z.array(autonomousActionCandidateSchema).max(6).optional(),
   })
   .strict();
 
@@ -129,6 +132,7 @@ const directorInputSchema = z
     turnId: turnIdSchema,
     snapshot: gameSnapshotInputSchema,
     suggestion: safeSuggestionSchema,
+    eventDefinition: eventDefinitionSchema.optional(),
     haruDecision: characterDecisionSchema,
     aoiDecision: characterDecisionSchema,
   })

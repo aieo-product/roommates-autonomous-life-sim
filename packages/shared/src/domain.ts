@@ -92,6 +92,15 @@ export type EventCandidate = {
   intimacyTier: 0 | 1 | 2 | 3;
 };
 
+export const autonomousInvitations = ["solo", "open"] as const;
+export type AutonomousInvitation = (typeof autonomousInvitations)[number];
+export const autonomousParticipantModes = [
+  "solo",
+  "optional_companion",
+  "shared_opt_in",
+] as const;
+export type AutonomousParticipantMode = (typeof autonomousParticipantModes)[number];
+
 export type EventLock = {
   requestedEventId?: string;
   reason: string;
@@ -157,8 +166,46 @@ export type EventDefinition = {
   safetyNotes: string[];
 };
 
+/**
+ * A server-authored, mechanically bounded action idea that a character may
+ * select when deciding to INITIATE. The model may select a candidate, but it
+ * cannot author its location, cost, timing, or effect limits.
+ */
+export type AutonomousActionCandidate = {
+  id: string;
+  eventDefinitionId: string;
+  title: string;
+  category: EventCategory;
+  intimacyTier: 0 | 1 | 2 | 3;
+  location: string;
+  publicIntent: string;
+  invitationOptions: AutonomousInvitation[];
+  durationMinutes: number;
+  energyCost: number;
+  minEnergy: number;
+  maxStress: number;
+  participantMode: AutonomousParticipantMode;
+  consent: {
+    allowPass: true;
+    allowModify: true;
+    physicalContact: "none";
+    secrets: "forbidden";
+    coercion: "forbidden";
+  };
+  effectBudget: Record<MutableStatKey, number>;
+  allowedPhases: Phase[];
+};
+
+export type CharacterInitiative = {
+  candidateId: string;
+  invitation: AutonomousInvitation;
+  publicIntent: string;
+};
+
 export type SafeSuggestion = {
   kind: "proposal" | "observe";
+  /** True only for an explicit, untransformed request to leave the turn open. */
+  allowsAutonomy: boolean;
   text: string;
   tags: ProposalTag[];
   cue: ProducerCue;
@@ -202,6 +249,8 @@ export type CharacterDecision = {
   publicReason: string;
   internalSummary: string;
   expectedEffects: StatDelta;
+  /** Only executable for INITIATE after server-side candidate membership checks. */
+  initiative?: CharacterInitiative;
 };
 
 export type GameSnapshot = {
@@ -221,12 +270,16 @@ export type CharacterDecisionInput = {
   recentMemories: Memory[];
   importantMemories: Memory[];
   suggestion: SafeSuggestion;
+  /** Server-authorized ideas available for this character and turn. */
+  autonomousCandidates?: AutonomousActionCandidate[];
 };
 
 export type DirectorInput = {
   turnId: string;
   snapshot: GameSnapshot;
   suggestion: SafeSuggestion;
+  /** Server-authoritative mechanics; prose must stay within these bounds. */
+  eventDefinition?: EventDefinition;
   haruDecision: CharacterDecision;
   aoiDecision: CharacterDecision;
 };
@@ -263,7 +316,7 @@ export type RuntimeAgentState = {
 
 export type PublicCharacterDecision = Pick<
   CharacterDecision,
-  "decision" | "action" | "dialogue" | "publicReason"
+  "decision" | "action" | "dialogue" | "publicReason" | "initiative"
 >;
 
 export type TurnStateSnapshot = {

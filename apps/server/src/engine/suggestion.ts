@@ -31,6 +31,71 @@ const tagPatterns: Array<[ProposalTag, RegExp]> = [
   ],
 ];
 
+type SpecificEventMatcher = {
+  eventDefinitionId: string;
+  category: EventCategory;
+  pattern: RegExp;
+  overridesCategories?: EventCategory[];
+};
+
+/**
+ * Concrete, low-ambiguity phrases for events that share a broad category.
+ *
+ * Generic category matching intentionally remains the fallback so a cue such
+ * as "料理をしよう" keeps selecting the first cook event. These matchers only
+ * make an explicitly named activity addressable by the producer.
+ */
+const specificEventMatchers: SpecificEventMatcher[] = [
+  {
+    eventDefinitionId: "easy-breakfast-prep",
+    category: "cook",
+    pattern: /朝食|朝ご飯|朝ごはん/i,
+  },
+  {
+    eventDefinitionId: "houseplant-care",
+    category: "clean",
+    pattern:
+      /(?:植物|鉢植え)(?:の|を)?[^。！？]{0,10}(?:世話|水やり|手入れ)|水やり(?:を|する|しよう|して)?/i,
+    // "世話" contains the generic talk token "話".
+    overridesCategories: ["talk"],
+  },
+  {
+    eventDefinitionId: "music-swap",
+    category: "talk",
+    pattern: /音楽|選曲|(?:一)?曲(?:を|ずつ|交換|聴|聞|流)/i,
+  },
+  {
+    eventDefinitionId: "tabletop-mini-game",
+    category: "movie",
+    pattern: /ボードゲーム|カードゲーム/i,
+  },
+  {
+    eventDefinitionId: "fold-shared-laundry",
+    category: "clean",
+    pattern:
+      /洗濯物[^。！？]{0,10}(?:畳|たた)|(?:畳|たた)[^。！？]{0,10}洗濯物/i,
+  },
+  {
+    eventDefinitionId: "tiny-co-creation",
+    category: "gift",
+    pattern:
+      /共同制作|(?:小物|飾り)[^。！？]{0,10}(?:作|制作)|(?:作|制作)[^。！？]{0,10}(?:小物|飾り)/i,
+  },
+  {
+    eventDefinitionId: "evening-cool-down",
+    category: "rest",
+    pattern: /夕涼み/i,
+  },
+  {
+    eventDefinitionId: "shared-memory-sort",
+    category: "talk",
+    pattern:
+      /(?:写真|思い出)[^。！？]{0,12}(?:整理|並べ|選び|見返|振り返)|(?:整理|並べ)[^。！？]{0,12}(?:写真|思い出)/i,
+    // "整理" is normally a clean cue, but here it names the memory event.
+    overridesCategories: ["clean"],
+  },
+];
+
 const safetyPatterns: Array<[CueSafetyFlag, RegExp]> = [
   [
     "prompt_injection",
@@ -61,6 +126,17 @@ const categoryPriority: EventCategory[] = [
   "rest",
 ];
 
+const defaultEventDefinitionIds: Record<EventCategory, string> = {
+  rest: "observe-rest",
+  cook: "shared-cooking",
+  movie: "movie-night",
+  clean: "shared-cleaning",
+  apology: "targeted-apology",
+  talk: "gentle-conversation",
+  gift: "small-gift",
+  confession: "confession-space",
+};
+
 const fallbackCueText: Record<EventCategory, string> = {
   rest: "無理に進めず、二人がそれぞれのペースで過ごせる時間を作る",
   cook: "簡単な料理を一緒に作れる場を用意する",
@@ -76,6 +152,8 @@ type ParsedCue = {
   normalizedText: string;
   kind: ProducerCue["kind"];
   category: ProducerCue["category"];
+  allowsAutonomy: boolean;
+  specificEventDefinitionId?: string;
   safetyFlags: CueSafetyFlag[];
   transformed: boolean;
 };
@@ -91,11 +169,17 @@ function normalize(raw: string): string {
 
 function parseCue(raw: string): ParsedCue {
   const normalizedText = normalize(raw);
-  if (!normalizedText || /何も(?:提案せず|せず)|見守る|observe/i.test(normalizedText)) {
+  const explicitObserve =
+    !normalizedText ||
+    /^(?:何も(?:提案せず|せず)(?:に?見守る)?|見守る|observe)[。.!！]?$/iu.test(
+      normalizedText,
+    );
+  if (explicitObserve) {
     return {
       normalizedText: normalizedText || "何も提案せず見守る",
       kind: "observe",
       category: "rest",
+      allowsAutonomy: true,
       safetyFlags: [],
       transformed: false,
     };
@@ -104,11 +188,20 @@ function parseCue(raw: string): ParsedCue {
   const tags = tagPatterns
     .filter(([, pattern]) => pattern.test(normalizedText))
     .map(([tag]) => tag);
+  const specificEvent = specificEventMatchers.find(({ pattern }) =>
+    pattern.test(normalizedText),
+  );
   const safetyFlags = safetyPatterns
     .filter(([, pattern]) => pattern.test(normalizedText))
     .map(([flag]) => flag);
   const matchedCategory = categoryPriority.find((category) => tags.includes(category));
-  let category: ProducerCue["category"] = matchedCategory ?? "unknown";
+  const useSpecificCategory =
+    specificEvent &&
+    (matchedCategory === undefined ||
+      matchedCategory === specificEvent.category ||
+      specificEvent.overridesCategories?.includes(matchedCategory));
+  let category: ProducerCue["category"] =
+    (useSpecificCategory ? specificEvent.category : matchedCategory) ?? "unknown";
 
   if (safetyFlags.includes("danger")) category = "rest";
   else if (safetyFlags.includes("deception")) category = "talk";
@@ -123,6 +216,10 @@ function parseCue(raw: string): ParsedCue {
     normalizedText,
     kind: category === "rest" && safetyFlags.length > 0 ? "observe" : "proposal",
     category,
+    allowsAutonomy: false,
+    ...(specificEvent && category === specificEvent.category
+      ? { specificEventDefinitionId: specificEvent.eventDefinitionId }
+      : {}),
     safetyFlags: [...new Set(safetyFlags)],
     transformed: safetyFlags.length > 0 || category === "unknown",
   };
@@ -130,7 +227,15 @@ function parseCue(raw: string): ParsedCue {
 
 function definitionForParsedCue(parsed: ParsedCue): EventDefinition {
   if (parsed.category === "unknown") return EVENT_DEFINITIONS_BY_ID.get("observe-rest")!;
-  return definitionsForCategory(parsed.category)[0] ?? EVENT_DEFINITIONS_BY_ID.get("observe-rest")!;
+  if (parsed.specificEventDefinitionId && !parsed.transformed) {
+    const specific = EVENT_DEFINITIONS_BY_ID.get(parsed.specificEventDefinitionId);
+    if (specific?.category === parsed.category) return specific;
+  }
+  return (
+    EVENT_DEFINITIONS_BY_ID.get(defaultEventDefinitionIds[parsed.category]) ??
+    definitionsForCategory(parsed.category)[0] ??
+    EVENT_DEFINITIONS_BY_ID.get("observe-rest")!
+  );
 }
 
 function safeText(parsed: ParsedCue, definition: EventDefinition, useFallback: boolean): string {
@@ -184,6 +289,11 @@ function buildSuggestion(
   };
   return {
     kind: cue.kind,
+    allowsAutonomy:
+      parsed.allowsAutonomy &&
+      selected.id === "observe-rest" &&
+      parsed.transformed === false &&
+      lock === undefined,
     text,
     tags,
     cue,

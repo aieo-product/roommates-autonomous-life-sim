@@ -100,8 +100,8 @@ describe("game API", () => {
     expect(agents.navigatorInput).toMatchObject({
       rawInput: suggestion,
       resolvedSuggestion: {
-        eventDefinitionId: "shared-cooking",
-        eventTitle: "一緒に料理する",
+        eventDefinitionId: "easy-breakfast-prep",
+        eventTitle: "簡単な朝食を用意する",
       },
     });
 
@@ -112,7 +112,7 @@ describe("game API", () => {
       navigator: {
         characterId: "navigator",
         characterName: "デコピン",
-        eventDefinitionId: "shared-cooking",
+        eventDefinitionId: "easy-breakfast-prep",
         outcome: "selected",
       },
     });
@@ -120,7 +120,7 @@ describe("game API", () => {
       suggestion,
       navigatorResponse: {
         characterName: "デコピン",
-        eventDefinitionId: "shared-cooking",
+        eventDefinitionId: "easy-breakfast-prep",
       },
     });
 
@@ -132,7 +132,7 @@ describe("game API", () => {
       shared: { day: 1, phase: "afternoon" },
       navigator: {
         characterName: "デコピン",
-        eventDefinitionId: "shared-cooking",
+        eventDefinitionId: "easy-breakfast-prep",
       },
     });
   });

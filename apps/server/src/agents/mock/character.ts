@@ -1,4 +1,6 @@
 import type {
+  AutonomousActionCandidate,
+  AutonomousInvitation,
   CharacterAgent,
   CharacterDefinition,
   CharacterDecision,
@@ -62,6 +64,80 @@ function personalizedDialogue(
   return base;
 }
 
+function autonomousCandidateScore(
+  candidate: AutonomousActionCandidate,
+  input: CharacterDecisionInput,
+  key: string,
+): number {
+  const { personality, profile } = input.character;
+  const searchable = `${candidate.title} ${candidate.publicIntent}`;
+  const preferenceMatch = profile.likes.some((like) =>
+    like
+      .split(/[・、\s]/u)
+      .filter((part) => part.length >= 2)
+      .some((part) => searchable.includes(part)),
+  );
+  const categoryAffinity = affinity[input.characterId][candidate.category] ?? 0;
+  const socialFit = candidate.invitationOptions.includes("open")
+    ? (personality.sociability + personality.cooperativeness - personality.independence) * 0.08
+    : personality.independence * 0.06;
+  const activityFit =
+    candidate.category === "clean"
+      ? (personality.cleanliness - 50) * 0.16
+      : candidate.category === "talk"
+        ? (personality.expressiveness - 50) * 0.08
+        : 0;
+
+  return (
+    categoryAffinity +
+    socialFit +
+    activityFit +
+    (preferenceMatch ? 18 : 0) -
+    candidate.energyCost * 0.35 +
+    jitter(`${key}:${candidate.id}`, -6, 6)
+  );
+}
+
+function chooseAutonomousCandidate(
+  input: CharacterDecisionInput,
+  key: string,
+): AutonomousActionCandidate | undefined {
+  return [...(input.autonomousCandidates ?? [])].sort((left, right) => {
+    const scoreDifference =
+      autonomousCandidateScore(right, input, key) -
+      autonomousCandidateScore(left, input, key);
+    return scoreDifference || left.id.localeCompare(right.id);
+  })[0];
+}
+
+function chooseInvitation(
+  candidate: AutonomousActionCandidate,
+  input: CharacterDecisionInput,
+): AutonomousInvitation {
+  if (candidate.invitationOptions.length === 1) return candidate.invitationOptions[0]!;
+  const { personality } = input.character;
+  const wantsSolitude =
+    input.self.energy < 40 && personality.solitudeWhenTired >= 55;
+  const openScore =
+    personality.sociability + personality.cooperativeness - personality.independence;
+  return wantsSolitude || openScore < 45 ? "solo" : "open";
+}
+
+function autonomousDialogue(
+  id: CharacterId,
+  candidate: AutonomousActionCandidate,
+  invitation: AutonomousInvitation,
+): string {
+  if (invitation === "solo") {
+    return id === "haru"
+      ? `少し、${candidate.title}をしてこようかな。`
+      : `今は${candidate.title}をして過ごそうかな。`;
+  }
+  return id === "haru"
+    ? `よかったら、${candidate.title}を一緒にどう？`
+    : `ねえ、${candidate.title}を一緒にやってみない？`;
+}
+
 export class MockCharacterAgent implements CharacterAgent {
   constructor(private readonly id: CharacterId) {}
 
@@ -82,20 +158,37 @@ export class MockCharacterAgent implements CharacterAgent {
         personality.sociability * 0.12 -
         personality.valuesPartnerInitiative * 0.16 +
         jitter(key, -8, 8);
-      const decision: DecisionKind = initiative >= 34 ? "INITIATE" : "IGNORE";
+      const candidate = chooseAutonomousCandidate(input, key);
+      const decision: DecisionKind = initiative >= 34 && candidate ? "INITIATE" : "IGNORE";
+      const invitation = candidate ? chooseInvitation(candidate, input) : undefined;
       return {
         decision,
         action:
-          decision === "INITIATE"
-            ? `${profile.likes[0]}をきっかけに相手へ声をかける`
+          decision === "INITIATE" && candidate
+            ? candidate.publicIntent
             : `${profile.lifeStyle.slice(0, 40)}という自分のペースを守る`,
-        dialogue: personalizedDialogue(this.id, decision, "rest", input.character),
+        dialogue:
+          decision === "INITIATE" && candidate && invitation
+            ? autonomousDialogue(this.id, candidate, invitation)
+            : personalizedDialogue(this.id, decision, "rest", input.character),
         publicReason:
-          decision === "INITIATE"
-            ? `${profile.likes[0]}を一緒に楽しみたいから`
+          decision === "INITIATE" && candidate
+            ? `${profile.likes[0]}など、自分の好きな過ごし方に近いから`
             : `疲れたときは${personality.solitudeWhenTired >= 60 ? "一人の時間" : "静かな時間"}が必要だから`,
         internalSummary: decision === "INITIATE" ? "命令されなくても、相手と少し近づきたい" : "無理をすると相手にも気を遣わせそう",
-        expectedEffects: decision === "INITIATE" ? { energy: -2, stress: -2 } : { energy: 6, stress: -5 },
+        expectedEffects:
+          decision === "INITIATE" && candidate
+            ? { energy: -candidate.energyCost, stress: -Math.min(3, candidate.effectBudget.stress) }
+            : { energy: 6, stress: -5 },
+        ...(decision === "INITIATE" && candidate && invitation
+          ? {
+              initiative: {
+                candidateId: candidate.id,
+                invitation,
+                publicIntent: candidate.publicIntent,
+              },
+            }
+          : {}),
       };
     }
 

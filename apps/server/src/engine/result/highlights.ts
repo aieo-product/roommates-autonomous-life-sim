@@ -1,5 +1,6 @@
 import type { ResultHighlight, ResultHighlightKind } from "@roommates/shared";
 import {
+  decisionFor,
   eventTier,
   hasInitiative,
   hasRefusal,
@@ -141,11 +142,20 @@ function buildCandidates(eventLog: StructuredEventLogEntry[]): HighlightCandidat
     }
 
     if (entry.resolutionBranch === "self_initiated" && hasInitiative(entry)) {
+      const initiators = (["haru", "aoi"] as const).filter(
+        (characterId) => decisionFor(entry, characterId)?.decision === "INITIATE",
+      );
+      const initiativeSubject =
+        initiators.length === 2
+          ? "二人"
+          : initiators[0] === "haru"
+            ? "Haru"
+            : "Aoi";
       candidates.push(
         candidate(
           entry,
           "self_initiated",
-          `二人から始まった「${entry.eventTitle}」`,
+          `${initiativeSubject}から始まった「${entry.eventTitle}」`,
           "Producerの指示で上書きされず、Agent自身のINITIATEが出来事になった。",
           { salience: 28 },
         ),

@@ -20,6 +20,7 @@ import {
   directorOutputSchema,
 } from "../src/agents/app-server/schemas.js";
 import { GameEngine } from "../src/engine/game-engine.js";
+import { EVENT_DEFINITIONS_BY_ID } from "../src/engine/event-definitions.js";
 import { MemoryGameRepository } from "../src/persistence/repository.js";
 import { toPublicGameState } from "../src/public-dto.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
@@ -35,6 +36,7 @@ const decision: CharacterDecision = {
 
 function directorInput(): DirectorInput {
   const state = createInitialGameState("app-server-conversation");
+  const suggestion = sanitizeSuggestion("二人で少し話してみて");
   return {
     turnId: "turn-app-server-conversation",
     snapshot: {
@@ -46,7 +48,8 @@ function directorInput(): DirectorInput {
       },
       shared: state.shared,
     },
-    suggestion: sanitizeSuggestion("二人で少し話してみて"),
+    suggestion,
+    eventDefinition: EVENT_DEFINITIONS_BY_ID.get(suggestion.eventDefinitionId),
     haruDecision: decision,
     aoiDecision: decision,
   };
@@ -121,7 +124,8 @@ describe("App Server Director conversation contract", () => {
     expect(directorInstructions).toContain("3〜6発話");
     expect(directorInstructions).toContain("DECLINEやIGNORE");
     expect(directorInstructions).toContain("internalSummary");
-    expect(directorPrompt(directorInput())).toContain("conversation");
+    expect(directorInstructions).toContain("eventDefinition");
+    expect(directorPrompt(directorInput())).toContain("physicalContact");
   });
 
   it("keeps App Server conversation in the committed and public event", async () => {

@@ -76,6 +76,16 @@ export const characterOutputSchema = {
     publicReason: { type: "string" },
     internalSummary: { type: "string" },
     expectedEffects: statDelta,
+    initiative: {
+      type: "object",
+      properties: {
+        candidateId: { type: "string", minLength: 1, maxLength: 200 },
+        invitation: { type: "string", enum: ["solo", "open"] },
+        publicIntent: { type: "string", minLength: 1, maxLength: 240 },
+      },
+      required: ["candidateId", "invitation", "publicIntent"],
+      additionalProperties: false,
+    },
   },
   required: ["decision", "action", "dialogue", "publicReason", "internalSummary", "expectedEffects"],
   additionalProperties: false,
