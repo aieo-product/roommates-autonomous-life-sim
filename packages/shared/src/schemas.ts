@@ -7,6 +7,8 @@ import {
   EVENT_STORY_BEAT_LOCATION_MAX_LENGTH,
   EVENT_STORY_BEATS_MAX_LENGTH,
   EVENT_STORY_BEATS_MIN_LENGTH,
+  autonomousInvitations,
+  autonomousParticipantModes,
   cueSafetyFlags,
   decisions,
   eventConversationSpeakers,
@@ -53,6 +55,7 @@ export const eventLockSchema = z
 export const safeSuggestionSchema = z
   .object({
     kind: z.enum(["proposal", "observe"]),
+    allowsAutonomy: z.boolean(),
     text: cueText,
     tags: z.array(z.enum(proposalTags)),
     cue: producerCueSchema,
@@ -89,6 +92,78 @@ const effectBudgetSchema = z
     romanticAwareness: z.number().finite().min(0).max(10),
   })
   .strict();
+
+export const autonomousActionCandidateSchema = z
+  .object({
+    id: z.string().trim().min(1).max(200),
+    eventDefinitionId: z.string().trim().min(1).max(200),
+    title: text,
+    category: z.enum(eventCategories),
+    intimacyTier: intimacyTierSchema,
+    location: text,
+    publicIntent: z.string().trim().min(1).max(240),
+    invitationOptions: z.array(z.enum(autonomousInvitations)).min(1).max(2),
+    durationMinutes: z.number().int().nonnegative(),
+    energyCost: z.number().finite().min(0).max(100),
+    minEnergy: z.number().finite().min(0).max(100),
+    maxStress: z.number().finite().min(0).max(100),
+    participantMode: z.enum(autonomousParticipantModes),
+    consent: z
+      .object({
+        allowPass: z.literal(true),
+        allowModify: z.literal(true),
+        physicalContact: z.literal("none"),
+        secrets: z.literal("forbidden"),
+        coercion: z.literal("forbidden"),
+      })
+      .strict(),
+    effectBudget: effectBudgetSchema,
+    allowedPhases: z.array(z.enum(phases)).min(1),
+  })
+  .strict()
+  .superRefine((candidate, context) => {
+    if (candidate.energyCost > candidate.effectBudget.energy) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "energyCost must fit within the energy effect budget",
+        path: ["energyCost"],
+      });
+    }
+    if (
+      candidate.participantMode === "solo" &&
+      candidate.invitationOptions.some((invitation) => invitation !== "solo")
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "solo candidates can only expose the solo invitation",
+        path: ["invitationOptions"],
+      });
+    }
+    if (
+      candidate.participantMode === "shared_opt_in" &&
+      candidate.invitationOptions.some((invitation) => invitation !== "open")
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "shared_opt_in candidates can only expose the open invitation",
+        path: ["invitationOptions"],
+      });
+    }
+    if (new Set(candidate.invitationOptions).size !== candidate.invitationOptions.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "invitationOptions must not contain duplicates",
+        path: ["invitationOptions"],
+      });
+    }
+    if (new Set(candidate.allowedPhases).size !== candidate.allowedPhases.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "allowedPhases must not contain duplicates",
+        path: ["allowedPhases"],
+      });
+    }
+  });
 
 export const eventDefinitionSchema = z
   .object({
@@ -219,6 +294,14 @@ export const statDeltaSchema = z
   })
   .strict();
 
+export const characterInitiativeSchema = z
+  .object({
+    candidateId: z.string().trim().min(1).max(200),
+    invitation: z.enum(autonomousInvitations),
+    publicIntent: z.string().trim().min(1).max(240),
+  })
+  .strict();
+
 export const characterDecisionSchema = z
   .object({
     decision: z.enum(decisions),
@@ -227,8 +310,18 @@ export const characterDecisionSchema = z
     publicReason: text,
     internalSummary: text,
     expectedEffects: statDeltaSchema.default({}),
+    initiative: characterInitiativeSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((decision, context) => {
+    if (decision.decision !== "INITIATE" && decision.initiative !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "initiative is only valid with an INITIATE decision",
+        path: ["initiative"],
+      });
+    }
+  });
 
 export const publicCharacterDecisionSchema = z
   .object({
@@ -236,8 +329,18 @@ export const publicCharacterDecisionSchema = z
     action: text,
     dialogue: z.string().max(2_000),
     publicReason: text,
+    initiative: characterInitiativeSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((decision, context) => {
+    if (decision.decision !== "INITIATE" && decision.initiative !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "initiative is only valid with an INITIATE decision",
+        path: ["initiative"],
+      });
+    }
+  });
 
 export const eventConversationLineSchema = z
   .object({
@@ -732,6 +835,8 @@ const legacyGameStateV1Schema = z
   .passthrough();
 
 function migratePublicDecision(value: unknown) {
+  const initiative =
+    value && typeof value === "object" ? Reflect.get(value, "initiative") : undefined;
   const source =
     value && typeof value === "object"
       ? {
@@ -739,6 +844,7 @@ function migratePublicDecision(value: unknown) {
           action: Reflect.get(value, "action"),
           dialogue: Reflect.get(value, "dialogue"),
           publicReason: Reflect.get(value, "publicReason"),
+          ...(initiative === undefined ? {} : { initiative }),
         }
       : value;
   const parsed = publicCharacterDecisionSchema.safeParse(source);

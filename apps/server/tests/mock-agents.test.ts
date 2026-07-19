@@ -14,6 +14,7 @@ import {
 } from "@roommates/shared";
 import { MockCharacterAgent } from "../src/agents/mock/character.js";
 import { MockDirectorAgent } from "../src/agents/mock/director.js";
+import { buildAutonomousActionCandidates } from "../src/engine/autonomy/action-elements.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
 
 function snapshot(): GameSnapshot {
@@ -126,6 +127,38 @@ describe("MockCharacterAgent", () => {
     expect(reserved.dialogue).not.toBe(expressive.dialogue);
     expect(reserved.action).not.toBe(expressive.action);
     expect(expressive.publicReason).toContain("率直な会話");
+  });
+
+  it("initiates only by selecting one of the server-authored autonomous candidates", async () => {
+    const currentState = createInitialGameState("deterministic-seed");
+    const autonomousInput = input("aoi", "見守る");
+    autonomousInput.autonomousCandidates = buildAutonomousActionCandidates(
+      currentState,
+      "aoi",
+    );
+
+    const result = await new MockCharacterAgent("aoi").decide(autonomousInput);
+
+    expect(result.decision).toBe("INITIATE");
+    const selected = autonomousInput.autonomousCandidates.find(
+      (candidate) => candidate.id === result.initiative?.candidateId,
+    );
+    expect(selected).toBeDefined();
+    expect(result.initiative).toMatchObject({
+      publicIntent: selected?.publicIntent,
+    });
+    expect(selected?.invitationOptions).toContain(result.initiative?.invitation);
+    expect(result.action).toBe(selected?.publicIntent);
+  });
+
+  it("does not invent an autonomous action when the server offers no candidates", async () => {
+    const autonomousInput = input("aoi", "見守る");
+    autonomousInput.autonomousCandidates = [];
+
+    const result = await new MockCharacterAgent("aoi").decide(autonomousInput);
+
+    expect(result.decision).toBe("IGNORE");
+    expect(result.initiative).toBeUndefined();
   });
 });
 describe("MockDirectorAgent", () => {

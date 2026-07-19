@@ -395,6 +395,24 @@ describe("selectHighlights and buildResultNarrative", () => {
     expect(highlights.flatMap((item) => item.eventLogIds)).toContain("event-01");
   });
 
+  it("credits a single self-initiated highlight to the character who started it", () => {
+    const selfInitiated = entry(0, {
+      decisions: {
+        haru: publicDecision("INITIATE"),
+        aoi: publicDecision("IGNORE"),
+      },
+      haruDecision: "INITIATE",
+      aoiDecision: "IGNORE",
+      resolutionBranch: "self_initiated",
+      eventTitle: "Haruの朝の一歩",
+    });
+
+    expect(selectHighlights([selfInitiated])[0]).toMatchObject({
+      kind: "self_initiated",
+      headline: "Haruから始まった「Haruの朝の一歩」",
+    });
+  });
+
   it("builds a stable seven-chapter article that references every turn", () => {
     const eventLog = resultRun();
     const narrative = buildResultNarrative(eventLog, friendshipEnding);

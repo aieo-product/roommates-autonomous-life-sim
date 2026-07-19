@@ -16,6 +16,7 @@ import type {
   PublicCharacterDecision,
   RelationshipLabel,
   ResolutionBranch,
+  SafeSuggestion,
   StatDelta,
   StreamEvent,
   TurnStateSnapshot,
@@ -44,6 +45,14 @@ import {
   deriveRelationship,
   endingFor,
 } from "./rules.js";
+import { buildAutonomousActionCandidates } from "./autonomy/action-elements.js";
+import {
+  composeAutonomousEvent,
+  constrainAutonomousEventDraft,
+  finalizeAutonomousResolvedEvent,
+  isGenuineObserveSuggestion,
+  type AutonomousEventPlan,
+} from "./autonomy/composer.js";
 import { EVENT_DEFINITIONS_BY_ID } from "./event-definitions.js";
 import { constrainResolvedEvent } from "./event-policy.js";
 import {
@@ -74,6 +83,19 @@ function toPublicDecision(decision: CharacterDecision): PublicCharacterDecision 
     action: decision.action,
     dialogue: decision.dialogue,
     publicReason: decision.publicReason,
+    ...(decision.initiative ? { initiative: structuredClone(decision.initiative) } : {}),
+  };
+}
+
+function toDirectorDecision(decision: CharacterDecision): CharacterDecision {
+  return {
+    decision: decision.decision,
+    action: decision.action,
+    dialogue: decision.dialogue,
+    publicReason: decision.publicReason,
+    internalSummary: "Directorには非公開",
+    expectedEffects: {},
+    ...(decision.initiative ? { initiative: structuredClone(decision.initiative) } : {}),
   };
 }
 
@@ -120,6 +142,53 @@ function resolutionBranch(
   if (haruParticipates && aoiParticipates) return "both_participated";
   if (haruParticipates || aoiParticipates) return "one_participated";
   return "both_declined";
+}
+
+function normalizeAutonomousDecision(
+  characterId: CharacterId,
+  decision: CharacterDecision,
+  suggestion: Readonly<SafeSuggestion>,
+  plan: AutonomousEventPlan | undefined,
+): CharacterDecision {
+  if (!isGenuineObserveSuggestion(suggestion)) {
+    const { initiative: _initiative, ...withoutInitiative } = decision;
+    if (suggestion.kind !== "observe" || decision.decision !== "INITIATE") {
+      return decision.initiative ? withoutInitiative : decision;
+    }
+    return {
+      ...withoutInitiative,
+      decision: "IGNORE",
+      action: "安全な見守り時間として、自分のペースで過ごす",
+      dialogue: "今は無理に何かを始めず、ゆっくりするね。",
+      publicReason: "このターンには選べる自律行動候補がないから",
+      internalSummary: "未提示の候補は実行しない",
+      expectedEffects: { energy: 3, stress: -2 },
+    };
+  }
+  const selection = plan?.selections.find((item) => item.characterId === characterId);
+  if (selection) {
+    return {
+      ...decision,
+      action: selection.candidate.publicIntent,
+      initiative: {
+        candidateId: selection.candidate.id,
+        invitation: selection.invitation,
+        publicIntent: selection.candidate.publicIntent,
+      },
+    };
+  }
+
+  const { initiative: _initiative, ...withoutInitiative } = decision;
+  if (!cooperative.has(decision.decision)) return withoutInitiative;
+  return {
+    ...withoutInitiative,
+    decision: "IGNORE",
+    action: "許可された候補を選ばず、自分の時間を過ごす",
+    dialogue: "今は自分のペースで過ごすね。",
+    publicReason: "今選べる行動候補とは一致しなかったから",
+    internalSummary: "候補にない行動は実行せず、今回は見送る",
+    expectedEffects: { energy: 3, stress: -2 },
+  };
 }
 
 function errorMessage(error: unknown): string {
@@ -234,6 +303,19 @@ export class GameEngine {
         agent: "navigator",
         message: "デコピンが指示を確認しています…",
       });
+      const autonomyAvailable = isGenuineObserveSuggestion(suggestion);
+      const autonomousCandidates = {
+        haru: deepFreeze(
+          autonomyAvailable
+            ? buildAutonomousActionCandidates(before, "haru")
+            : [],
+        ),
+        aoi: deepFreeze(
+          autonomyAvailable
+            ? buildAutonomousActionCandidates(before, "aoi")
+            : [],
+        ),
+      };
       const buildInput = (id: CharacterId): CharacterDecisionInput => {
         const other = id === "haru" ? "aoi" : "haru";
         const recent = snapshot.shared.sharedMemories.slice(-5);
@@ -252,6 +334,7 @@ export class GameEngine {
           recentMemories: recent,
           importantMemories: important,
           suggestion,
+          autonomousCandidates: autonomousCandidates[id],
         };
       };
 
@@ -299,15 +382,7 @@ export class GameEngine {
         return { navigator, navigatorResponse };
       });
       const characterPromise = (id: CharacterId) =>
-        this.agents.decide(id, buildInput(id)).then((result) => {
-          emit({
-            type: "agent.completed",
-            agent: id,
-            message: `${id === "haru" ? "Haru" : "Aoi"}: ${result.value.decision}`,
-            data: toPublicDecision(result.value),
-          });
-          return result;
-        });
+        this.agents.decide(id, buildInput(id));
       const [navigatorResult, haruResult, aoiResult] = await Promise.allSettled([
         navigatorPromise,
         characterPromise("haru"),
@@ -319,6 +394,38 @@ export class GameEngine {
       const { navigator, navigatorResponse } = navigatorResult.value;
       const haru = haruResult.value;
       const aoi = aoiResult.value;
+      const autonomousPlan = composeAutonomousEvent({
+        baseSuggestion: suggestion,
+        snapshot,
+        decisions: { haru: haru.value, aoi: aoi.value },
+        offeredCandidates: autonomousCandidates,
+      });
+      const haruDecision = normalizeAutonomousDecision(
+        "haru",
+        haru.value,
+        suggestion,
+        autonomousPlan,
+      );
+      const aoiDecision = normalizeAutonomousDecision(
+        "aoi",
+        aoi.value,
+        suggestion,
+        autonomousPlan,
+      );
+      const activeSuggestion = autonomousPlan?.suggestion ?? suggestion;
+      const activeEventDefinition = autonomousPlan?.definition ?? eventDefinition;
+      emit({
+        type: "agent.completed",
+        agent: "haru",
+        message: `Haru: ${haruDecision.decision}`,
+        data: toPublicDecision(haruDecision),
+      });
+      emit({
+        type: "agent.completed",
+        agent: "aoi",
+        message: `Aoi: ${aoiDecision.decision}`,
+        data: toPublicDecision(aoiDecision),
+      });
       if (haru.runtime.source === "fallback" || aoi.runtime.source === "fallback") {
         emit({ type: "warning", message: "App Serverに接続できないため、安全なモックへ切り替えました" });
       }
@@ -327,25 +434,32 @@ export class GameEngine {
       const director = await this.agents.resolve({
         turnId,
         snapshot,
-        suggestion,
-        haruDecision: haru.value,
-        aoiDecision: aoi.value,
+        suggestion: activeSuggestion,
+        eventDefinition: activeEventDefinition,
+        haruDecision: toDirectorDecision(haruDecision),
+        aoiDecision: toDirectorDecision(aoiDecision),
       });
-      let resolved = {
-        ...constrainResolvedEvent(
-          eventDefinition,
-          director.value,
-          { haru: haru.value, aoi: aoi.value },
+      const directorEvent = autonomousPlan
+        ? constrainAutonomousEventDraft(autonomousPlan, director.value)
+        : director.value;
+      const policyResolved = constrainResolvedEvent(
+          activeEventDefinition,
+          directorEvent,
+          { haru: haruDecision, aoi: aoiDecision },
           before.shared.unresolvedConflicts,
           {
             suppressRelationshipEffects:
-              suggestion.cue.transformed && eventDefinition.category === "rest",
+              activeSuggestion.cue.transformed && activeEventDefinition.category === "rest",
             originalLocations: {
               haru: snapshot.characters.haru.location,
               aoi: snapshot.characters.aoi.location,
             },
           },
-        ),
+        );
+      let resolved = {
+        ...(autonomousPlan
+          ? finalizeAutonomousResolvedEvent(autonomousPlan, policyResolved)
+          : policyResolved),
         navigatorMessage: navigatorResponse.message,
       };
       emit({ type: "director.completed", agent: "director", message: resolved.eventTitle, data: resolved });
@@ -362,8 +476,8 @@ export class GameEngine {
         .concat(resolved.conflictUpdate?.add ?? []);
       let relationship = deriveRelationship(nextCharacters, conflicts, before.shared.relationshipLabel);
       const memory = createMemory(resolved.memory, before.shared.day, before.shared.phase, turnId);
-      const independentYes = cooperative.has(haru.value.decision) && cooperative.has(aoi.value.decision);
-      if (eventDefinition.category === "confession" && independentYes && confessionEligible(snapshot)) {
+      const independentYes = cooperative.has(haruDecision.decision) && cooperative.has(aoiDecision.decision);
+      if (activeEventDefinition.category === "confession" && independentYes && confessionEligible(snapshot)) {
         relationship = "couple";
         resolved = {
           ...resolved,
@@ -377,11 +491,11 @@ export class GameEngine {
       const positive = resolved.memory.emotionalImpact > 0;
       nextCharacters.haru = decorateCharacterState(nextCharacters.haru, "haru", positive);
       nextCharacters.aoi = decorateCharacterState(nextCharacters.aoi, "aoi", positive);
-      nextCharacters.haru.currentGoal = haru.value.action;
-      nextCharacters.aoi.currentGoal = aoi.value.action;
+      nextCharacters.haru.currentGoal = haruDecision.action;
+      nextCharacters.aoi.currentGoal = aoiDecision.action;
       const isLastTurn = before.shared.day === 7 && before.shared.phase === "night";
-      const haruPublicDecision = toPublicDecision(haru.value);
-      const aoiPublicDecision = toPublicDecision(aoi.value);
+      const haruPublicDecision = toPublicDecision(haruDecision);
+      const aoiPublicDecision = toPublicDecision(aoiDecision);
       const beforeSnapshot = turnSnapshot(
         {
           haru: before.characters.haru.state,
@@ -422,24 +536,24 @@ export class GameEngine {
             turnId,
             day: before.shared.day,
             phase: before.shared.phase,
-            eventDefinitionId: eventDefinition.id,
-            eventCategory: eventDefinition.category,
-            intimacyTier: eventDefinition.intimacyTier,
-            cooldownPhases: eventDefinition.cooldownPhases,
+            eventDefinitionId: activeEventDefinition.id,
+            eventCategory: activeEventDefinition.category,
+            intimacyTier: activeEventDefinition.intimacyTier,
+            cooldownPhases: activeEventDefinition.cooldownPhases,
             cueSafetyFlags: suggestion.cue.safetyFlags,
-            suggestion: suggestion.text,
-            haruReaction: `${haru.value.decision}: ${haru.value.action}`,
-            aoiReaction: `${aoi.value.decision}: ${aoi.value.action}`,
-            haruDecision: haru.value.decision,
-            aoiDecision: aoi.value.decision,
-            haruAction: haru.value.action,
-            aoiAction: aoi.value.action,
+            suggestion: activeSuggestion.text,
+            haruReaction: `${haruDecision.decision}: ${haruDecision.action}`,
+            aoiReaction: `${aoiDecision.decision}: ${aoiDecision.action}`,
+            haruDecision: haruDecision.decision,
+            aoiDecision: aoiDecision.decision,
+            haruAction: haruDecision.action,
+            aoiAction: aoiDecision.action,
             haruDialogue: resolved.haruDialogue,
             aoiDialogue: resolved.aoiDialogue,
             conversation: resolved.conversation,
             storyBeats: resolved.storyBeats,
-            haruPublicReason: haru.value.publicReason,
-            aoiPublicReason: aoi.value.publicReason,
+            haruPublicReason: haruDecision.publicReason,
+            aoiPublicReason: aoiDecision.publicReason,
             scene: {
               haru: nextCharacters.haru.location,
               aoi: nextCharacters.aoi.location,
@@ -456,7 +570,7 @@ export class GameEngine {
             navigatorMessage: navigatorResponse.message,
             navigatorResponse,
             decisions: { haru: haruPublicDecision, aoi: aoiPublicDecision },
-            resolutionBranch: resolutionBranch(haru.value, aoi.value),
+            resolutionBranch: resolutionBranch(haruDecision, aoiDecision),
             before: beforeSnapshot,
             after: afterSnapshot,
             appliedEffects: appliedEffects(beforeSnapshot.characters, afterSnapshot.characters),

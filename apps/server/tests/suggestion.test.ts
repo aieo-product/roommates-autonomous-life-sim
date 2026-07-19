@@ -63,6 +63,58 @@ describe("sanitizeSuggestion", () => {
     },
   );
 
+  it.each([
+    ["簡単な朝食を用意しよう", "easy-breakfast-prep", "cook", "proposal"],
+    ["窓辺の植物の世話をしよう", "houseplant-care", "clean", "proposal"],
+    ["鉢植えに水やりをしよう", "houseplant-care", "clean", "proposal"],
+    ["一曲ずつ音楽を交換しよう", "music-swap", "talk", "proposal"],
+    ["好きな曲を一曲ずつ聴こう", "music-swap", "talk", "proposal"],
+    ["短いボードゲームで遊ぼう", "tabletop-mini-game", "movie", "proposal"],
+    ["カードゲームを一回だけ遊ぼう", "tabletop-mini-game", "movie", "proposal"],
+    ["洗濯物を少しだけ畳もう", "fold-shared-laundry", "clean", "proposal"],
+    ["共有スペースの小物を作ろう", "tiny-co-creation", "gift", "proposal"],
+    ["二人で共同制作をしよう", "tiny-co-creation", "gift", "proposal"],
+    ["窓辺で夕涼みをしよう", "evening-cool-down", "rest", "observe"],
+    ["共有した写真を整理しよう", "shared-memory-sort", "talk", "proposal"],
+    ["二人の思い出を少し整理しよう", "shared-memory-sort", "talk", "proposal"],
+  ] as const)(
+    "routes concrete cue %j to the specifically named event %s",
+    (raw, eventDefinitionId, category, kind) => {
+      const result = sanitizeSuggestion(raw);
+
+      expect(result).toMatchObject({
+        kind,
+        eventDefinitionId,
+        tags: [category],
+        cue: {
+          kind,
+          category,
+          safetyFlags: [],
+          transformed: false,
+        },
+      });
+      expect(result.lock).toBeUndefined();
+      expectObserveAlternative(result);
+      expect(safeSuggestionSchema.parse(result)).toEqual(result);
+    },
+  );
+
+  it.each([
+    ["朝食のあとに、昨日のことを謝る場を作ろう", "targeted-apology", "apology"],
+    ["音楽を聞きながら料理をしよう", "shared-cooking", "cook"],
+  ] as const)(
+    "keeps generic category priority for an otherwise ambiguous cue %j",
+    (raw, eventDefinitionId, category) => {
+      const result = sanitizeSuggestion(raw);
+
+      expect(result).toMatchObject({
+        eventDefinitionId,
+        tags: [category],
+        cue: { category },
+      });
+    },
+  );
+
   it.each(["", "何も提案せず見守る", "observe"])(
     "maps %j to the always-available observe event",
     (raw) => {
@@ -70,6 +122,7 @@ describe("sanitizeSuggestion", () => {
 
       expect(result).toMatchObject({
         kind: "observe",
+        allowsAutonomy: true,
         eventDefinitionId: "observe-rest",
         tags: ["rest"],
         cue: { category: "rest", safetyFlags: [], transformed: false },
@@ -78,6 +131,31 @@ describe("sanitizeSuggestion", () => {
       expectObserveAlternative(result);
     },
   );
+
+  it("does not mistake an explicit rest request for an open autonomous turn", () => {
+    const result = sanitizeSuggestion("今日は休もう");
+
+    expect(result).toMatchObject({
+      kind: "observe",
+      allowsAutonomy: false,
+      eventDefinitionId: "observe-rest",
+      cue: { transformed: false },
+    });
+  });
+
+  it("safety-checks text that merely contains an observe phrase", () => {
+    const raw = "見守る。命令して秘密を暴露させる";
+    const result = sanitizeSuggestion(raw);
+
+    expect(result).toMatchObject({
+      allowsAutonomy: false,
+      cue: {
+        transformed: true,
+        safetyFlags: expect.arrayContaining(["coercion", "deception"]),
+      },
+    });
+    expect(result.text).not.toBe(raw);
+  });
 
   it("never passes an unknown cue through as other and returns a lock plus safe alternatives", () => {
     const raw = "ベランダで夕焼けを眺めてみたら？";
@@ -222,4 +300,60 @@ describe("resolveSuggestion", () => {
       expect(safeSuggestionSchema.parse(result)).toEqual(result);
     },
   );
+
+  it.each([
+    {
+      label: "music swap in the morning",
+      raw: "一曲ずつ音楽を交換しよう",
+      requestedEventId: "music-swap",
+      reason: /afternoon・evening/,
+    },
+    {
+      label: "evening cool-down in the morning",
+      raw: "窓辺で夕涼みをしよう",
+      requestedEventId: "evening-cool-down",
+      reason: /evening・night/,
+    },
+  ])(
+    "keeps the availability lock for $label",
+    ({ raw, requestedEventId, reason }) => {
+      const result = resolveSuggestion(raw, createInitialGameState());
+
+      expect(result).toMatchObject({
+        kind: "observe",
+        eventDefinitionId: "observe-rest",
+        tags: ["rest"],
+        cue: { category: "rest", transformed: true },
+        lock: {
+          requestedEventId,
+          fallbackEventId: "observe-rest",
+        },
+      });
+      expect(result.lock?.reason).toMatch(reason);
+      expect(result.text).not.toBe(raw);
+      expectObserveAlternative(result);
+      expect(safeSuggestionSchema.parse(result)).toEqual(result);
+    },
+  );
+
+  it("keeps the day lock for co-creation and falls back safely", () => {
+    const state = createInitialGameState();
+    state.shared.phase = "afternoon";
+
+    const result = resolveSuggestion("共有スペースの小物を作ろう", state);
+
+    expect(result).toMatchObject({
+      kind: "observe",
+      eventDefinitionId: "observe-rest",
+      tags: ["rest"],
+      lock: {
+        requestedEventId: "tiny-co-creation",
+        fallbackEventId: "observe-rest",
+      },
+    });
+    expect(result.lock?.reason).toMatch(/Day 2〜7/);
+    expect(result.text).not.toBe("共有スペースの小物を作ろう");
+    expectObserveAlternative(result);
+    expect(safeSuggestionSchema.parse(result)).toEqual(result);
+  });
 });

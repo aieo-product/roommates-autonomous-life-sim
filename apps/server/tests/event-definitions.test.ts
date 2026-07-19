@@ -5,6 +5,17 @@ import {
   EVENT_DEFINITIONS_BY_ID,
 } from "../src/engine/event-definitions.js";
 
+const EVERYDAY_AUTONOMY_EVENT_IDS = [
+  "easy-breakfast-prep",
+  "houseplant-care",
+  "music-swap",
+  "tabletop-mini-game",
+  "fold-shared-laundry",
+  "tiny-co-creation",
+  "evening-cool-down",
+  "shared-memory-sort",
+] as const;
+
 describe("event definition catalog", () => {
   it("contains at least three schema-valid definitions", () => {
     expect(EVENT_DEFINITIONS.length).toBeGreaterThanOrEqual(3);
@@ -34,5 +45,39 @@ describe("event definition catalog", () => {
         expect(definition.effectBudget[stat]).toBeLessThanOrEqual(10);
       }
     }
+  });
+
+  it("offers varied everyday actions that remain safe when initiated, modified, or done solo", () => {
+    const categories = new Set<string>();
+
+    for (const id of EVERYDAY_AUTONOMY_EVENT_IDS) {
+      const definition = EVENT_DEFINITIONS_BY_ID.get(id);
+      expect(definition, `${id} must be present in the catalog`).toBeDefined();
+      if (!definition) throw new Error(`Missing event definition: ${id}`);
+
+      categories.add(definition.category);
+      expect(definition.allowedPhases.length).toBeGreaterThan(0);
+      expect(definition.minDay).toBeLessThanOrEqual(definition.maxDay);
+      expect(definition.preconditions.minEnergy).toBeTypeOf("number");
+      expect(definition.preconditions.maxStress).toBeTypeOf("number");
+      expect(definition.cooldownPhases).toBeGreaterThan(0);
+      expect(definition.maxUsesPerDay).toBeGreaterThan(0);
+      expect(definition.maxUsesPerRun).toBeGreaterThanOrEqual(definition.maxUsesPerDay);
+      expect(definition.participantRange.min).toBeLessThanOrEqual(1);
+      expect(definition.characterChoices).toContain("INITIATE");
+      expect(definition.consent).toMatchObject({
+        allowPass: true,
+        allowModify: true,
+        physicalContact: "none",
+      });
+      expect(definition.producerControls.length).toBeGreaterThanOrEqual(3);
+      expect(definition.branches.oneParticipates.trim().length).toBeGreaterThan(0);
+      expect(definition.branches.bothDecline.trim().length).toBeGreaterThan(0);
+      expect(definition.branches.modified.trim().length).toBeGreaterThan(0);
+      expect(EVENT_DEFINITIONS_BY_ID.has(definition.fallbackEventId)).toBe(true);
+      expect(definition.safetyNotes.length).toBeGreaterThanOrEqual(2);
+    }
+
+    expect(categories.size).toBeGreaterThanOrEqual(6);
   });
 });

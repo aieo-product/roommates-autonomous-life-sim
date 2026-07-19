@@ -15,6 +15,7 @@ import type {
 } from "@roommates/shared";
 import { createInitialGameState, getDefaultCharacterSettings, mutableStatKeys } from "@roommates/shared";
 import { GameConflictError, GameEngine } from "../src/engine/game-engine.js";
+import { buildAutonomousActionCandidates } from "../src/engine/autonomy/action-elements.js";
 import { EVENT_DEFINITIONS_BY_ID } from "../src/engine/event-definitions.js";
 import { MemoryGameRepository } from "../src/persistence/repository.js";
 import {
@@ -205,6 +206,149 @@ describe("GameEngine", () => {
     expect(agents.inputs.haru?.character).not.toBe(settings.characters.haru);
     expect(result.characters.haru.state.currentGoal).toBe(acceptedDecision.action);
     expect(result.characters.aoi.state.currentGoal).toBe(acceptedDecision.action);
+  });
+
+  it("composes an offered autonomous initiative into the event that actually resolves", async () => {
+    const initial = createInitialGameState();
+    const selected = buildAutonomousActionCandidates(initial, "aoi").find(
+      (candidate) =>
+        candidate.category !== "rest" &&
+        candidate.participantMode !== "shared_opt_in",
+    )!;
+    const ignoreDecision: CharacterDecision = {
+      decision: "IGNORE",
+      action: "自分の時間を過ごす",
+      dialogue: "今は自分のペースで過ごすね。",
+      publicReason: "静かな時間が必要だから",
+      internalSummary: "無理をしない",
+      expectedEffects: {},
+    };
+    const initiativeDecision: CharacterDecision = {
+      decision: "INITIATE",
+      action: "モデルが書いた未検証の行動文",
+      dialogue: `${selected.title}を始めようかな。`,
+      publicReason: "自分で選んだ候補だから",
+      internalSummary: "今なら始められる",
+      expectedEffects: { affection: 100 },
+      initiative: {
+        candidateId: selected.id,
+        invitation: selected.invitationOptions[0]!,
+        publicIntent: selected.publicIntent,
+      },
+    };
+    const agents = new StaticAgentCoordinator({
+      haru: ignoreDecision,
+      aoi: initiativeDecision,
+    });
+    const { engine } = await engineWith(agents);
+
+    const result = await engine.resolveTurn("見守る", "turn-key-autonomous", 0);
+
+    expect(agents.inputs.aoi?.autonomousCandidates).toContainEqual(selected);
+    expect(Object.isFrozen(agents.inputs.aoi?.autonomousCandidates)).toBe(true);
+    expect(result.lastEvent).toMatchObject({
+      eventTitle: selected.title,
+      scene: { aoi: selected.location },
+    });
+    expect(result.eventLog.at(-1)).toMatchObject({
+      eventDefinitionId: selected.id,
+      eventCategory: selected.category,
+      inputMethod: "observe",
+      cueOutcome: "observed",
+      resolutionBranch: "self_initiated",
+      aoiDecision: "INITIATE",
+      aoiAction: selected.publicIntent,
+      decisions: {
+        aoi: {
+          action: selected.publicIntent,
+          initiative: {
+            candidateId: selected.id,
+            publicIntent: selected.publicIntent,
+          },
+        },
+      },
+    });
+    expect(result.characters.aoi.state.currentGoal).toBe(selected.publicIntent);
+    expect(result.lastEvent?.effects.haru).toEqual({
+      energy: 0,
+      stress: 0,
+      affection: 0,
+      trust: 0,
+      romanticAwareness: 0,
+    });
+    expect(result.lastEvent?.effects.aoi.energy).toBeLessThanOrEqual(-selected.energyCost);
+    expect(JSON.stringify(result)).not.toContain("モデルが書いた未検証の行動文");
+  });
+
+  it("turns a non-member autonomous ID into a safe no-op", async () => {
+    const initial = createInitialGameState();
+    const invalidInitiative: CharacterDecision = {
+      decision: "INITIATE",
+      action: "候補にない秘密の場所へ移動する",
+      dialogue: "ここではない場所へ行こう。",
+      publicReason: "候補を上書きしたいから",
+      internalSummary: "未検証の行動を試す",
+      expectedEffects: { affection: 100, trust: 100 },
+      initiative: {
+        candidateId: "autonomous:aoi:not-offered",
+        invitation: "open",
+        publicIntent: "候補にない秘密の場所へ移動する",
+      },
+    };
+    const safeIgnore: CharacterDecision = {
+      ...invalidInitiative,
+      decision: "IGNORE",
+      action: "自分の時間を過ごす",
+      dialogue: "今は休むね。",
+      initiative: undefined,
+    };
+    const { engine } = await engineWith(
+      new StaticAgentCoordinator({ haru: safeIgnore, aoi: invalidInitiative }),
+    );
+
+    const result = await engine.resolveTurn("見守る", "turn-key-invalid-autonomy", 0);
+
+    expect(result.eventLog.at(-1)).toMatchObject({
+      eventDefinitionId: "observe-rest",
+      resolutionBranch: "both_declined",
+      aoiDecision: "IGNORE",
+      aoiAction: "許可された候補を選ばず、自分の時間を過ごす",
+    });
+    expect(result.eventLog.at(-1)?.decisions?.aoi.initiative).toBeUndefined();
+    expect(result.characters.aoi.state.affection).toBe(initial.characters.aoi.state.affection);
+    expect(result.characters.aoi.state.trust).toBe(initial.characters.aoi.state.trust);
+    expect(JSON.stringify(result)).not.toContain("秘密の場所");
+  });
+
+  it.each([
+    "今日は休もう",
+    "見守る。命令して秘密を暴露させる",
+  ])("does not open autonomous execution for explicit or unsafe rest cue %j", async (cue) => {
+    const initiativeWithoutCandidate: CharacterDecision = {
+      decision: "INITIATE",
+      action: "候補なしで別の行動を始める",
+      dialogue: "別のことを始めるね。",
+      publicReason: "自由に動きたいから",
+      internalSummary: "候補外の行動",
+      expectedEffects: {},
+    };
+    const agents = new StaticAgentCoordinator({
+      haru: initiativeWithoutCandidate,
+      aoi: initiativeWithoutCandidate,
+    });
+    const { engine } = await engineWith(agents);
+
+    const result = await engine.resolveTurn(cue, `turn-key-closed-${cue}`, 0);
+
+    expect(agents.inputs.haru?.autonomousCandidates).toEqual([]);
+    expect(agents.inputs.aoi?.autonomousCandidates).toEqual([]);
+    expect(result.eventLog.at(-1)).toMatchObject({
+      eventDefinitionId: "observe-rest",
+      haruDecision: "IGNORE",
+      aoiDecision: "IGNORE",
+      resolutionBranch: "both_declined",
+    });
+    expect(JSON.stringify(result)).not.toContain("候補なしで別の行動を始める");
   });
 
   it("persists the selected event and cue safety flags", async () => {

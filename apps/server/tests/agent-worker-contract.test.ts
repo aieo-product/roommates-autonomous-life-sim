@@ -19,6 +19,8 @@ import {
   buildAgentReflectionInput,
   fallbackAgentReflection,
 } from "../src/agents/reflection.js";
+import { buildAutonomousActionCandidates } from "../src/engine/autonomy/action-elements.js";
+import { EVENT_DEFINITIONS_BY_ID } from "../src/engine/event-definitions.js";
 import { sanitizeSuggestion } from "../src/engine/suggestion.js";
 
 const SESSION_ID = "123e4567-e89b-42d3-a456-426614174000";
@@ -123,6 +125,7 @@ function characterInput(): CharacterDecisionInput {
     recentMemories: [],
     importantMemories: [],
     suggestion: sanitizeSuggestion("二人で話してみて"),
+    autonomousCandidates: buildAutonomousActionCandidates(state, "haru"),
   };
 }
 
@@ -132,6 +135,7 @@ function directorInput(): DirectorInput {
     turnId: character.turnId,
     snapshot: character.snapshot,
     suggestion: character.suggestion,
+    eventDefinition: EVENT_DEFINITIONS_BY_ID.get(character.suggestion.eventDefinitionId),
     haruDecision: structuredClone(decision),
     aoiDecision: structuredClone(decision),
   };
@@ -228,6 +232,14 @@ describe("AgentWorker HTTP contract", () => {
       value: { decision: "ACCEPT" },
       threadId: "haru-thread",
     });
+    expect(adapter.decide).toHaveBeenCalledWith(
+      "haru",
+      expect.objectContaining({
+        autonomousCandidates: expect.arrayContaining([
+          expect.objectContaining({ id: expect.stringMatching(/^autonomous:/) }),
+        ]),
+      }),
+    );
     expect(director).toMatchObject({
       value: { conversation: expect.any(Array) },
       threadId: "director-thread",
