@@ -101,6 +101,33 @@ describe("ResilientAgentCoordinator", () => {
     expect(result.runtime.source).toBe("mock");
   });
 
+  it("preserves an explicitly attributed OpenAI API runtime source", async () => {
+    const real: AppServerAdapter = {
+      decide: vi.fn(async () => ({
+        value: {
+          decision: "ACCEPT",
+          action: "一緒に料理をする",
+          dialogue: "やってみよう。",
+          publicReason: "今なら楽しめそうだから",
+          internalSummary: "少し興味がある",
+          expectedEffects: {},
+        },
+        threadId: "openai-haru-thread",
+        source: "openai_api" as const,
+      })),
+      resolve: vi.fn(),
+      shutdown: vi.fn(async () => undefined),
+    };
+    const coordinator = new ResilientAgentCoordinator("auto", 100, real);
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime).toMatchObject({
+      source: "openai_api",
+      threadId: "openai-haru-thread",
+    });
+  });
+
   it("falls back from an invalid navigator envelope without disabling other agents", async () => {
     const navigate = vi.fn(async () => ({
       value: {

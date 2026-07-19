@@ -1,5 +1,6 @@
 import type {
   AgentId,
+  AgentSource,
   CharacterDecision,
   CharacterDecisionInput,
   CharacterId,
@@ -37,11 +38,23 @@ export interface AgentCoordinator {
   shutdown?(): Promise<void>;
 }
 
+export type AppServerAdapterSource = Extract<
+  AgentSource,
+  "app_server" | "openai_api"
+>;
+
+export type AppServerAdapterResult = {
+  value: unknown;
+  threadId: string;
+  /** Defaults to app_server so existing adapters remain source-compatible. */
+  source?: AppServerAdapterSource;
+};
+
 export interface AppServerAdapter {
-  navigate?(input: NavigatorInput): Promise<{ value: unknown; threadId: string }>;
-  decide(id: CharacterId, input: CharacterDecisionInput): Promise<{ value: unknown; threadId: string }>;
-  resolve(input: DirectorInput): Promise<{ value: unknown; threadId: string }>;
-  reflect?(id: CharacterId, input: AgentReflectionInput): Promise<{ value: unknown; threadId: string }>;
+  navigate?(input: NavigatorInput): Promise<AppServerAdapterResult>;
+  decide(id: CharacterId, input: CharacterDecisionInput): Promise<AppServerAdapterResult>;
+  resolve(input: DirectorInput): Promise<AppServerAdapterResult>;
+  reflect?(id: CharacterId, input: AgentReflectionInput): Promise<AppServerAdapterResult>;
   resetContext?(): Promise<void>;
   shutdown(): Promise<void>;
 }
@@ -124,7 +137,7 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
 
   private async run<T>(
     _agent: AgentId,
-    realCall: () => Promise<{ value: unknown; threadId: string }>,
+    realCall: () => Promise<AppServerAdapterResult>,
     mockCall: () => Promise<T>,
     schema: SchemaLike<T>,
     fallbackCall: () => Promise<T> = mockCall,
@@ -148,7 +161,11 @@ export class ResilientAgentCoordinator implements AgentCoordinator {
           if (!parsed.success) throw new Error("App Server returned invalid structured JSON");
           return {
             value: parsed.data,
-            runtime: { source: "app_server", threadId: output.threadId, latencyMs: Date.now() - started },
+            runtime: {
+              source: output.source ?? "app_server",
+              threadId: output.threadId,
+              latencyMs: Date.now() - started,
+            },
           };
         } catch (error) {
           lastError = error;

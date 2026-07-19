@@ -103,12 +103,16 @@ export interface GameEvent extends ResultEventLogEntry {
 }
 
 export interface RuntimeInfo {
-  mode: "app-server" | "mock" | "offline" | "unknown";
+  mode: "app-server" | "openai-api" | "mock" | "offline" | "unknown";
   label?: string;
   model?: string;
   haruThreadId?: string;
   aoiThreadId?: string;
   directorThreadId?: string;
+}
+
+export interface RuntimeHealth {
+  openaiApiConfigured: boolean;
 }
 
 export interface GameState {

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CHARACTER_SETTINGS } from "@roommates/shared";
-import { INITIAL_GAME_STATE, normalizeGameState, runTurn } from "../src/api.js";
+import { DEFAULT_CHARACTER_SETTINGS, runtimeAgentStateSchema } from "@roommates/shared";
+import {
+  INITIAL_GAME_STATE,
+  getRuntimeHealth,
+  normalizeGameState,
+  runTurn,
+} from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -61,6 +66,38 @@ describe("runTurn SSE handling", () => {
     )).resolves.toBeUndefined();
 
     expect(events).toEqual(["turn.completed"]);
+  });
+});
+
+describe("OpenAI API runtime observability", () => {
+  it("maps the direct OpenAI source to its own UI mode", () => {
+    const normalized = normalizeGameState({
+      runtime: {
+        haru: { source: "app_server", latencyMs: 21 },
+        aoi: { source: "app_server", latencyMs: 18 },
+        director: { source: "app_server", latencyMs: 34 },
+        navigator: { source: "openai_api", latencyMs: 12 },
+      },
+    }, INITIAL_GAME_STATE);
+
+    expect(normalized.runtime.mode).toBe("openai-api");
+    expect(runtimeAgentStateSchema.parse({ source: "openai_api" })).toEqual({
+      source: "openai_api",
+    });
+  });
+
+  it("reads only the public configuration flag from health", async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
+      openaiApiConfigured: true,
+      OPENAI_API_KEY: "must-not-be-consumed-by-the-client",
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    await expect(getRuntimeHealth()).resolves.toEqual({
+      openaiApiConfigured: true,
+    });
   });
 });
 

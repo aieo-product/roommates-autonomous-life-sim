@@ -13,6 +13,7 @@ import {
   advanceGame,
   fastForwardGame,
   getGame,
+  getRuntimeHealth,
   normalizeGameState,
   resetGame,
   runTurn,
@@ -170,6 +171,7 @@ function RuntimeBadge({ runtime, offline }: { runtime: RuntimeInfo; offline: boo
   const mode = offline ? "offline" : runtime.mode;
   const content = {
     "app-server": ["live", "AI LIVE"],
+    "openai-api": ["openai", "OPENAI API"],
     mock: ["mock", "DEMO"],
     offline: ["offline", "OFFLINE"],
     unknown: ["checking", "CONNECTING"],
@@ -1129,6 +1131,7 @@ export default function App() {
   const [resolving, setResolving] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [offline, setOffline] = useState(false);
+  const [openaiApiConfigured, setOpenaiApiConfigured] = useState(false);
   const [actionBusy, setActionBusy] = useState<ActionBusy>(null);
   const [streamMessage, setStreamMessage] = useState("");
   const [navigatorMessage, setNavigatorMessage] = useState("");
@@ -1169,7 +1172,9 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    refreshGame(controller.signal)
+    const loadRuntimeHealth = getRuntimeHealth(controller.signal)
+      .then((health) => setOpenaiApiConfigured(health.openaiApiConfigured));
+    Promise.all([refreshGame(controller.signal), loadRuntimeHealth])
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setOffline(true);
@@ -1754,12 +1759,20 @@ export default function App() {
                   <option value="">選ぶ…</option>{PRESETS.map((preset) => <option value={preset} key={preset}>{preset}</option>)}
                 </select>
               </div>
-              <form className="suggestion-form" onSubmit={handleSubmit}>
-                <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
-                <textarea ref={suggestionInputRef} id="suggestion" name="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={!canSubmitCue} aria-describedby="game-control-status" enterKeyHint="send" autoCapitalize="sentences" placeholder="例：今日は一緒に夕食を作ってみたら？" />
-                <span className="character-count">{suggestion.length}/240</span>
-                <button className="submit-cue" type="submit" disabled={!canSubmitCue || !suggestion.trim()}><span>{resolving || game.status === "resolving" ? "反映中…" : game.status === "resolved" ? "先に時間を進める" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
-              </form>
+              <div className="suggestion-stack">
+                {openaiApiConfigured && (
+                  <p className="openai-data-notice" id="openai-api-data-notice">
+                    <span aria-hidden="true">i</span>
+                    OpenAI API利用時、指示と生成内容は、選択中のAPIプロジェクトのデータ共有設定に従いOpenAIと共有される場合があります。
+                  </p>
+                )}
+                <form className="suggestion-form" onSubmit={handleSubmit}>
+                  <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
+                  <textarea ref={suggestionInputRef} id="suggestion" name="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={!canSubmitCue} aria-describedby={openaiApiConfigured ? "game-control-status openai-api-data-notice" : "game-control-status"} enterKeyHint="send" autoCapitalize="sentences" placeholder="例：今日は一緒に夕食を作ってみたら？" />
+                  <span className="character-count">{suggestion.length}/240</span>
+                  <button className="submit-cue" type="submit" disabled={!canSubmitCue || !suggestion.trim()}><span>{resolving || game.status === "resolving" ? "反映中…" : game.status === "resolved" ? "先に時間を進める" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
+                </form>
+              </div>
               <div className="dock-actions">
                 <p id="game-control-status" className="sr-only" aria-live="polite">{controls.cueStatusMessage}</p>
                 <button className="watch-button" type="button" onClick={() => void submitSuggestion("何も提案せず見守る")} disabled={!canSubmitCue}><span aria-hidden="true">◉</span>見守る</button>

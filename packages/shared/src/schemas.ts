@@ -466,7 +466,7 @@ export const memorySchema = z.object({
 
 export const runtimeAgentStateSchema = z
   .object({
-    source: z.enum(["app_server", "mock", "fallback"]),
+    source: z.enum(["app_server", "openai_api", "mock", "fallback"]),
     threadId: z.string().optional(),
     latencyMs: z.number().finite().nonnegative().optional(),
     error: z.string().max(2_000).optional(),
@@ -557,10 +557,10 @@ export const eventLogEntrySchema = z
       .optional(),
     runtimeSources: z
       .object({
-        haru: z.enum(["app_server", "mock", "fallback"]),
-        aoi: z.enum(["app_server", "mock", "fallback"]),
-        director: z.enum(["app_server", "mock", "fallback"]),
-        navigator: z.enum(["app_server", "mock", "fallback"]).optional(),
+        haru: z.enum(["app_server", "openai_api", "mock", "fallback"]),
+        aoi: z.enum(["app_server", "openai_api", "mock", "fallback"]),
+        director: z.enum(["app_server", "openai_api", "mock", "fallback"]),
+        navigator: z.enum(["app_server", "openai_api", "mock", "fallback"]).optional(),
       })
       .strict()
       .optional(),

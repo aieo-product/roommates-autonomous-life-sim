@@ -47,7 +47,7 @@ export type EventStoryBeat =
     };
 export type CoreAgentId = CharacterId | "director";
 export type AgentId = CoreAgentId | "navigator";
-export type AgentSource = "app_server" | "mock" | "fallback";
+export type AgentSource = "app_server" | "openai_api" | "mock" | "fallback";
 export type GameStatus = "awaiting_suggestion" | "resolving" | "resolved" | "ended";
 
 export type CharacterState = {
