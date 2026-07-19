@@ -358,6 +358,31 @@ describe("public Worker Agent Worker runtime", () => {
     expect(result.runtime.source).toBe("fallback");
   });
 
+  it("logs only a safe category for a Cloudflare fetch invocation failure", async () => {
+    const openAiApiKey = "sk-test-cloudflare-fetch-secret";
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      { OPENAI_API_KEY: openAiApiKey },
+      vi.fn<typeof fetch>(async () => {
+        throw new TypeError(`Illegal invocation: ${openAiApiKey}`);
+      }),
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("fallback");
+    expect(warning).toHaveBeenCalledWith(
+      JSON.stringify({
+        message: "ROOMMATES agent provider failed",
+        source: "openai_api",
+        kind: "provider_error",
+        failureCategory: "illegal_invocation",
+      }),
+    );
+    expect(warning.mock.calls.flat().join("\n")).not.toContain(openAiApiKey);
+  });
+
   it("falls back while unavailable and retries after a new turn coordinator is created", async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
