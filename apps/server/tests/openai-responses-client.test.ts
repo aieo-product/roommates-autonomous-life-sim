@@ -205,7 +205,10 @@ async function caughtError(promise: Promise<unknown>): Promise<Error> {
 }
 
 describe("OpenAIResponsesClient", () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("sends a stateless, tool-free Responses request with strict Structured Outputs", async () => {
     const input = navigatorInput();
@@ -250,6 +253,20 @@ describe("OpenAIResponsesClient", () => {
       source: "openai_api",
       threadId: expect.stringMatching(/^openai:[a-f0-9]+:navigator:resp_nav$/),
     });
+  });
+
+  it("preserves the Cloudflare global receiver when using runtime fetch", async () => {
+    const runtimeFetch = vi.fn(async function (this: unknown) {
+      expect(this).toBe(globalThis);
+      return completedResponse({ message: "受け取ったよ。" }, "resp_runtime_fetch");
+    });
+    vi.stubGlobal("fetch", runtimeFetch);
+    const client = new OpenAIResponsesClient({ apiKey: SECRET });
+
+    const result = await client.navigate(navigatorInput());
+
+    expect(result.value).toEqual({ message: "受け取ったよ。" });
+    expect(runtimeFetch).toHaveBeenCalledTimes(1);
   });
 
   it("uses the configured model and maps a nullable non-INITIATE field to the game contract", async () => {
@@ -312,6 +329,20 @@ describe("OpenAIResponsesClient", () => {
     expect(error.message).toBe(`OpenAI Responses request failed with status ${status}`);
     expect(String(error)).not.toContain(SECRET);
     expect(String(error)).not.toContain("PRIVATE_BODY_MARKER");
+  });
+
+  it("classifies an illegal runtime invocation without exposing its message", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError(`Illegal invocation: ${SECRET}`);
+    });
+    const error = await caughtError(clientWith(fetchMock).navigate(navigatorInput()));
+
+    expect(error).toBeInstanceOf(OpenAIResponsesClientError);
+    expect((error as OpenAIResponsesClientError).failureCategory).toBe(
+      "illegal_invocation",
+    );
+    expect(error.message).toBe("OpenAI Responses request failed");
+    expect(String(error)).not.toContain(SECRET);
   });
 
   it.each([

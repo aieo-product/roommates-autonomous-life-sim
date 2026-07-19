@@ -18,7 +18,10 @@ import type {
   AppServerAdapterResult,
   AppServerAdapterSource,
 } from "./coordinator.js";
-import { OpenAIResponsesClientError } from "./openai/responses-client.js";
+import {
+  OpenAIResponsesClientError,
+  type OpenAIProviderFailureCategory,
+} from "./openai/responses-client.js";
 
 export type AgentProvider = {
   source: AppServerAdapterSource;
@@ -29,6 +32,7 @@ export type ProviderFailureDiagnostic = {
   source: AppServerAdapterSource;
   kind: "provider_error" | "invalid_structured_output";
   httpStatus?: number;
+  failureCategory?: OpenAIProviderFailureCategory;
 };
 
 export type ProviderFailureObserver = (
@@ -139,6 +143,11 @@ export class ProviderCascadeAdapter implements AppServerAdapter {
           source: provider.source,
           kind: "provider_error",
           ...(httpStatus === undefined ? {} : { httpStatus }),
+          ...(provider.source === "openai_api" &&
+          error instanceof OpenAIResponsesClientError &&
+          error.failureCategory !== undefined
+            ? { failureCategory: error.failureCategory }
+            : {}),
         });
       }
     }

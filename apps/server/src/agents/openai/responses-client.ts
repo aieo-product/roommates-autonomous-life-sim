@@ -39,6 +39,13 @@ export const DEFAULT_OPENAI_RESPONSES_MAX_BYTES = 256 * 1024;
 export const MAX_OPENAI_RESPONSES_MAX_BYTES = 1024 * 1024;
 export const OPENAI_RESPONSES_MAX_OUTPUT_TOKENS = 4_096;
 
+export type OpenAIProviderFailureCategory =
+  | "timeout"
+  | "illegal_invocation"
+  | "request_context"
+  | "network"
+  | "fetch_failed";
+
 export type OpenAIResponsesClientOptions = {
   apiKey: string;
   model?: string;
@@ -118,10 +125,33 @@ export class OpenAIResponsesClientError extends Error {
   constructor(
     message: string,
     readonly httpStatus?: number,
+    readonly failureCategory?: OpenAIProviderFailureCategory,
   ) {
     super(message);
     this.name = "OpenAIResponsesClientError";
   }
+}
+
+function fetchFailureCategory(error: unknown): OpenAIProviderFailureCategory {
+  const message = error instanceof Error ? error.message : "";
+  if (/illegal invocation|incorrect this reference/i.test(message)) {
+    return "illegal_invocation";
+  }
+  if (
+    /different request|request context|global scope|disallowed operation/i.test(
+      message,
+    )
+  ) {
+    return "request_context";
+  }
+  if (
+    /network connection lost|fetch failed|dns|resolve|connection|connect/i.test(
+      message,
+    )
+  ) {
+    return "network";
+  }
+  return "fetch_failed";
 }
 
 function positiveIntegerInRange(
@@ -277,10 +307,14 @@ export class OpenAIResponsesClient implements AppServerAdapter {
       MAX_OPENAI_RESPONSES_MAX_BYTES,
       "OpenAI Responses size limit is invalid",
     );
-    this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
-    if (typeof this.fetchImpl !== "function") {
+    const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    if (typeof fetchImpl !== "function") {
       throw new OpenAIResponsesClientError("Fetch is unavailable for OpenAI Responses");
     }
+    // Cloudflare runtime functions can depend on their original receiver. The
+    // wrapper prevents a stored global fetch from being invoked with this
+    // client instance as its `this` value (an "Illegal invocation" failure).
+    this.fetchImpl = (input, init) => fetchImpl.call(globalThis, input, init);
     this.initialScope = validatedScope(options.scopeId ?? options.sessionId ?? "default");
   }
 
@@ -403,6 +437,8 @@ export class OpenAIResponsesClient implements AppServerAdapter {
         reject(
           new OpenAIResponsesClientError(
             `OpenAI Responses request timed out after ${this.timeoutMs}ms`,
+            undefined,
+            "timeout",
           ),
         );
       }, this.timeoutMs);
@@ -421,6 +457,8 @@ export class OpenAIResponsesClient implements AppServerAdapter {
       if (timedOut) {
         throw new OpenAIResponsesClientError(
           `OpenAI Responses request timed out after ${this.timeoutMs}ms`,
+          undefined,
+          "timeout",
         );
       }
       throw new OpenAIResponsesClientError("OpenAI Responses request failed");
@@ -460,13 +498,19 @@ export class OpenAIResponsesClient implements AppServerAdapter {
         }),
         signal,
       });
-    } catch {
+    } catch (error) {
       if (signal.aborted) {
         throw new OpenAIResponsesClientError(
           `OpenAI Responses request timed out after ${this.timeoutMs}ms`,
+          undefined,
+          "timeout",
         );
       }
-      throw new OpenAIResponsesClientError("OpenAI Responses request failed");
+      throw new OpenAIResponsesClientError(
+        "OpenAI Responses request failed",
+        undefined,
+        fetchFailureCategory(error),
+      );
     }
 
     if (!response.ok) {
