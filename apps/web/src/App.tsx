@@ -1137,6 +1137,7 @@ export default function App() {
   const [selectedPerson, setSelectedPerson] = useState<CharacterId>("haru");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("status");
   const [logOpen, setLogOpen] = useState(false);
+  const [mapOverlaysVisible, setMapOverlaysVisible] = useState(true);
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
   const [eventAnnouncementId, setEventAnnouncementId] = useState<string | null>(null);
   const [freshEventId, setFreshEventId] = useState<string | null>(null);
@@ -1706,19 +1707,32 @@ export default function App() {
 
       <main id="game" className="game-layout" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
-          <div className="world-stage-wrap">
+          <div className={`world-stage-wrap ${mapOverlaysVisible ? "" : "is-map-focus"}`}>
+            <button
+              type="button"
+              className={`map-overlay-toggle ${mapOverlaysVisible ? "is-visible" : ""}`}
+              aria-label="マップ上の情報"
+              aria-pressed={mapOverlaysVisible}
+              aria-controls="map-overlay-layer"
+              onClick={() => setMapOverlaysVisible((visible) => !visible)}
+            >
+              マップ情報
+              <span aria-hidden="true">{mapOverlaysVisible ? "ON" : "OFF"}</span>
+            </button>
             <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} resolving={resolving} onSelectPerson={selectCharacter} />
-            <div className="resident-hud" aria-label="住人の状態">
-              <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
-              <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
+            <div id="map-overlay-layer" className="map-overlay-layer">
+              <div className="resident-hud" aria-label="住人の状態">
+                <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
+                <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
+              </div>
+              <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
+              <EventCard event={latestEvent} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
+                setLogOpen(false);
+                setActiveMemory(undefined);
+                setPersonalityOpen(false);
+                setEventAnnouncementId(latestEvent.id);
+              } : undefined} />
             </div>
-            <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
-            <EventCard event={latestEvent} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
-              setLogOpen(false);
-              setActiveMemory(undefined);
-              setPersonalityOpen(false);
-              setEventAnnouncementId(latestEvent.id);
-            } : undefined} />
             <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
               {freshEventId === latestEvent?.id && latestEvent
                 ? `イベントが反映されました：${latestEvent.eventTitle}。「全文を読む」で詳細を確認できます。`
