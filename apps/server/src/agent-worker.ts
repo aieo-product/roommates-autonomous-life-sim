@@ -9,12 +9,33 @@ import { createServer, type Server } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CodexAppServerClient } from "./agents/app-server/client.js";
+import {
+  CodexAppServerClient,
+  type AppServerReasoningEffort,
+  type CodexAppServerModelPolicy,
+} from "./agents/app-server/client.js";
 import { createAgentWorkerApp } from "./agent-worker-app.js";
 
-const DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS = 10_000;
+// A cold App Server may need more than ten seconds to initialize the selected
+// model on the first thread/start. Keep this below the remote operation budget
+// while allowing that one-time setup to finish instead of forcing a fallback.
+const DEFAULT_APP_SERVER_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_APP_SERVER_TURN_TIMEOUT_MS = 50_000;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
+const DEFAULT_AGENT_WORKER_MODEL = "gpt-5.6-terra";
+const DEFAULT_FAST_REASONING_EFFORT: AppServerReasoningEffort = "low";
+const DEFAULT_DELIBERATE_REASONING_EFFORT: AppServerReasoningEffort = "medium";
+const MAX_MODEL_NAME_LENGTH = 128;
+const APP_SERVER_REASONING_EFFORTS = new Set<AppServerReasoningEffort>([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+]);
 
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value ?? fallback);
@@ -24,6 +45,28 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 
 function loopbackHost(host: string): boolean {
   return host === "127.0.0.1" || host === "::1" || host === "localhost";
+}
+
+function agentWorkerModel(value: string | undefined): string {
+  const model = value === undefined ? DEFAULT_AGENT_WORKER_MODEL : value.trim();
+  if (model.length === 0 || model.length > MAX_MODEL_NAME_LENGTH) {
+    throw new Error(
+      `AGENT_WORKER_MODEL must be 1-${MAX_MODEL_NAME_LENGTH} characters`,
+    );
+  }
+  return model;
+}
+
+function reasoningEffort(
+  value: string | undefined,
+  fallback: AppServerReasoningEffort,
+  name: string,
+): AppServerReasoningEffort {
+  const effort = value === undefined ? fallback : value.trim();
+  if (!APP_SERVER_REASONING_EFFORTS.has(effort as AppServerReasoningEffort)) {
+    throw new Error(`${name} is invalid`);
+  }
+  return effort as AppServerReasoningEffort;
 }
 
 export type AgentWorkerCwd = {
@@ -81,6 +124,7 @@ export type AgentWorkerSettings = {
   maxInvocationsPerMinute: number;
   idempotencyTtlMs: number;
   idempotencyMaxEntries: number;
+  modelPolicy: CodexAppServerModelPolicy;
 };
 
 export function readAgentWorkerSettings(
@@ -146,6 +190,19 @@ export function readAgentWorkerSettings(
       environment.AGENT_WORKER_IDEMPOTENCY_MAX_ENTRIES,
       256,
     ),
+    modelPolicy: {
+      model: agentWorkerModel(environment.AGENT_WORKER_MODEL),
+      fastReasoningEffort: reasoningEffort(
+        environment.AGENT_WORKER_FAST_REASONING_EFFORT,
+        DEFAULT_FAST_REASONING_EFFORT,
+        "AGENT_WORKER_FAST_REASONING_EFFORT",
+      ),
+      deliberateReasoningEffort: reasoningEffort(
+        environment.AGENT_WORKER_DELIBERATE_REASONING_EFFORT,
+        DEFAULT_DELIBERATE_REASONING_EFFORT,
+        "AGENT_WORKER_DELIBERATE_REASONING_EFFORT",
+      ),
+    },
   };
 }
 
@@ -183,6 +240,7 @@ export async function startAgentWorker(
   const client = new CodexAppServerClient(settings.executable, cwd.cwd, {
     requestTimeoutMs: settings.requestTimeoutMs,
     turnTimeoutMs: settings.turnTimeoutMs,
+    modelPolicy: settings.modelPolicy,
   });
   const runtime = createAgentWorkerApp({
     client,

@@ -81,6 +81,14 @@ function appServerAdapter(includeConversation = true): AppServerAdapter {
               ],
             }
           : {}),
+        storyBeats: [
+          { kind: "move", actor: "both", location: "リビング" },
+          { kind: "dialogue", actor: "haru", text: decision.dialogue },
+          { kind: "dialogue", actor: "aoi", text: decision.dialogue },
+          { kind: "action", actor: "both", action: "ソファに腰掛けて話す" },
+          { kind: "dialogue", actor: "haru", text: "APP_SERVER_CONVERSATION_HARU" },
+          { kind: "dialogue", actor: "aoi", text: "APP_SERVER_CONVERSATION_AOI" },
+        ],
         effects: { haru: {}, aoi: {} },
         memory: {
           title: "ソファで続く会話",
@@ -103,10 +111,20 @@ describe("App Server Director conversation contract", () => {
       maxItems?: number;
     };
     const characterDialogue = characterOutputSchema.properties.dialogue;
+    const storyBeats = Reflect.get(directorOutputSchema.properties, "storyBeats") as unknown as {
+      minItems?: number;
+      maxItems?: number;
+      items?: {
+        anyOf?: Array<{
+          properties?: Record<string, { enum?: string[]; maxLength?: number }>;
+        }>;
+      };
+    };
     const haruDialogue = directorOutputSchema.properties.haruDialogue;
     const aoiDialogue = directorOutputSchema.properties.aoiDialogue;
 
     expect(directorOutputSchema.required).toContain("conversation");
+    expect(directorOutputSchema.required).toContain("storyBeats");
     expect(directorOutputSchema.required).toEqual(
       expect.arrayContaining(["scene", "conflictUpdate"]),
     );
@@ -121,11 +139,20 @@ describe("App Server Director conversation contract", () => {
     expect(haruDialogue).toMatchObject({ minLength: 1, maxLength: 160 });
     expect(aoiDialogue).toMatchObject({ minLength: 1, maxLength: 160 });
     expect(conversation).toMatchObject({ minItems: 3, maxItems: 6 });
+    expect(storyBeats).toMatchObject({ minItems: 4, maxItems: 8 });
+    expect(storyBeats.items?.anyOf).toHaveLength(3);
+    expect(storyBeats.items?.anyOf?.[0]?.properties?.location?.maxLength).toBe(48);
+    expect(storyBeats.items?.anyOf?.[1]?.properties?.actor?.enum).toEqual(["haru", "aoi"]);
+    expect(storyBeats.items?.anyOf?.[1]?.properties?.text?.maxLength).toBe(160);
+    expect(storyBeats.items?.anyOf?.[2]?.properties?.action?.maxLength).toBe(160);
     expect(directorInstructions).toContain("3〜6発話");
+    expect(directorInstructions).toContain("moveは必ず2個以上");
     expect(directorInstructions).toContain("DECLINEやIGNORE");
     expect(directorInstructions).toContain("internalSummary");
     expect(directorInstructions).toContain("eventDefinition");
     expect(directorPrompt(directorInput())).toContain("physicalContact");
+    expect(directorPrompt(directorInput())).toContain("conversation");
+    expect(directorPrompt(directorInput())).toContain("storyBeats");
   });
 
   it("keeps App Server conversation in the committed and public event", async () => {
@@ -154,6 +181,18 @@ describe("App Server Director conversation contract", () => {
     ]);
     expect(publicState.eventLog.at(-1)?.conversation).toEqual(
       publicState.lastEvent?.conversation,
+    );
+    expect(publicState.lastEvent?.storyBeats).toEqual([
+      { kind: "move", actor: "both", location: "ダイニングの食卓" },
+      { kind: "dialogue", actor: "haru", text: decision.dialogue },
+      { kind: "dialogue", actor: "aoi", text: decision.dialogue },
+      { kind: "move", actor: "both", location: "リビング" },
+      { kind: "action", actor: "both", action: "ソファに腰掛けて話す" },
+      { kind: "dialogue", actor: "haru", text: "APP_SERVER_CONVERSATION_HARU" },
+      { kind: "dialogue", actor: "aoi", text: "APP_SERVER_CONVERSATION_AOI" },
+    ]);
+    expect(publicState.eventLog.at(-1)?.storyBeats).toEqual(
+      publicState.lastEvent?.storyBeats,
     );
     expect(JSON.stringify(publicState)).not.toContain("PRIVATE_SUMMARY_MUST_NOT_BE_PUBLIC");
   });

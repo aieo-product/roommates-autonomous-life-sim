@@ -1,6 +1,7 @@
 import type {
   AgentDecision,
   CharacterState,
+  EventStoryBeat,
   GameEvent,
   GameState,
   Memory,
@@ -102,6 +103,37 @@ const normalizeConversation = (value: unknown): GameEvent["conversation"] => {
     return [{ speaker: speaker as "haru" | "aoi", text: line.trim().slice(0, 160) }];
   });
   return turns.length ? turns : undefined;
+};
+
+const normalizeStoryBeats = (value: unknown): GameEvent["storyBeats"] => {
+  if (!Array.isArray(value)) return undefined;
+  const beats = value.flatMap<EventStoryBeat>((item) => {
+    const source = record(item);
+    const kind = text(first(source.kind, source.type)).toLowerCase();
+    const actor = text(first(source.actor, source.character, source.person)).toLowerCase();
+    if (actor !== "haru" && actor !== "aoi" && actor !== "both") return [];
+
+    if (kind === "move") {
+      const location = optionalText(first(source.location, source.destination, source.place));
+      return location
+        ? [{ kind, actor, location: location.trim().slice(0, 48) } as const]
+        : [];
+    }
+    if (kind === "dialogue" && actor !== "both") {
+      const line = optionalText(first(source.text, source.dialogue, source.line, source.message));
+      return line
+        ? [{ kind, actor, text: line.trim().slice(0, 160) } as const]
+        : [];
+    }
+    if (kind === "action") {
+      const action = optionalText(first(source.action, source.text, source.description));
+      return action
+        ? [{ kind, actor, action: action.trim().slice(0, 160) } as const]
+        : [];
+    }
+    return [];
+  }).slice(0, 8);
+  return beats.length ? beats : undefined;
 };
 
 const normalizePhase = (value: unknown, fallback: Phase): Phase => {
@@ -343,6 +375,9 @@ const normalizeEvent = (
     aoiDialogue: optionalText(first(aoiDecision?.dialogue, merged.aoiDialogue, merged.aoi_dialogue)),
     conversation: normalizeConversation(
       first(merged.conversation, merged.eventConversation, merged.event_conversation),
+    ),
+    storyBeats: normalizeStoryBeats(
+      first(merged.storyBeats, merged.story_beats, merged.choreography),
     ),
     haruPublicReason: optionalText(first(haruDecision?.publicReason, merged.haruPublicReason)),
     aoiPublicReason: optionalText(first(aoiDecision?.publicReason, merged.aoiPublicReason)),
@@ -833,6 +868,7 @@ export const normalizeGameState = (
         haruDialogue: currentDetail.haruDialogue ?? lastLogged.haruDialogue,
         aoiDialogue: currentDetail.aoiDialogue ?? lastLogged.aoiDialogue,
         conversation: currentDetail.conversation ?? lastLogged.conversation,
+        storyBeats: currentDetail.storyBeats ?? lastLogged.storyBeats,
         haruPublicReason: currentDetail.haruPublicReason ?? lastLogged.haruPublicReason,
         aoiPublicReason: currentDetail.aoiPublicReason ?? lastLogged.aoiPublicReason,
         scene: currentDetail.scene ?? lastLogged.scene,

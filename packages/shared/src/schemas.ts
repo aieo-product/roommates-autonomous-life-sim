@@ -3,6 +3,10 @@ import {
   EVENT_CONVERSATION_MAX_LINES,
   EVENT_CONVERSATION_MIN_LINES,
   EVENT_CONVERSATION_TEXT_MAX_LENGTH,
+  EVENT_STORY_BEAT_CONTENT_MAX_LENGTH,
+  EVENT_STORY_BEAT_LOCATION_MAX_LENGTH,
+  EVENT_STORY_BEATS_MAX_LENGTH,
+  EVENT_STORY_BEATS_MIN_LENGTH,
   autonomousInvitations,
   autonomousParticipantModes,
   cueSafetyFlags,
@@ -11,6 +15,7 @@ import {
   eventCategories,
   phases,
   relationshipLabels,
+  storyBeatActors,
 } from "./domain.js";
 import { characterSettingsSchema } from "./personality.js";
 
@@ -349,6 +354,61 @@ export const eventConversationSchema = z
   .min(EVENT_CONVERSATION_MIN_LINES)
   .max(EVENT_CONVERSATION_MAX_LINES);
 
+const storyBeatActorSchema = z.enum(storyBeatActors);
+
+export const eventStoryBeatSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("move"),
+      actor: storyBeatActorSchema,
+      location: z.string().trim().min(1).max(EVENT_STORY_BEAT_LOCATION_MAX_LENGTH),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("dialogue"),
+      actor: z.enum(eventConversationSpeakers),
+      text: z.string().trim().min(1).max(EVENT_STORY_BEAT_CONTENT_MAX_LENGTH),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("action"),
+      actor: storyBeatActorSchema,
+      action: z.string().trim().min(1).max(EVENT_STORY_BEAT_CONTENT_MAX_LENGTH),
+    })
+    .strict(),
+]);
+
+export const eventStoryBeatsSchema = z
+  .array(eventStoryBeatSchema)
+  .min(EVENT_STORY_BEATS_MIN_LENGTH)
+  .max(EVENT_STORY_BEATS_MAX_LENGTH)
+  .superRefine((beats, context) => {
+    const stagedAction = beats.findIndex((beat, index) => {
+      if (beat.kind !== "action") return false;
+      const before = beats.slice(0, index);
+      const after = beats.slice(index + 1);
+      const moved = beat.actor === "both"
+        ? before.some((prior) => prior.kind === "move" && prior.actor === "both")
+          || (["haru", "aoi"] as const).every((actor) =>
+            before.some((prior) => prior.kind === "move" && prior.actor === actor))
+        : before.some((prior) =>
+          prior.kind === "move" && (prior.actor === beat.actor || prior.actor === "both"));
+      const spokeBefore = before.some((prior) =>
+        prior.kind === "dialogue" && (beat.actor === "both" || prior.actor === beat.actor));
+      const spokeAfter = after.some((later) =>
+        later.kind === "dialogue" && (beat.actor === "both" || later.actor === beat.actor));
+      return moved && spokeBefore && spokeAfter;
+    });
+    if (stagedAction === -1) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "storyBeats must stage a move, dialogue, action, and follow-up dialogue in order",
+      });
+    }
+  });
+
 export const resolvedEventSchema = z
   .object({
     eventTitle: text,
@@ -357,6 +417,7 @@ export const resolvedEventSchema = z
     haruDialogue: z.string().max(2_000),
     aoiDialogue: z.string().max(2_000),
     conversation: eventConversationSchema.optional(),
+    storyBeats: eventStoryBeatsSchema.optional(),
     effects: z.object({ haru: statDeltaSchema, aoi: statDeltaSchema }).strict(),
     memory: z
       .object({
@@ -377,6 +438,7 @@ export const resolvedEventSchema = z
 /** AI Director output requires the new exchange; persisted legacy events do not. */
 export const directorResolvedEventSchema = resolvedEventSchema.extend({
   conversation: eventConversationSchema,
+  storyBeats: eventStoryBeatsSchema,
 });
 
 export const characterStateSchema = z.object({
@@ -455,6 +517,7 @@ export const eventLogEntrySchema = z
     haruDialogue: z.string().max(2_000).optional(),
     aoiDialogue: z.string().max(2_000).optional(),
     conversation: eventConversationSchema.optional(),
+    storyBeats: eventStoryBeatsSchema.optional(),
     haruPublicReason: z.string().max(2_000).optional(),
     aoiPublicReason: z.string().max(2_000).optional(),
     scene: z.object({ haru: text.optional(), aoi: text.optional() }).strict().optional(),

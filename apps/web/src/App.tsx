@@ -59,12 +59,11 @@ import { useCharacterSettings } from "./personality/useCharacterSettings";
 type InspectorTab = "status" | "schedule" | "memories";
 type StageStatus = "waiting" | "active" | "complete";
 type LogFilter = "all" | "haru" | "aoi" | "event";
-type AfterScenePhase = "placing" | "moving" | "talking" | "settled";
 
 type AfterScenePlayback = {
   plan: AfterScenePlan;
-  phase: AfterScenePhase;
-  lineIndex: number;
+  /** -1 places residents at the turn snapshot; beats.length means settled. */
+  beatIndex: number;
 };
 
 type TurnStages = {
@@ -332,7 +331,9 @@ function SceneCharacter({
   moving,
   travelling,
   conversing,
+  acting,
   dialogue,
+  action,
   onSelect,
 }: {
   person: CharacterId;
@@ -344,14 +345,16 @@ function SceneCharacter({
   moving: boolean;
   travelling: boolean;
   conversing: boolean;
+  acting: boolean;
   dialogue?: string;
+  action?: string;
   onSelect: () => void;
 }) {
   const bubbleX = point.x > 950 || person === "haru" ? -216 : 38;
   const activate = () => onSelect();
   return (
     <g
-      className={`scene-character scene-${person} ${selected ? "is-selected" : ""} ${thinking ? "is-thinking" : ""} ${moving ? "is-moving" : ""} ${travelling ? "is-travelling" : ""} ${conversing ? "is-conversing" : ""}`}
+      className={`scene-character scene-${person} ${selected ? "is-selected" : ""} ${thinking ? "is-thinking" : ""} ${moving ? "is-moving" : ""} ${travelling ? "is-travelling" : ""} ${conversing ? "is-conversing" : ""} ${acting ? "is-acting" : ""}`}
       style={{ transform: `translate(${point.x}px, ${point.y}px)` }}
       role="button"
       tabIndex={0}
@@ -369,7 +372,7 @@ function SceneCharacter({
       <ellipse className="character-shadow" cx="0" cy="18" rx="21" ry="9" />
       <g className="character-sprite">
         <foreignObject x="-32" y="-41" width="64" height="64" className="resident-sprite-object">
-          <ResidentSceneSprite person={person} direction={direction} moving={moving || thinking} />
+          <ResidentSceneSprite person={person} direction={direction} moving={moving} />
         </foreignObject>
       </g>
       <foreignObject x="-45" y="28" width="90" height="30" className="nameplate-object">
@@ -384,11 +387,11 @@ function SceneCharacter({
           </div>
         </foreignObject>
       )}
-      {!thinking && dialogue && (
+      {!thinking && (dialogue || action) && (
         <foreignObject x={bubbleX} y="-142" width="208" height="94" className="speech-object">
-          <div className={`scene-speech speech-${person}`} aria-live={conversing ? "polite" : undefined}>
-            <small>{name}</small>
-            <p>{clipText(dialogue, 46)}</p>
+          <div className={`scene-speech speech-${person} ${action ? "is-action" : ""}`} aria-live={conversing || acting ? "polite" : undefined}>
+            <small>{action ? "ACTION" : name}</small>
+            <p>{clipText(action || dialogue || "", 46)}</p>
           </div>
         </foreignObject>
       )}
@@ -403,6 +406,7 @@ function ApartmentStage({
   selectedPerson,
   currentEvent,
   afterScene,
+  turnStart,
   resolving,
   onSelectPerson,
 }: {
@@ -412,35 +416,67 @@ function ApartmentStage({
   selectedPerson: CharacterId;
   currentEvent?: GameEvent;
   afterScene?: AfterScenePlayback;
+  turnStart?: Partial<Record<CharacterId, CharacterState>>;
   resolving: boolean;
   onSelectPerson: (person: CharacterId) => void;
 }) {
-  const eventRoom = game.status === "resolved" || game.status === "ended"
-    ? roomForEvent(currentEvent)
+  const playback = afterScene?.plan.eventId === currentEvent?.id ? afterScene : undefined;
+  const activeBeat = playback && playback.beatIndex >= 0
+    ? playback.plan.beats[playback.beatIndex]
     : undefined;
-  const selectedRoom = roomForLocation(game[selectedPerson].location, selectedPerson);
+  const beatFocusPerson = activeBeat?.actor === "aoi" ? "aoi" : "haru";
+  const beatRoom = activeBeat?.focusLocation
+    ? roomForLocation(activeBeat.focusLocation, beatFocusPerson)
+    : undefined;
+  const playbackStartLocation = turnStart?.[selectedPerson]?.location
+    ?? currentEvent?.before?.characters[selectedPerson]?.location;
+  const playbackStartRoom = playback?.beatIndex === -1 && playbackStartLocation
+    ? roomForLocation(playbackStartLocation, selectedPerson)
+    : undefined;
+  const eventRoom = beatRoom ?? playbackStartRoom ?? (
+    game.status === "resolved" || game.status === "ended"
+      ? roomForEvent(currentEvent)
+      : undefined
+  );
+  const selectedLocation = turnStart?.[selectedPerson]?.location
+    ?? game[selectedPerson].location;
+  const selectedRoom = roomForLocation(selectedLocation, selectedPerson);
   const focusRoom = eventRoom ?? selectedRoom;
   const focusPoint = focusPointForRoom(focusRoom);
   // Event focus changes only the camera/lighting. Character placement always
   // follows the resolved world state, including decline and split-room cases.
-  const playback = afterScene?.plan.eventId === currentEvent?.id ? afterScene : undefined;
-  const activeTurn = playback && playback.lineIndex >= 0
-    ? playback.plan.conversation[playback.lineIndex]
-    : undefined;
-  const pointFor = (person: CharacterId): Point => playback?.phase === "placing"
-    ? playback.plan.routes[person].start
-    : playback?.plan.routes[person].end ?? characterAnchor(person, game[person]);
-  const dialogueFor = (person: CharacterId): string | undefined => {
+  const pointFor = (person: CharacterId): Point => {
     if (!playback) {
+      // Keep the pre-turn pose through React's completion batching. The ref is
+      // cleared only when the ordered playback has been installed.
+      const state = turnStart?.[person];
+      return characterAnchor(person, state ?? game[person]);
+    }
+    if (playback.beatIndex < 0) return playback.plan.initialPoints[person];
+    return activeBeat?.points[person] ?? playback.plan.finalPoints[person];
+  };
+  const dialogueFor = (person: CharacterId): string | undefined => {
+    if (!playback || resolving) {
+      if (resolving) return undefined;
       return game.decisions[person]?.dialogue
         ?? (person === "haru" ? currentEvent?.haruDialogue : currentEvent?.aoiDialogue);
     }
-    if (playback.phase === "placing" || playback.phase === "moving") return undefined;
-    return activeTurn?.speaker === person ? activeTurn.text : undefined;
+    return activeBeat?.kind === "dialogue" && activeBeat.actor === person
+      ? activeBeat.text
+      : undefined;
   };
-  const directionFor = (person: CharacterId): SpriteDirection =>
-    playback?.plan.routes[person].direction ?? "south";
-  const isMoving = playback?.phase === "moving";
+  const directionFor = (person: CharacterId): SpriteDirection => {
+    if (!playback) return "south";
+    return activeBeat?.directions[person] ?? playback.plan.finalDirections[person];
+  };
+  const actorIncludes = (person: CharacterId): boolean =>
+    activeBeat?.actor === "both" || activeBeat?.actor === person;
+  const isMoving = (person: CharacterId): boolean =>
+    activeBeat?.kind === "move" && actorIncludes(person) && activeBeat.routes[person].hasTravel;
+  const isActing = (person: CharacterId): boolean =>
+    activeBeat?.kind === "action" && actorIncludes(person);
+  const actionFor = (person: CharacterId): string | undefined =>
+    isActing(person) && activeBeat?.kind === "action" ? activeBeat.action : undefined;
 
   return (
     <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""}`}>
@@ -495,8 +531,8 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" name={people.haru.name} point={pointFor("haru")} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={Boolean(isMoving)} travelling={Boolean(isMoving && playback?.plan.routes.haru.hasTravel)} conversing={activeTurn?.speaker === "haru"} dialogue={dialogueFor("haru")} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" name={people.aoi.name} point={pointFor("aoi")} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={Boolean(isMoving)} travelling={Boolean(isMoving && playback?.plan.routes.aoi.hasTravel)} conversing={activeTurn?.speaker === "aoi"} dialogue={dialogueFor("aoi")} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" name={people.haru.name} point={pointFor("haru")} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={isMoving("haru")} travelling={isMoving("haru")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "haru"} acting={isActing("haru")} dialogue={dialogueFor("haru")} action={actionFor("haru")} onSelect={() => onSelectPerson("haru")} />
+            <SceneCharacter person="aoi" name={people.aoi.name} point={pointFor("aoi")} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={isMoving("aoi")} travelling={isMoving("aoi")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "aoi"} acting={isActing("aoi")} dialogue={dialogueFor("aoi")} action={actionFor("aoi")} onSelect={() => onSelectPerson("aoi")} />
           </g>
         </g>
       </svg>
@@ -1163,36 +1199,33 @@ export default function App() {
       return;
     }
 
-    const activeLine = afterScene.plan.conversation[afterScene.lineIndex];
-    const delay = afterScene.phase === "placing"
+    const activeBeat = afterScene.beatIndex >= 0
+      ? afterScene.plan.beats[afterScene.beatIndex]
+      : undefined;
+    const delay = afterScene.beatIndex < 0
       ? 80
-      : afterScene.phase === "moving"
-        ? reducedMotion
-          ? 80
-          : Object.values(afterScene.plan.routes).some((route) => route.hasTravel)
-            ? 1_650
-            : 850
-        : afterScene.phase === "talking"
-          ? Math.min(3_400, Math.max(2_100, (activeLine?.text.length ?? 0) * 70))
-          : null;
+      : !activeBeat
+        ? null
+        : activeBeat.kind === "move"
+          ? reducedMotion
+            ? 80
+            : Object.values(activeBeat.routes).some((route) => route.hasTravel)
+              ? 1_650
+              : 450
+          : activeBeat.kind === "dialogue"
+            ? Math.min(3_400, Math.max(2_100, activeBeat.text.length * 70))
+            : reducedMotion
+              ? 500
+              : Math.min(2_800, Math.max(1_500, activeBeat.action.length * 45));
     if (delay === null) return;
 
     const timer = window.setTimeout(() => {
       setAfterScene((current) => {
         if (!current || current.plan.eventId !== afterScene.plan.eventId) return current;
-        if (current.phase === "placing") return { ...current, phase: "moving" };
-        if (current.phase === "moving") {
-          return current.plan.conversation.length
-            ? { ...current, phase: "talking", lineIndex: 0 }
-            : { ...current, phase: "settled", lineIndex: -1 };
-        }
-        if (current.phase === "talking") {
-          const nextLine = current.lineIndex + 1;
-          return nextLine < current.plan.conversation.length
-            ? { ...current, lineIndex: nextLine }
-            : { ...current, phase: "settled" };
-        }
-        return current;
+        return {
+          ...current,
+          beatIndex: Math.min(current.beatIndex + 1, current.plan.beats.length),
+        };
       });
     }, delay);
     return () => window.clearTimeout(timer);
@@ -1261,8 +1294,8 @@ export default function App() {
     if (normalizedType === "agent.thinking") {
       setStages((previous) => ({
         ...previous,
-        ...(agent === "haru" ? { navigator: "complete" as const, haru: "active" as const } : {}),
-        ...(agent === "aoi" ? { navigator: "complete" as const, haru: previous.haru === "waiting" ? "active" as const : previous.haru, aoi: "active" as const } : {}),
+        ...(agent === "haru" ? { haru: "active" as const } : {}),
+        ...(agent === "aoi" ? { aoi: "active" as const } : {}),
       }));
     }
     if (
@@ -1275,14 +1308,9 @@ export default function App() {
     if (normalizedType === "agent.completed") {
       setStages((previous) => ({
         ...previous,
-        ...(agent === "haru" ? { haru: "complete" as const, aoi: previous.aoi === "waiting" ? "active" as const : previous.aoi } : {}),
+        ...(agent === "haru" ? { haru: "complete" as const } : {}),
         ...(agent === "aoi" ? { aoi: "complete" as const } : {}),
       }));
-      const decision = record(payload);
-      if (agent === "haru" || agent === "aoi") {
-        const maybeDecision = (Object.keys(record(decision.decision)).length ? decision.decision : payload) as unknown;
-        setGame((previous) => normalizeGameState({ characters: { [agent]: { lastDecision: maybeDecision } } }, previous));
-      }
     }
     if (
       normalizedType === "navigator.completed"
@@ -1310,12 +1338,19 @@ export default function App() {
       setStages((previous) => ({ ...previous, navigator: "complete" }));
     }
     if (normalizedType === "director.resolving" || normalizedType === "director.completed") {
-      setStages({ navigator: "complete", haru: "complete", aoi: "complete", director: normalizedType === "director.completed" ? "complete" : "active" });
+      setStages((previous) => ({
+        ...previous,
+        director: normalizedType === "director.completed" ? "complete" : "active",
+      }));
     }
     if (normalizedType === "turn.completed") setStages({ navigator: "complete", haru: "complete", aoi: "complete", director: "complete" });
     if (normalizedType === "warning") setNotice(displayMessage || "一部のエージェントがモックへ切り替わりました");
     if (normalizedType === "error") setNotice(displayMessage || "ターン処理でエラーが発生しました");
-    if (Object.keys(record(payload)).length) setGame((previous) => normalizeGameState(payload, previous));
+    // Intermediate agent/director payloads are progress only. The committed
+    // turn is the sole authority for positions, dialogue, and choreography.
+    if (normalizedType === "turn.completed" && Object.keys(record(payload)).length) {
+      setGame((previous) => normalizeGameState(payload, previous));
+    }
   }, []);
 
   const submitSuggestion = async (value?: string) => {
@@ -1501,8 +1536,7 @@ export default function App() {
     playedAfterSceneIdsRef.current.add(event.id);
     setAfterScene({
       plan: createAfterScenePlan(event, game, turnStartStatesRef.current),
-      phase: "placing",
-      lineIndex: -1,
+      beatIndex: -1,
     });
     turnStartStatesRef.current = undefined;
   }, [game]);
@@ -1519,8 +1553,10 @@ export default function App() {
       if (game.status === "awaiting_suggestion") presentedEventIdRef.current = null;
       return;
     }
-    // Navigator acknowledgement can arrive before the event is committed.
-    if (resolving || (game.status !== "resolved" && game.status !== "ended")) return;
+    // Intermediate acknowledgements arrive before the committed event. Once
+    // turn.completed supplies it, install the initial pose while `resolving`
+    // still blocks playback so the final position never flashes first.
+    if (game.status !== "resolved" && game.status !== "ended") return;
     if (presentedEventIdRef.current === latestId) return;
     presentedEventIdRef.current = latestId;
     const submittedSuggestion = submittedSuggestionRef.current;
@@ -1642,7 +1678,7 @@ export default function App() {
       <main id="game" className="game-layout" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
           <div className="world-stage-wrap">
-            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} resolving={resolving} onSelectPerson={selectCharacter} />
+            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} resolving={resolving} onSelectPerson={selectCharacter} />
             <div className="resident-hud" aria-label="住人の状態">
               <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
               <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />

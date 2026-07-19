@@ -58,6 +58,41 @@ const statDelta = {
   additionalProperties: false,
 };
 
+const storyBeat = {
+  anyOf: [
+    {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["move"] },
+        actor: { type: "string", enum: ["haru", "aoi", "both"] },
+        location: { type: "string", minLength: 1, maxLength: 48 },
+      },
+      required: ["kind", "actor", "location"],
+      additionalProperties: false,
+    },
+    {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["dialogue"] },
+        actor: { type: "string", enum: ["haru", "aoi"] },
+        text: { type: "string", minLength: 1, maxLength: 160 },
+      },
+      required: ["kind", "actor", "text"],
+      additionalProperties: false,
+    },
+    {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["action"] },
+        actor: { type: "string", enum: ["haru", "aoi", "both"] },
+        action: { type: "string", minLength: 1, maxLength: 160 },
+      },
+      required: ["kind", "actor", "action"],
+      additionalProperties: false,
+    },
+  ],
+};
+
 export const navigatorOutputSchema = {
   type: "object",
   properties: {
@@ -112,6 +147,12 @@ export const directorOutputSchema = {
         additionalProperties: false,
       },
     },
+    storyBeats: {
+      type: "array",
+      minItems: 4,
+      maxItems: 8,
+      items: storyBeat,
+    },
     effects: {
       type: "object",
       properties: { haru: statDelta, aoi: statDelta },
@@ -151,6 +192,7 @@ export const directorOutputSchema = {
     "haruDialogue",
     "aoiDialogue",
     "conversation",
+    "storyBeats",
     "effects",
     "memory",
     "scene",

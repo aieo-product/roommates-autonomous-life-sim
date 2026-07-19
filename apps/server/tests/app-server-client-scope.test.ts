@@ -20,13 +20,16 @@ type ClientInternals = {
   start: () => Promise<void>;
   request: (method: string, params: unknown) => Promise<unknown>;
   turn: (threadId: string, text: string, outputSchema: unknown) => Promise<unknown>;
-  thread: (scope: string, role: "navigator" | "haru") => Promise<string>;
+  thread: (
+    scope: string,
+    role: "navigator" | "haru" | "aoi" | "director" | "haru-reflection" | "aoi-reflection",
+  ) => Promise<string>;
 };
 
 function stubAppServer(client: CodexAppServerClient) {
   const internals = client as unknown as ClientInternals;
   let nextThread = 0;
-  const request = vi.fn(async (method: string) => {
+  const request = vi.fn(async (method: string, _params: unknown) => {
     if (method === "thread/start") {
       nextThread += 1;
       return { thread: { id: `thread-${nextThread}` } };
@@ -204,6 +207,86 @@ describe("CodexAppServerClient session scopes", () => {
     expect(
       () => new CodexAppServerClient("codex", "/tmp", { sessionScopeTtlMs: 0 }),
     ).toThrow("sessionScopeTtlMs");
+  });
+
+  it("applies fast and deliberate model settings to every corresponding role", async () => {
+    const client = new CodexAppServerClient("codex", "/tmp", {
+      modelPolicy: {
+        model: "gpt-5.6-terra",
+        fastReasoningEffort: "low",
+        deliberateReasoningEffort: "medium",
+      },
+    });
+    const { internals, request } = stubAppServer(client);
+
+    for (const role of ["navigator", "haru", "aoi"] as const) {
+      await internals.thread("default", role);
+    }
+    for (const role of ["director", "haru-reflection", "aoi-reflection"] as const) {
+      await internals.thread("default", role);
+    }
+
+    const starts = request.mock.calls.filter(([method]) => method === "thread/start");
+    expect(starts).toHaveLength(6);
+    for (const [, params] of starts.slice(0, 3)) {
+      expect(params).toMatchObject({
+        model: "gpt-5.6-terra",
+        config: { model_reasoning_effort: "low" },
+      });
+    }
+    for (const [, params] of starts.slice(3)) {
+      expect(params).toMatchObject({
+        model: "gpt-5.6-terra",
+        config: { model_reasoning_effort: "medium" },
+      });
+    }
+  });
+
+  it("omits model settings when no model policy is configured", async () => {
+    const client = new CodexAppServerClient("codex", "/tmp");
+    const { internals, request } = stubAppServer(client);
+
+    await internals.thread("default", "navigator");
+
+    const [, params] = request.mock.calls.find(([method]) => method === "thread/start")!;
+    expect(params).not.toHaveProperty("model");
+    expect(params).not.toHaveProperty("config.model_reasoning_effort");
+  });
+
+  it("validates configured model policies", () => {
+    const policy = {
+      model: "gpt-5.6-terra",
+      fastReasoningEffort: "low" as const,
+      deliberateReasoningEffort: "medium" as const,
+    };
+
+    expect(
+      () => new CodexAppServerClient("codex", "/tmp", { modelPolicy: { ...policy, model: " " } }),
+    ).toThrow("modelPolicy.model");
+    expect(
+      () =>
+        new CodexAppServerClient("codex", "/tmp", {
+          modelPolicy: { ...policy, model: "m".repeat(129) },
+        }),
+    ).toThrow("modelPolicy.model");
+    expect(
+      () =>
+        new CodexAppServerClient("codex", "/tmp", {
+          modelPolicy: { ...policy, fastReasoningEffort: "turbo" as "low" },
+        }),
+    ).toThrow("modelPolicy.fastReasoningEffort");
+    expect(
+      () =>
+        new CodexAppServerClient("codex", "/tmp", {
+          modelPolicy: { ...policy, deliberateReasoningEffort: "turbo" as "medium" },
+        }),
+    ).toThrow("modelPolicy.deliberateReasoningEffort");
+    expect(
+      () =>
+        new CodexAppServerClient("codex", "/tmp", {
+          modelPolicy: { ...policy, model: ` ${"m".repeat(128)} ` },
+        }),
+    ).not.toThrow();
   });
 
   it("exposes readiness and clears cached thread IDs when the owner shuts down", async () => {
