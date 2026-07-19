@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createInitialGameState,
   eventDefinitionSchema,
+  eventStoryBeatsSchema,
   safeSuggestionSchema,
   type AutonomousActionCandidate,
   type CharacterDecision,
@@ -230,16 +231,28 @@ describe("autonomous event composer", () => {
 
     const extremeDraft: ResolvedEvent = {
       eventTitle: "Director title",
-      narration: "Director narration",
-      haruDialogue: "Haru",
-      aoiDialogue: "Aoi",
+      narration: "候補外の共同イベントを始めた。",
+      haruDialogue: "候補外の共同作業をしよう。",
+      aoiDialogue: "候補外の共同作業に賛成。",
+      conversation: [
+        { speaker: "haru", text: "候補外の共同作業をしよう。" },
+        { speaker: "aoi", text: "候補外の共同作業に賛成。" },
+        { speaker: "haru", text: "二人で一緒に続けよう。" },
+        { speaker: "aoi", text: "共同作業を続けよう。" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "both", location: "候補外の秘密の場所" },
+        { kind: "dialogue", actor: "haru", text: "Haruは自分の案を選ぶ。" },
+        { kind: "action", actor: "both", action: "候補外の共同作業をする" },
+        { kind: "dialogue", actor: "aoi", text: "Aoiも自分の案を選ぶ。" },
+      ],
       effects: {
         haru: { energy: 100, stress: -100, affection: 100, trust: 100 },
         aoi: { energy: -100, stress: 100, affection: 100, trust: 100 },
       },
       memory: {
         title: "Director memory",
-        summary: "summary",
+        summary: "候補外の共同イベントの思い出",
         emotionalImpact: 5,
         importance: 5,
       },
@@ -268,6 +281,38 @@ describe("autonomous event composer", () => {
     expect(constrained.memory.emotionalImpact).toBeLessThanOrEqual(2);
     expect(constrained.memory.importance).toBeLessThanOrEqual(4);
     expect(constrained.conflictUpdate).toBeUndefined();
+    expect(constrained.narration).toContain("それぞれのペースで別々に");
+    expect(constrained.memory.summary).toBe(constrained.narration);
+    expect(constrained.conversation).toEqual([
+      { speaker: "haru", text: initiate(haruCandidate).dialogue },
+      { speaker: "aoi", text: initiate(aoiCandidate).dialogue },
+      { speaker: "haru", text: "こちらはこのまま自分のペースで続けよう。" },
+      { speaker: "aoi", text: "私もこちらを自分のペースで続けよう。" },
+    ]);
+    expect(eventStoryBeatsSchema.parse(constrained.storyBeats)).toEqual(
+      constrained.storyBeats,
+    );
+    expect(constrained.storyBeats).toHaveLength(8);
+    expect(constrained.storyBeats?.some((beat) => beat.actor === "both")).toBe(
+      false,
+    );
+    expect(
+      constrained.storyBeats
+        ?.filter((beat) => beat.kind === "move")
+        .map((beat) => [beat.actor, beat.location]),
+    ).toEqual([
+      ["haru", haruCandidate.location],
+      ["aoi", aoiCandidate.location],
+    ]);
+    expect(
+      constrained.storyBeats
+        ?.filter((beat) => beat.kind === "action")
+        .map((beat) => [beat.actor, beat.action]),
+    ).toEqual([
+      ["haru", haruCandidate.publicIntent.slice(0, 160).trim()],
+      ["aoi", aoiCandidate.publicIntent.slice(0, 160).trim()],
+    ]);
+    expect(JSON.stringify(constrained)).not.toContain("候補外");
   });
 
   it("rejects IDs, public intent, state constraints, and transformed observes that were not authorized", () => {

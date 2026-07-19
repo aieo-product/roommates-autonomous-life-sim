@@ -3,7 +3,9 @@ import type {
   AutonomousInvitation,
   CharacterDecision,
   CharacterId,
+  EventConversationLine,
   EventDefinition,
+  EventStoryBeat,
   GameSnapshot,
   ResolvedEvent,
   SafeSuggestion,
@@ -20,6 +22,7 @@ export type ValidatedAutonomousSelection = {
   characterId: CharacterId;
   candidate: AutonomousActionCandidate;
   invitation: AutonomousInvitation;
+  dialogue: string;
 };
 
 export type AutonomousEventPlan = {
@@ -88,7 +91,12 @@ function validateSelection(
     return undefined;
   }
 
-  return { characterId, candidate, invitation: initiative.invitation };
+  return {
+    characterId,
+    candidate,
+    invitation: initiative.invitation,
+    dialogue: decision.dialogue,
+  };
 }
 
 function semanticCandidateId(candidate: AutonomousActionCandidate): string {
@@ -407,5 +415,118 @@ export function finalizeAutonomousResolvedEvent(
           romanticAwareness: 0,
         };
   }
-  return { ...event, effects };
+  const parallel =
+    plan.mode === "parallel" ? buildParallelPresentation(plan) : undefined;
+  return {
+    ...event,
+    effects,
+    ...(parallel
+      ? {
+          narration: parallel.narration,
+          haruDialogue: parallel.haruDialogue,
+          aoiDialogue: parallel.aoiDialogue,
+          conversation: parallel.conversation,
+          storyBeats: parallel.storyBeats,
+          memory: {
+            ...event.memory,
+            summary: parallel.narration,
+          },
+        }
+      : {}),
+  };
+}
+
+function boundedStoryText(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim().slice(0, 160).trim();
+  return normalized || fallback;
+}
+
+function boundedEventText(value: string, fallback: string): string {
+  const normalized = value.trim().slice(0, 2_000).trim();
+  return normalized || fallback;
+}
+
+function boundedStoryLocation(value: string): string {
+  return value.trim().slice(0, 48).trim();
+}
+
+/**
+ * A parallel plan represents two independent initiatives, even when both
+ * characters happen to choose the same activity or room. Rebuild its public
+ * presentation from the validated selections after the common event policy so
+ * Director prose cannot turn it back into a shared action or add a new place.
+ */
+function buildParallelPresentation(
+  plan: AutonomousEventPlan,
+): {
+  narration: string;
+  haruDialogue: string;
+  aoiDialogue: string;
+  conversation: EventConversationLine[];
+  storyBeats: EventStoryBeat[];
+} {
+  const haru = plan.selections.find(
+    (selection) => selection.characterId === "haru",
+  )!;
+  const aoi = plan.selections.find(
+    (selection) => selection.characterId === "aoi",
+  )!;
+  const openings = {
+    haru: boundedStoryText(haru.dialogue, "自分のペースで始めよう。"),
+    aoi: boundedStoryText(aoi.dialogue, "私も自分のペースでやってみよう。"),
+  };
+  const followUps = {
+    haru: "こちらはこのまま自分のペースで続けよう。",
+    aoi: "私もこちらを自分のペースで続けよう。",
+  };
+  const conversation: EventConversationLine[] = [
+    { speaker: "haru", text: openings.haru },
+    { speaker: "aoi", text: openings.aoi },
+    { speaker: "haru", text: followUps.haru },
+    { speaker: "aoi", text: followUps.aoi },
+  ];
+  const beats: EventStoryBeat[] = [];
+  for (const characterId of CHARACTER_IDS) {
+    const selection = plan.selections.find(
+      (item) => item.characterId === characterId,
+    );
+    if (!selection) continue;
+
+    beats.push(
+      {
+        kind: "move",
+        actor: characterId,
+        location: boundedStoryLocation(selection.candidate.location),
+      },
+      { kind: "dialogue", actor: characterId, text: openings[characterId] },
+      {
+        kind: "action",
+        actor: characterId,
+        action: boundedStoryText(
+          selection.candidate.publicIntent,
+          selection.candidate.title,
+        ),
+      },
+      { kind: "dialogue", actor: characterId, text: followUps[characterId] },
+    );
+  }
+  const narration = boundedEventText(
+    "Haruは「" +
+      haru.candidate.title +
+      "」を選び、" +
+      haru.candidate.publicIntent +
+      " 一方、Aoiは「" +
+      aoi.candidate.title +
+      "」を選び、" +
+      aoi.candidate.publicIntent +
+      " 二人は相手の選択を邪魔せず、それぞれのペースで別々に過ごした。",
+    "二人は相手の選択を邪魔せず、それぞれのペースで別々に過ごした。",
+  );
+  return {
+    narration,
+    haruDialogue: openings.haru,
+    aoiDialogue: openings.aoi,
+    conversation,
+    storyBeats: beats,
+  };
 }
