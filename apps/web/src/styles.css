@@ -2578,3 +2578,320 @@ a:focus-visible,
   .personality-comparison-head,
   .personality-comparison-row { grid-template-columns: minmax(0,1fr) 90px minmax(0,1fr); gap: 7px; }
 }
+
+/* Smartphone layout ------------------------------------------------------ */
+@media (max-width: 700px) {
+  html,
+  body,
+  #root {
+    min-width: 0;
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .app {
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) 88px 66px;
+    grid-template-areas:
+      "brand relationship memory"
+      "phase phase phase"
+      "meta meta meta";
+    align-items: stretch;
+  }
+
+  .brand {
+    grid-area: brand;
+    gap: 7px;
+    min-height: 58px;
+    padding: 8px 7px 5px;
+    border-right-width: 2px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 38px;
+    border-width: 2px;
+  }
+
+  .brand strong { font-size: 15px; letter-spacing: .7px; }
+  .brand small { margin-top: 4px; font-size: 6px; letter-spacing: .65px; }
+
+  .day-phase {
+    grid-area: phase;
+    justify-content: stretch;
+    gap: 7px;
+    min-height: 54px;
+    padding: 5px 7px;
+    border-top: 2px solid rgba(34,48,76,.4);
+    border-right: 0;
+  }
+
+  .day-number strong { font-size: 27px; }
+  .day-number span { font-size: 8px; }
+  .day-number small { font-size: 8px; }
+  .phase-rail { min-width: 0; flex: 1; }
+  .phase-node {
+    min-width: 0;
+    height: 42px;
+    flex: 1 1 0;
+    grid-template-columns: 22px minmax(0, 1fr);
+    padding: 3px;
+  }
+  .phase-node span { width: 21px; height: 21px; font-size: 10px; }
+  .phase-node small { font-size: 8px; text-align: center; }
+
+  .relationship-status { grid-area: relationship; }
+  .topbar > .header-stat:not(.relationship-status) { grid-area: memory; }
+  .header-stat,
+  .relationship-status {
+    min-width: 0;
+    padding: 4px;
+    border-right-width: 2px;
+  }
+  .header-stat small { font-size: 6px; letter-spacing: .45px; }
+  .header-stat strong { font-size: 12px; white-space: normal; }
+  .relationship-status strong span { margin-right: 2px; }
+
+  .header-meta {
+    grid-area: meta;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+    border-top: 2px solid rgba(34,48,76,.4);
+  }
+
+  .runtime-badge,
+  .header-log-button,
+  .reset-button,
+  .personality-open-button {
+    min-height: 44px;
+    height: 44px;
+  }
+  .runtime-badge { padding-inline: 6px; }
+  .header-log-button,
+  .personality-open-button { padding-inline: 8px; font-size: 10px; }
+  .reset-button { width: 44px; }
+
+  .game-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+    padding: 7px;
+    overflow: visible;
+  }
+
+  .world-column {
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+
+  .world-stage-wrap {
+    height: clamp(300px, 82vw, 350px);
+    min-height: 300px;
+  }
+
+  .apartment-stage svg {
+    transform: scale(1.28);
+    transform-origin: center;
+  }
+
+  .stage-caption {
+    top: 7px;
+    right: 7px;
+    max-width: calc(100% - 178px);
+  }
+  .stage-caption small,
+  .camera-note { display: none; }
+
+  .resident-hud {
+    top: 8px;
+    left: 8px;
+    width: 160px;
+    gap: 4px;
+  }
+  .resident-chip {
+    height: 56px;
+    grid-template-columns: 43px minmax(0, 1fr) 12px;
+    gap: 5px;
+    padding: 4px;
+    border-width: 2px;
+    box-shadow: 2px 2px 0 rgba(31,48,64,.26);
+  }
+  .resident-chip .pixel-portrait { width: 42px; height: 42px; border-width: 2px; }
+  .resident-chip-copy strong { font-size: 12px; }
+  .resident-chip-copy small { font-size: 7px; }
+  .resident-chip-copy > b { font-size: 8px; }
+  .resident-cue { font-size: 16px; }
+
+  .resolution-progress {
+    top: 126px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    transform: none;
+  }
+  .resolution-label { padding-inline: 4px; font-size: 7px; }
+  .progress-step b { display: none; }
+
+  .event-card {
+    left: 8px;
+    bottom: 8px;
+    width: calc(100% - 16px);
+    grid-template-columns: 46px minmax(0,1fr);
+    gap: 7px;
+    padding: 7px;
+    border-width: 2px;
+    box-shadow: 3px 3px 0 rgba(30,46,62,.28);
+  }
+  .event-card.is-fresh { min-height: 104px; }
+  .event-icon { width: 43px; height: 43px; border-width: 2px; }
+  .event-card h2 { font-size: 14px; }
+  .event-card p { font-size: 9px; }
+  .event-card .event-dekopin-message { padding-right: 102px; }
+  .event-card-open {
+    min-width: 94px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 7px;
+  }
+
+  .interaction-dock { grid-template-rows: auto auto; }
+  .latest-log-strip {
+    min-height: 48px;
+    grid-template-columns: 48px 22px minmax(0,1fr);
+    gap: 5px;
+    padding: 4px 7px;
+  }
+  .latest-log-copy { display: grid; gap: 1px; }
+  .latest-log-copy b { max-width: 100%; }
+  .latest-log-copy em { display: none; }
+  .open-log-label { display: none; }
+
+  .producer-row {
+    grid-template-columns: minmax(0,1fr);
+    align-items: stretch;
+    gap: 8px;
+    padding: 9px;
+  }
+  .dekopin-guide { height: 76px; }
+  .preset-menu select { min-height: 44px; height: 44px; }
+  .suggestion-form {
+    height: auto;
+    grid-template-columns: minmax(0,1fr);
+  }
+  .suggestion-form textarea {
+    width: 100%;
+    height: 82px;
+    padding: 12px 10px 25px;
+  }
+  .character-count { top: 63px; right: 9px; bottom: auto; }
+  .submit-cue {
+    width: auto;
+    min-height: 44px;
+    margin: 4px;
+  }
+  .dock-actions {
+    grid-template-columns: minmax(0,1fr) 64px;
+    gap: 7px;
+  }
+  .dock-actions button { height: 44px; min-height: 44px; }
+  .advance-button { grid-column: 1 / -1; min-width: 0; }
+
+  .inspector-panel {
+    grid-template-rows: auto auto auto;
+    overflow: visible;
+  }
+  .inspector-tabs { min-height: 52px; }
+  .inspector-tabs button { min-height: 46px; }
+  .inspector-body { overflow: visible; }
+  .memory-list button { min-height: 44px; padding: 8px 0; }
+  .schedule-item { min-height: 44px; }
+
+  .log-drawer {
+    position: fixed;
+    z-index: 1000;
+    height: min(78dvh, 640px);
+    grid-template-rows: auto minmax(0,1fr);
+  }
+  .log-drawer > header {
+    grid-template-columns: minmax(0,1fr) 44px;
+    grid-template-areas:
+      "log-title log-close"
+      "log-filters log-filters";
+    gap: 6px;
+    padding: 7px;
+  }
+  .log-drawer > header > div:first-child { grid-area: log-title; }
+  .log-filters { grid-area: log-filters; }
+  .log-filters button { min-width: 0; min-height: 44px; height: 44px; flex: 1; padding-inline: 4px; }
+  .drawer-close { grid-area: log-close; width: 44px; height: 44px; }
+  .log-list { padding: 8px 7px 18px; }
+  .log-entry { grid-template-columns: 58px minmax(0,1fr); }
+  .log-time { padding-inline: 3px; }
+
+  .notice {
+    top: 7px;
+    width: calc(100% - 14px);
+    max-width: none;
+  }
+  .notice button { width: 44px; height: 44px; flex: 0 0 auto; }
+
+  .event-announcement-overlay,
+  .memory-article-overlay,
+  .personality-modal-backdrop { padding: 6px; }
+  .event-announcement-dialog,
+  .memory-article-modal,
+  .personality-modal { max-height: calc(100dvh - 12px); }
+  .event-announcement-close,
+  .memory-article-header > button,
+  .personality-close { width: 44px; height: 44px; }
+  .event-announcement-header { grid-template-columns: 46px minmax(0,1fr) 44px; }
+  .event-announcement-footer button { min-height: 44px; }
+
+  .memory-article-header { grid-template-columns: 68px minmax(0,1fr) 48px; }
+  .memory-article-date strong { font-size: 28px; }
+  .memory-article-header h2 { font-size: 17px; }
+  .memory-article-scene {
+    grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+    min-height: 180px;
+    padding: 18px 8px 24px;
+  }
+  .memory-character-columns { grid-template-columns: minmax(0,1fr); }
+
+  .ending-card { width: calc(100% - 16px); padding: 18px 12px; }
+  .ending-card button { min-height: 44px; }
+
+  .personality-modal-header { gap: 8px; padding: 11px 10px; }
+  .personality-modal-header h2 { font-size: 20px; }
+  .personality-modal-header p { font-size: 10px; }
+  .personality-tabs { padding-inline: 5px; }
+  .personality-tabs button { min-height: 44px; font-size: 11px; }
+  .personality-modal-body { padding: 9px; }
+  .personality-character-header > button,
+  .personality-modal-footer button,
+  .personality-tag-add,
+  .personality-profile-grid input,
+  .personality-profile-grid textarea,
+  .personality-tag-row input,
+  .personality-tag-row button { min-height: 44px; }
+  .personality-footer-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .personality-footer-actions button:last-child { grid-column: 1 / -1; }
+}

@@ -581,7 +581,7 @@ function EventCard({
   if (!event && !resolving) {
     return (
       <div className="event-card event-welcome">
-        <span className="event-icon">⌂</span>
+        <span className="event-icon" aria-hidden="true">⌂</span>
         <div><small>DAY 1 · NEW LIFE</small><h2>ふたりの生活を見守ろう</h2><p>命令ではなく、きっかけだけを届けられます。</p></div>
       </div>
     );
@@ -589,20 +589,20 @@ function EventCard({
   if (resolving) {
     return (
       <div className="event-card event-live">
-        <span className="event-icon">…</span>
+        <span className="event-icon" aria-hidden="true">…</span>
         <div><small>DEKOPIN · EVENT UPDATE</small><h2>デコピンが反映しています</h2><p>{clipText(lastSuggestion, 62)}</p></div>
       </div>
     );
   }
   return (
     <div className={`event-card event-result ${fresh ? "is-fresh" : ""}`}>
-      <span className="event-icon">★</span>
+      <span className="event-icon" aria-hidden="true">★</span>
       <div>
         <small>デコピンが反映したイベント · DAY {event?.day}</small>
         <h2>{event?.eventTitle}</h2>
         <p>{clipText(event?.narration ?? "", 74)}</p>
         {navigatorMessage && <p className="event-dekopin-message"><b>{DEKOPIN_NAME}</b>「{clipText(navigatorMessage, 64)}」</p>}
-        {event && onOpen && <button type="button" className="event-card-open" onClick={onOpen}>全文を読む <span aria-hidden="true">↗</span></button>}
+        {event && onOpen && <button type="button" className="event-card-open" onClick={onOpen} aria-haspopup="dialog" aria-label={`${event.eventTitle}の全文を読む`}>全文を読む <span aria-hidden="true">↗</span></button>}
       </div>
     </div>
   );
@@ -1046,25 +1046,45 @@ function LogDrawer({
   onFilter: (filter: LogFilter) => void;
   onClose: () => void;
 }) {
+  const drawerRef = useRef<HTMLElement>(null);
   const visible = events.filter((event) => {
     if (filter === "haru") return Boolean(event.haruDialogue);
     if (filter === "aoi") return Boolean(event.aoiDialogue);
     return true;
   }).slice().reverse();
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    drawerRef.current?.focus({ preventScroll: true });
+
+    const handleKeyDown = (keyboardEvent: globalThis.KeyboardEvent) => {
+      if (keyboardEvent.key !== "Escape") return;
+      keyboardEvent.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus({ preventScroll: true });
+    };
+  }, [onClose]);
+
   return (
-    <section className="log-drawer" role="dialog" aria-modal="false" aria-labelledby="log-title">
+    <section id="life-log-drawer" className="log-drawer" role="dialog" aria-modal="false" aria-labelledby="log-title" ref={drawerRef} tabIndex={-1}>
       <header>
         <div><small>LIFE ARCHIVE</small><h2 id="log-title">ふたりの生活ログ</h2></div>
         <div className="log-filters" role="tablist" aria-label="ログの絞り込み">
           {([[
             "all", "すべて"
           ], ["haru", "Haru"], ["aoi", "Aoi"], ["event", "できごと"]] as [LogFilter, string][]).map(([id, label]) => (
-            <button type="button" role="tab" aria-selected={filter === id} className={filter === id ? "is-active" : ""} onClick={() => onFilter(id)} key={id}>{label}</button>
+            <button type="button" id={`log-filter-${id}`} role="tab" aria-selected={filter === id} aria-controls="life-log-list" tabIndex={filter === id ? 0 : -1} className={filter === id ? "is-active" : ""} onClick={() => onFilter(id)} key={id}>{label}</button>
           ))}
         </div>
         <button type="button" className="drawer-close" onClick={onClose} aria-label="ログを閉じる">×</button>
       </header>
-      <div className="log-list">
+      <div id="life-log-list" className="log-list" role="tabpanel" aria-labelledby={`log-filter-${filter}`} tabIndex={0}>
         {visible.length ? visible.map((event) => {
           const navigatorMessage = event.navigatorMessage
             ?? navigatorResponses[event.id]
@@ -1126,6 +1146,7 @@ export default function App() {
   const [activeMemory, setActiveMemory] = useState<Memory>();
   const [personalityOpen, setPersonalityOpen] = useState(false);
   const personalityButtonRef = useRef<HTMLButtonElement | null>(null);
+  const suggestionInputRef = useRef<HTMLTextAreaElement | null>(null);
   const turnAbortRef = useRef<AbortController | null>(null);
   const operationRef = useRef<"turn" | Exclude<ActionBusy, null> | null>(null);
   const presentedEventIdRef = useRef<string | null | undefined>(undefined);
@@ -1137,6 +1158,7 @@ export default function App() {
     setPersonalityOpen(false);
     window.requestAnimationFrame(() => personalityButtonRef.current?.focus());
   }, []);
+  const closeLog = useCallback(() => setLogOpen(false), []);
 
   const refreshGame = useCallback(async (signal?: AbortSignal) => {
     const payload = await getGame(signal);
@@ -1589,6 +1611,13 @@ export default function App() {
   const useScheduleCue = (value: string) => {
     setSuggestion(value);
     setNotice("予定から「きっかけ」を作りました。送る前に編集できます。");
+    window.requestAnimationFrame(() => {
+      suggestionInputRef.current?.focus({ preventScroll: true });
+      suggestionInputRef.current?.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
+    });
   };
 
   const closeEventAnnouncement = useCallback(() => {
@@ -1656,16 +1685,16 @@ export default function App() {
 
   return (
     <div className={`app phase-theme-${game.shared.phase}`}>
-      <header className="topbar" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
+      <header className="topbar" aria-label="ゲーム情報とメニュー" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark"><i /><i /><b>♡</b></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
         <PhaseRail game={game} />
         <div className="header-stat relationship-status"><small>RELATIONSHIP</small><strong><span aria-hidden="true">♥</span>{RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div>
         <div className="header-stat"><small>MEMORY</small><strong>{game.shared.sharedMemories.length.toString().padStart(2, "0")}</strong></div>
         <div className="header-meta">
           <RuntimeBadge runtime={game.runtime} offline={offline} />
-          <button ref={personalityButtonRef} className="personality-open-button" type="button" aria-haspopup="dialog" onClick={() => setPersonalityOpen(true)}><span aria-hidden="true">◆</span>個性設定</button>
-          <button className={`header-log-button ${logOpen ? "is-open" : ""}`} type="button" onClick={() => setLogOpen((open) => !open)}><span aria-hidden="true">▤</span>生活ログ</button>
-          <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={initialLoading || Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
+          <button ref={personalityButtonRef} className="personality-open-button" type="button" aria-haspopup="dialog" aria-expanded={personalityOpen} onClick={() => setPersonalityOpen(true)}><span aria-hidden="true">◆</span>個性設定</button>
+          <button className={`header-log-button ${logOpen ? "is-open" : ""}`} type="button" aria-controls="life-log-drawer" aria-expanded={logOpen} onClick={() => setLogOpen((open) => !open)}><span aria-hidden="true">▤</span>生活ログ</button>
+          <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={initialLoading || Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す" aria-label="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
         </div>
       </header>
 
@@ -1698,7 +1727,7 @@ export default function App() {
           </div>
 
           <section className="interaction-dock" aria-labelledby="dekopin-title">
-            <button type="button" className="latest-log-strip" onClick={() => setLogOpen(true)}>
+            <button type="button" className="latest-log-strip" aria-controls="life-log-drawer" aria-expanded={logOpen} onClick={() => setLogOpen(true)}>
               <span className="log-clock">{activePhase.time}</span><span className="log-star">★</span>
               <span className="latest-log-copy"><small>最新の生活ログ</small><b>{latestEvent?.eventTitle ?? "共同生活がはじまりました"}</b><em>{latestEvent?.haruDialogue ? `「${clipText(latestEvent.haruDialogue, 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
               <span className="open-log-label">振り返る <b>⌃</b></span>
@@ -1713,7 +1742,7 @@ export default function App() {
               </div>
               <form className="suggestion-form" onSubmit={handleSubmit}>
                 <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
-                <textarea id="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={!canSubmitCue} aria-describedby="game-control-status" placeholder="例：今日は一緒に夕食を作ってみたら？" />
+                <textarea ref={suggestionInputRef} id="suggestion" name="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={!canSubmitCue} aria-describedby="game-control-status" enterKeyHint="send" autoCapitalize="sentences" placeholder="例：今日は一緒に夕食を作ってみたら？" />
                 <span className="character-count">{suggestion.length}/240</span>
                 <button className="submit-cue" type="submit" disabled={!canSubmitCue || !suggestion.trim()}><span>{resolving || game.status === "resolving" ? "反映中…" : game.status === "resolved" ? "先に時間を進める" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
               </form>
@@ -1726,18 +1755,18 @@ export default function App() {
             </div>
           </section>
 
-          {logOpen && <LogDrawer events={eventLog} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={() => setLogOpen(false)} />}
+          {logOpen && <LogDrawer events={eventLog} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={closeLog} />}
         </section>
 
-        <aside className="inspector-panel">
+        <aside className="inspector-panel" aria-label="住人と共同生活の詳細">
           <div className="inspector-tabs" role="tablist" aria-label="詳細情報">
             {([[
               "status", "状態", "人"
             ], ["schedule", "予定", "予"], ["memories", "思い出", "記"]] as [InspectorTab, string, string][]).map(([id, label, icon]) => (
-              <button type="button" role="tab" aria-selected={inspectorTab === id} className={inspectorTab === id ? "is-active" : ""} onClick={() => setInspectorTab(id)} key={id}><span aria-hidden="true">{icon}</span>{label}</button>
+              <button type="button" id={`inspector-tab-${id}`} role="tab" aria-selected={inspectorTab === id} aria-controls="inspector-panel" tabIndex={inspectorTab === id ? 0 : -1} className={inspectorTab === id ? "is-active" : ""} onClick={() => setInspectorTab(id)} key={id}><span aria-hidden="true">{icon}</span>{label}</button>
             ))}
           </div>
-          <div className="inspector-body">
+          <div id="inspector-panel" className="inspector-body" role="tabpanel" aria-labelledby={`inspector-tab-${inspectorTab}`} tabIndex={0}>
             {inspectorTab === "status" && <CharacterInspector person={selectedPerson} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
             {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} canUseCue={canSubmitCue} onUseCue={useScheduleCue} />}
             {inspectorTab === "memories" && <MemoryPanel game={game} onOpenMemory={setActiveMemory} />}
