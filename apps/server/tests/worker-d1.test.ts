@@ -20,7 +20,7 @@ import {
   type D1SessionBinding,
   type D1StatementBinding,
 } from "../src/persistence/d1-repository.js";
-import {
+import worker, {
   MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS,
   SSE_KEEPALIVE_INTERVAL_MS,
   stateForRead,
@@ -29,7 +29,11 @@ import {
   workerAgentCoordinatorTimeoutMs,
   workerAgentMode,
   workerAgentProbeTimeoutMs,
+  workerAgentWorkerConfigured,
   workerAgentTimeoutMs,
+  workerOpenAiApiConfigured,
+  workerOpenAiApiModel,
+  workerOpenAiApiTimeoutMs,
 } from "../src/worker.js";
 
 type StoredRow = {
@@ -271,6 +275,8 @@ describe("D1 Worker recovery and isolation", () => {
     const maximumCoordinatorTimeout = workerAgentCoordinatorTimeoutMs({
       AGENT_WORKER_TIMEOUT_MS: "999999",
       AGENT_WORKER_PROBE_TIMEOUT_MS: "999999",
+      OPENAI_API_KEY: "sk-test-max-budget",
+      OPENAI_API_TIMEOUT_MS: "999999",
     });
     const maximumConfiguredBudget = maximumCoordinatorTimeout * 2 * 4;
 
@@ -309,6 +315,78 @@ describe("D1 Worker recovery and isolation", () => {
     expect(
       workerAgentMode({ AGENT_WORKER_URL: "http://127.0.0.1:3002" }),
     ).toBe("auto");
+    expect(
+      workerAgentWorkerConfigured({
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "secret",
+      }),
+    ).toBe(true);
+    expect(
+      workerAgentWorkerConfigured({ OPENAI_API_KEY: "sk-test-openai" }),
+    ).toBe(false);
+  });
+
+  it("enables OpenAI independently and strictly validates its public configuration", () => {
+    expect(workerOpenAiApiConfigured()).toBe(false);
+    expect(workerOpenAiApiConfigured({ OPENAI_API_KEY: "   " })).toBe(false);
+    expect(
+      workerOpenAiApiConfigured({ OPENAI_API_KEY: "sk-test\n-injected" }),
+    ).toBe(false);
+    expect(
+      workerOpenAiApiConfigured({ OPENAI_API_KEY: "sk-test-openai" }),
+    ).toBe(true);
+    expect(workerAgentMode({ OPENAI_API_KEY: "sk-test-openai" })).toBe(
+      "auto",
+    );
+
+    expect(workerOpenAiApiModel()).toBe("gpt-5.6-terra");
+    expect(workerOpenAiApiModel({ OPENAI_API_MODEL: "" })).toBe(
+      "gpt-5.6-terra",
+    );
+    expect(
+      workerOpenAiApiModel({ OPENAI_API_MODEL: "invalid model value" }),
+    ).toBe("gpt-5.6-terra");
+    expect(
+      workerOpenAiApiModel({ OPENAI_API_MODEL: "gpt-5.6-terra-fast" }),
+    ).toBe("gpt-5.6-terra-fast");
+
+    expect(workerOpenAiApiTimeoutMs()).toBe(30_000);
+    expect(
+      workerOpenAiApiTimeoutMs({ OPENAI_API_TIMEOUT_MS: "invalid" }),
+    ).toBe(30_000);
+    expect(
+      workerOpenAiApiTimeoutMs({ OPENAI_API_TIMEOUT_MS: "20" }),
+    ).toBe(1_000);
+    expect(
+      workerOpenAiApiTimeoutMs({ OPENAI_API_TIMEOUT_MS: "999999" }),
+    ).toBe(120_000);
+  });
+
+  it("reports only OpenAI configuration status without exposing its secret or model", async () => {
+    const apiKey = "sk-test-health-must-stay-secret";
+    const response = await worker.fetch(
+      new Request("https://roommates.example.test/api/health"),
+      {
+        DB: new FakeD1Database(),
+        ASSETS: {
+          fetch: async () => new Response(null, { status: 404 }),
+        },
+        OPENAI_API_KEY: apiKey,
+        OPENAI_API_MODEL: "gpt-test-private-model",
+      },
+      {} as ExecutionContext,
+    );
+    const text = await response.text();
+    const body = JSON.parse(text) as Record<string, unknown>;
+
+    expect(body).toMatchObject({
+      ok: true,
+      agentMode: "auto",
+      agentWorkerConfigured: false,
+      openaiApiConfigured: true,
+    });
+    expect(text).not.toContain(apiKey);
+    expect(text).not.toContain("gpt-test-private-model");
   });
 
   it("uses a short bounded readiness probe timeout", () => {

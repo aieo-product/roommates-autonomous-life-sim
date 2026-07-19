@@ -11,6 +11,14 @@ import {
 } from "@roommates/shared";
 import { AgentWorkerClient } from "./agents/app-server/remote-client.js";
 import { ResilientAgentCoordinator } from "./agents/coordinator.js";
+import {
+  DEFAULT_OPENAI_RESPONSES_MODEL,
+  DEFAULT_OPENAI_RESPONSES_TIMEOUT_MS,
+  MAX_OPENAI_RESPONSES_TIMEOUT_MS,
+  MIN_OPENAI_RESPONSES_TIMEOUT_MS,
+  OpenAIResponsesClient,
+} from "./agents/openai/responses-client.js";
+import { ProviderCascadeAdapter } from "./agents/provider-cascade.js";
 import { GameConflictError, GameEngine } from "./engine/game-engine.js";
 import {
   D1GameRepository,
@@ -30,6 +38,9 @@ export interface Env {
   AGENT_WORKER_TOKEN?: string;
   AGENT_WORKER_TIMEOUT_MS?: string;
   AGENT_WORKER_PROBE_TIMEOUT_MS?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_API_MODEL?: string;
+  OPENAI_API_TIMEOUT_MS?: string;
 }
 
 export type AgentWorkerEnv = Pick<
@@ -38,6 +49,9 @@ export type AgentWorkerEnv = Pick<
   | "AGENT_WORKER_TOKEN"
   | "AGENT_WORKER_TIMEOUT_MS"
   | "AGENT_WORKER_PROBE_TIMEOUT_MS"
+  | "OPENAI_API_KEY"
+  | "OPENAI_API_MODEL"
+  | "OPENAI_API_TIMEOUT_MS"
 >;
 
 const SESSION_COOKIE = "roommates_session";
@@ -49,17 +63,19 @@ const DEFAULT_AGENT_WORKER_PROBE_TIMEOUT_MS = 2_000;
 const MIN_AGENT_WORKER_PROBE_TIMEOUT_MS = 250;
 const MAX_AGENT_WORKER_PROBE_TIMEOUT_MS = 10_000;
 const AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS = 5_000;
+const OPENAI_API_MODEL_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 const MAX_AGENT_WORKER_ATTEMPTS_PER_OPERATION = 2;
 // Navigator, Haru, Aoi, and director are the four remote operations that may
 // run between persisted checkpoints. Count them conservatively as sequential
 // even though character decisions currently run in parallel.
 const MAX_AGENT_WORKER_OPERATIONS_PER_CHECKPOINT = 4;
-const MAX_AGENT_WORKER_COORDINATOR_TIMEOUT_MS =
+const MAX_AGENT_PROVIDER_COORDINATOR_TIMEOUT_MS =
   MAX_AGENT_WORKER_TIMEOUT_MS +
   MAX_AGENT_WORKER_PROBE_TIMEOUT_MS +
+  MAX_OPENAI_RESPONSES_TIMEOUT_MS +
   AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS;
 export const MAX_WORKER_AGENT_CHECKPOINT_BUDGET_MS =
-  MAX_AGENT_WORKER_COORDINATOR_TIMEOUT_MS *
+  MAX_AGENT_PROVIDER_COORDINATOR_TIMEOUT_MS *
   MAX_AGENT_WORKER_ATTEMPTS_PER_OPERATION *
   MAX_AGENT_WORKER_OPERATIONS_PER_CHECKPOINT;
 const MIN_WORKER_STATE_LEASE_MS = 20 * 60_000;
@@ -212,8 +228,26 @@ function configuredAgentWorkerUrl(env?: AgentWorkerEnv): string | undefined {
   }
 }
 
+function configuredOpenAiApiKey(env?: AgentWorkerEnv): string | undefined {
+  const value = env?.OPENAI_API_KEY?.trim();
+  if (!value || value.length > 512 || /[\s\u0000-\u001f\u007f]/.test(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+export function workerAgentWorkerConfigured(env?: AgentWorkerEnv): boolean {
+  return configuredAgentWorkerUrl(env) !== undefined;
+}
+
+export function workerOpenAiApiConfigured(env?: AgentWorkerEnv): boolean {
+  return configuredOpenAiApiKey(env) !== undefined;
+}
+
 export function workerAgentMode(env?: AgentWorkerEnv): "auto" | "mock" {
-  return configuredAgentWorkerUrl(env) ? "auto" : "mock";
+  return workerAgentWorkerConfigured(env) || workerOpenAiApiConfigured(env)
+    ? "auto"
+    : "mock";
 }
 
 export function workerAgentTimeoutMs(env?: AgentWorkerEnv): number {
@@ -238,10 +272,29 @@ export function workerAgentProbeTimeoutMs(env?: AgentWorkerEnv): number {
   );
 }
 
+export function workerOpenAiApiModel(env?: AgentWorkerEnv): string {
+  const value = env?.OPENAI_API_MODEL?.trim();
+  return value && OPENAI_API_MODEL_PATTERN.test(value)
+    ? value
+    : DEFAULT_OPENAI_RESPONSES_MODEL;
+}
+
+export function workerOpenAiApiTimeoutMs(env?: AgentWorkerEnv): number {
+  const raw = env?.OPENAI_API_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_OPENAI_RESPONSES_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_OPENAI_RESPONSES_TIMEOUT_MS;
+  return Math.min(
+    MAX_OPENAI_RESPONSES_TIMEOUT_MS,
+    Math.max(MIN_OPENAI_RESPONSES_TIMEOUT_MS, Math.trunc(parsed)),
+  );
+}
+
 export function workerAgentCoordinatorTimeoutMs(env?: AgentWorkerEnv): number {
   return (
     workerAgentTimeoutMs(env) +
     workerAgentProbeTimeoutMs(env) +
+    (workerOpenAiApiConfigured(env) ? workerOpenAiApiTimeoutMs(env) : 0) +
     AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS
   );
 }
@@ -253,6 +306,7 @@ export function createWorkerAgentCoordinator(
   agentEpoch = 0,
 ): ResilientAgentCoordinator {
   const baseUrl = configuredAgentWorkerUrl(env);
+  const openAiApiKey = configuredOpenAiApiKey(env);
   const timeoutMs = workerAgentTimeoutMs(env);
   const probeTimeoutMs = workerAgentProbeTimeoutMs(env);
   const remote = baseUrl
@@ -266,10 +320,24 @@ export function createWorkerAgentCoordinator(
         fetchImpl,
       })
     : undefined;
+  const openAi = openAiApiKey
+    ? new OpenAIResponsesClient({
+        apiKey: openAiApiKey,
+        model: workerOpenAiApiModel(env),
+        timeoutMs: workerOpenAiApiTimeoutMs(env),
+        fetchImpl,
+      }).scope(`${sessionId}:${agentEpoch}`)
+    : undefined;
+  const providers = [
+    ...(remote ? [{ source: "app_server" as const, adapter: remote }] : []),
+    ...(openAi ? [{ source: "openai_api" as const, adapter: openAi }] : []),
+  ];
+  const cascade =
+    providers.length > 0 ? new ProviderCascadeAdapter(providers) : undefined;
   return new ResilientAgentCoordinator(
-    remote ? "auto" : "mock",
+    cascade ? "auto" : "mock",
     workerAgentCoordinatorTimeoutMs(env),
-    remote,
+    cascade,
   );
 }
 
@@ -503,7 +571,8 @@ async function handleApi(
       {
         ok: true,
         agentMode: workerAgentMode(env),
-        agentWorkerConfigured: workerAgentMode(env) === "auto",
+        agentWorkerConfigured: workerAgentWorkerConfigured(env),
+        openaiApiConfigured: workerOpenAiApiConfigured(env),
         runtime: toPublicGameState(state).runtime,
         day: state.shared.day,
         phase: state.shared.phase,

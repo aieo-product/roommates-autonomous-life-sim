@@ -8,6 +8,7 @@ import type {
   Phase,
   RelationshipLabel,
   RuntimeInfo,
+  RuntimeHealth,
   StreamMessage,
 } from "./types.js";
 import type {
@@ -720,7 +721,13 @@ const normalizeRuntime = (
   const haruRuntime = record(first(runtime.haru, runtime.Haru));
   const aoiRuntime = record(first(runtime.aoi, runtime.Aoi));
   const directorRuntime = record(first(runtime.director, runtime.Director));
-  const runtimeSources = [haruRuntime.source, aoiRuntime.source, directorRuntime.source]
+  const navigatorRuntime = record(first(runtime.navigator, runtime.Navigator));
+  const runtimeSources = [
+    haruRuntime.source,
+    aoiRuntime.source,
+    directorRuntime.source,
+    navigatorRuntime.source,
+  ]
     .map((source) => text(source).toLowerCase())
     .filter(Boolean);
   const rawMode = text(
@@ -728,6 +735,9 @@ const normalizeRuntime = (
       runtime.mode,
       root.runtimeMode,
       root.runtime_mode,
+      runtimeSources.some((source) => source === "openai_api")
+        ? "openai-api"
+        : undefined,
       runtime.connected === true ? "app-server" : undefined,
       runtimeSources.some((source) => source === "app_server")
         ? "app-server"
@@ -737,13 +747,15 @@ const normalizeRuntime = (
     ),
     fallback.mode,
   ).toLowerCase();
-  const mode: RuntimeInfo["mode"] = rawMode.includes("mock")
-    ? "mock"
-    : rawMode.includes("offline")
-      ? "offline"
-      : rawMode.includes("app") || rawMode.includes("codex") || rawMode === "live"
-        ? "app-server"
-        : fallback.mode;
+  const mode: RuntimeInfo["mode"] = rawMode.includes("openai")
+    ? "openai-api"
+    : rawMode.includes("mock")
+      ? "mock"
+      : rawMode.includes("offline")
+        ? "offline"
+        : rawMode.includes("app") || rawMode.includes("codex") || rawMode === "live"
+          ? "app-server"
+          : fallback.mode;
   const threads = record(first(runtime.threads, root.threads, root.threadIds));
   return {
     mode,
@@ -1006,6 +1018,13 @@ export const getGame = async (signal?: AbortSignal): Promise<unknown> => {
   const response = await fetch("/api/game", { signal });
   if (!response.ok) throw new Error(await getErrorMessage(response));
   return response.json();
+};
+
+export const getRuntimeHealth = async (signal?: AbortSignal): Promise<RuntimeHealth> => {
+  const response = await fetch("/api/health", { signal });
+  if (!response.ok) throw new Error(await getErrorMessage(response));
+  const payload = record(await response.json());
+  return { openaiApiConfigured: payload.openaiApiConfigured === true };
 };
 
 const postAction = async (path: string, payload: unknown = {}): Promise<unknown> => {

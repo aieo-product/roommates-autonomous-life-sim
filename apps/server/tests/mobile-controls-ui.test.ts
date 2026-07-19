@@ -45,6 +45,14 @@ describe("mobile-friendly game controls", () => {
     expect(app).toContain("suggestionInputRef.current?.scrollIntoView({");
   });
 
+  it("shows the OpenAI data-sharing notice only when the public health flag is set", () => {
+    expect(app).toContain("const [openaiApiConfigured, setOpenaiApiConfigured] = useState(false)");
+    expect(app).toContain("{openaiApiConfigured && (");
+    expect(app).toContain("選択中のAPIプロジェクトのデータ共有設定");
+    expect(app).toContain('"game-control-status openai-api-data-notice"');
+    expect(app).not.toContain("OPENAI_API_KEY");
+  });
+
   it("associates inspector tabs and the currently rendered panel", () => {
     expect(app).toContain('aria-label="住人と共同生活の詳細"');
     expect(app).toContain('id={`inspector-tab-${id}`}');
@@ -86,6 +94,11 @@ describe("smartphone layout contract", () => {
     expect(mobileStyles).toMatch(/\.advance-button\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/);
     expect(mobileStyles).toMatch(/\.log-drawer\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?78dvh/);
     expect(mobileStyles).toMatch(/\.log-filters button\s*\{[^}]*min-height:\s*44px;/);
+  });
+
+  it("keeps the OpenAI data-sharing notice readable above the mobile input", () => {
+    expect(mobileStyles).toMatch(/\.openai-data-notice\s*\{[\s\S]*?padding:\s*7px 8px;[\s\S]*?font-size:\s*10px;/);
+    expect(mobileStyles).toMatch(/\.suggestion-form\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,1fr\);/);
   });
 });
 

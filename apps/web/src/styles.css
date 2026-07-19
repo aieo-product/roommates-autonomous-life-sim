@@ -360,6 +360,12 @@ a:focus-visible,
   animation: livePulse 1.8s infinite;
 }
 
+.runtime-openai { background: #315f75; }
+.runtime-openai i {
+  background: #6ee7c4;
+  box-shadow: 0 0 0 3px rgba(110,231,196,.18);
+  animation: livePulse 1.8s infinite;
+}
 .runtime-mock i { background: var(--yellow); }
 .runtime-offline i { background: #ff7d75; }
 
@@ -1488,6 +1494,39 @@ a:focus-visible,
 
 .preset-menu label { color: #647287; font-size: 8px; font-weight: 900; }
 .preset-menu select { width: 100%; height: 34px; padding: 0 5px; color: var(--ink); background: #fffdf3; border: 2px solid var(--ink); font-size: 10px; font-weight: 800; }
+
+.suggestion-stack {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.openai-data-notice {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  color: #435d68;
+  font-size: 7.5px;
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.openai-data-notice span {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #315f75;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  font: 1000 8px ui-monospace, monospace;
+}
 
 .suggestion-form {
   min-width: 0;
@@ -2830,6 +2869,16 @@ a:focus-visible,
   }
   .dekopin-guide { height: 76px; }
   .preset-menu select { min-height: 44px; height: 44px; }
+  .suggestion-stack { gap: 6px; }
+  .openai-data-notice {
+    gap: 6px;
+    padding: 7px 8px;
+    background: #e6f3ef;
+    border: 2px solid #789992;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+  .openai-data-notice span { width: 18px; height: 18px; font-size: 10px; }
   .suggestion-form {
     height: auto;
     grid-template-columns: minmax(0,1fr);

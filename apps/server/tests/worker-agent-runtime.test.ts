@@ -51,6 +51,41 @@ function appServerResponse() {
   };
 }
 
+function openAiResponse() {
+  return new Response(
+    JSON.stringify({
+      id: "resp_worker_fallback",
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "output_text",
+              text: JSON.stringify({
+                decision: "ACCEPT",
+                action: "OpenAIと一緒に料理をする",
+                dialogue: "やってみよう。",
+                publicReason: "今なら楽しめそうだから",
+                internalSummary: "少し興味がある",
+                expectedEffects: {},
+                initiative: null,
+              }),
+            },
+          ],
+        },
+      ],
+    }),
+    { headers: { "Content-Type": "application/json" } },
+  );
+}
+
+function fetchUrl(input: Parameters<typeof fetch>[0]): URL {
+  if (input instanceof Request) return new URL(input.url);
+  return new URL(String(input));
+}
+
 describe("public Worker Agent Worker runtime", () => {
   it("does not contact Agent Worker when its URL is not configured", async () => {
     const fetchImpl = vi.fn<typeof fetch>();
@@ -97,6 +132,185 @@ describe("public Worker Agent Worker runtime", () => {
       threadId: "remote-haru-thread",
     });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses Agent Worker first and does not send a configured OpenAI key", async () => {
+    const openAiApiKey = "sk-test-must-not-reach-agent-worker";
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      const url = fetchUrl(input);
+      expect(url.origin).toBe("https://agent.example.test");
+      const authorization = new Headers(init?.headers).get("Authorization");
+      expect(authorization).toBe("Bearer worker-secret");
+      expect(authorization).not.toContain(openAiApiKey);
+      if (init?.method === "GET") {
+        return new Response(JSON.stringify({ ok: true }));
+      }
+      return new Response(JSON.stringify(appServerResponse()));
+    });
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      {
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "worker-secret",
+        OPENAI_API_KEY: openAiApiKey,
+      },
+      fetchImpl,
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("app_server");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses OpenAI directly when Agent Worker is not configured", async () => {
+    const openAiApiKey = "sk-test-direct-openai";
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      const url = fetchUrl(input);
+      expect(url.toString()).toBe("https://api.openai.com/v1/responses");
+      expect(new Headers(init?.headers).get("Authorization")).toBe(
+        `Bearer ${openAiApiKey}`,
+      );
+      expect(String(init?.body)).not.toContain(openAiApiKey);
+      return openAiResponse();
+    });
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      { OPENAI_API_KEY: openAiApiKey },
+      fetchImpl,
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("openai_api");
+    expect(result.value.action).toBe("OpenAIと一緒に料理をする");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("cascades from an unavailable Agent Worker to OpenAI in the same call", async () => {
+    const openAiApiKey = "sk-test-worker-to-openai";
+    const origins: string[] = [];
+    let agentWorkerAvailable = false;
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      const url = fetchUrl(input);
+      origins.push(url.origin);
+      if (url.origin === "https://agent.example.test") {
+        expect(new Headers(init?.headers).get("Authorization")).toBe(
+          "Bearer worker-secret",
+        );
+        if (!agentWorkerAvailable) {
+          return new Response(null, { status: 503 });
+        }
+        return init?.method === "GET"
+          ? new Response(JSON.stringify({ ok: true }))
+          : new Response(JSON.stringify(appServerResponse()));
+      }
+      expect(url.toString()).toBe("https://api.openai.com/v1/responses");
+      expect(new Headers(init?.headers).get("Authorization")).toBe(
+        `Bearer ${openAiApiKey}`,
+      );
+      return openAiResponse();
+    });
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      {
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "worker-secret",
+        OPENAI_API_KEY: openAiApiKey,
+      },
+      fetchImpl,
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("openai_api");
+    expect(origins).toEqual([
+      "https://agent.example.test",
+      "https://api.openai.com",
+    ]);
+
+    agentWorkerAvailable = true;
+    const nextTurn = createWorkerAgentCoordinator(
+      SESSION_ID,
+      {
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "worker-secret",
+        OPENAI_API_KEY: openAiApiKey,
+      },
+      fetchImpl,
+      1,
+    );
+    const recovered = await nextTurn.decide("haru", characterInput());
+
+    expect(recovered.runtime.source).toBe("app_server");
+    expect(origins).toEqual([
+      "https://agent.example.test",
+      "https://api.openai.com",
+      "https://agent.example.test",
+      "https://agent.example.test",
+    ]);
+  });
+
+  it("cascades to OpenAI when Agent Worker returns invalid structured output", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+      const url = fetchUrl(input);
+      if (url.origin === "https://agent.example.test") {
+        if (init?.method === "GET") {
+          return new Response(JSON.stringify({ ok: true }));
+        }
+        return new Response(
+          JSON.stringify({
+            value: { decision: "NOT_VALID" },
+            threadId: "invalid-agent-worker-thread",
+          }),
+        );
+      }
+      return openAiResponse();
+    });
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      {
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "worker-secret",
+        OPENAI_API_KEY: "sk-test-invalid-worker-output",
+      },
+      fetchImpl,
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("openai_api");
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses the deterministic mock when both configured providers fail", async () => {
+    const openAiApiKey = "sk-test-never-expose-this";
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      const url = fetchUrl(input);
+      if (url.origin === "https://agent.example.test") {
+        return new Response(null, { status: 503 });
+      }
+      return new Response("upstream secret response body", { status: 500 });
+    });
+    const coordinator = createWorkerAgentCoordinator(
+      SESSION_ID,
+      {
+        AGENT_WORKER_URL: "https://agent.example.test",
+        AGENT_WORKER_TOKEN: "worker-secret",
+        OPENAI_API_KEY: openAiApiKey,
+      },
+      fetchImpl,
+    );
+
+    const result = await coordinator.decide("haru", characterInput());
+
+    expect(result.runtime.source).toBe("fallback");
+    expect(result.value.decision).toMatch(/ACCEPT|DECLINE|MODIFY|IGNORE|INITIATE/);
+    expect(result.runtime.error).toBe(
+      "Configured agent providers are unavailable: app_server, openai_api",
+    );
+    expect(JSON.stringify(result)).not.toContain(openAiApiKey);
+    expect(JSON.stringify(result)).not.toContain("upstream secret response body");
   });
 
   it("falls back while unavailable and retries after a new turn coordinator is created", async () => {
