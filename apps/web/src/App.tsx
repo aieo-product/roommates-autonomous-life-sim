@@ -290,6 +290,8 @@ function FurnitureLayer() {
   return (
     <g className="furniture-layer" aria-hidden="true">
       <g className="entry-furniture">
+        <polygon className="entry-rug" points="982.5,321.25 1032.5,346.25 1007.5,358.75 957.5,333.75" />
+        <polygon className="entry-rug-inset" points="983.75,325.625 1023.75,345.625 1006.25,354.375 966.25,334.375" />
         <path className="door-mark" d="M1016 309v60M1016 369l42 21" />
       </g>
       <g className="living-furniture">

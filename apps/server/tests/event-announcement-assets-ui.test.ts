@@ -20,6 +20,8 @@ type FurnitureManifest = {
     id: string;
     file: string;
     footprintTiles: { width: number; depth: number };
+    pivot?: { x: number; y: number };
+    flipX?: boolean;
   }>;
   defaultScene: {
     instances: Array<{
@@ -29,6 +31,7 @@ type FurnitureManifest = {
       anchorId?: string;
       floorContact: { x: number; y: number };
       pivot?: { x: number; y: number };
+      displayScale: number;
     }>;
   };
 };
@@ -166,7 +169,7 @@ describe("generated furniture integration", () => {
   };
 
   it("statically imports and references all 19 furniture PNGs", () => {
-    expect(manifest.version).toBe(4);
+    expect(manifest.version).toBe(5);
     expect(manifest.assets).toHaveLength(19);
     expect(existsSync(rendererUrl), "the shared furniture renderer should exist").toBe(true);
     const renderer = readFileSync(rendererUrl, "utf8");
@@ -243,7 +246,31 @@ describe("generated furniture integration", () => {
     const renderer = readFileSync(rendererUrl, "utf8");
     expect(renderer).toMatch(/import\s*\{\s*projectRoomPoint,\s*type Point\s*\}\s*from\s*["']\.\/room-layout(?:\.js)?["']/);
     expect(renderer).toContain("projectRoomPoint(placement.floorContact.x, placement.floorContact.y)");
+    expect(renderer).toContain("asset.pivot ?? furnitureManifest.pivot");
+    expect(renderer).toContain("asset.flipX ?? false");
+    expect(renderer).toContain("scale(-1 1)");
     expect(renderer).toMatch(/sort\(\(left, right\) => left\.pivot\.y - right\.pivot\.y\)/);
+  });
+
+  it("calibrates the generated sprites to their real feet and leaves the entry open", () => {
+    const expected = {
+      sofa: { pivot: { x: 173, y: 236 }, flipX: false, scale: 1 },
+      "kitchen-counter": { pivot: { x: 156, y: 236 }, flipX: true, scale: 1.2 },
+      refrigerator: { pivot: { x: 130, y: 236 }, flipX: false, scale: 1.08 },
+      bathtub: { pivot: { x: 140, y: 236 }, flipX: true, scale: 1.5 },
+      "balcony-drying-rack": { pivot: { x: 154, y: 236 }, flipX: false, scale: 1 },
+    } as const;
+
+    for (const [assetId, config] of Object.entries(expected)) {
+      const asset = manifest.assets.find((candidate) => candidate.id === assetId);
+      const instance = manifest.defaultScene.instances.find((candidate) => candidate.assetId === assetId);
+      expect(asset?.pivot, `${assetId} should use its opaque floor contact`).toEqual(config.pivot);
+      expect(asset?.flipX ?? false, `${assetId} should face the room grid`).toBe(config.flipX);
+      expect(instance?.displayScale, `${assetId} should cover its logical footprint`).toBe(config.scale);
+    }
+
+    expect(manifest.defaultScene.instances.some((instance) => instance.assetId === "entry-shoe-cabinet")).toBe(false);
+    expect(anchorById.has("entry_cabinet")).toBe(false);
   });
 
   it("connects one generated furniture layer to the shared apartment renderer", () => {
@@ -263,6 +290,8 @@ describe("generated furniture integration", () => {
     );
     expect(furnitureLayer).toContain("<FurnitureSpriteLayer");
     expect(furnitureLayer).toContain('className="door-mark"');
+    expect(furnitureLayer).toContain('className="entry-rug"');
+    expect(furnitureLayer).toContain('className="entry-rug-inset"');
     expect(furnitureLayer).toContain('className="rug"');
     expect(furnitureLayer).toContain('className="rail"');
     expect(furnitureLayer).not.toContain('className="wash-furniture"');

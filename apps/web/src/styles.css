@@ -608,6 +608,8 @@ a:focus-visible,
 .easel path { fill: none; stroke: #795f50; stroke-width: 5; }
 .easel circle { fill: #e86f91; stroke-width: 2; }
 .door-mark { fill: none; stroke: #7e5943; stroke-width: 6; }
+.entry-rug { fill: #b85f4c; stroke: #8f4638 !important; stroke-width: 3 !important; }
+.entry-rug-inset { fill: #df8a68; stroke: #f5c69b !important; stroke-width: 2 !important; }
 .table-top { fill: #a97952; }
 .dining-furniture > path { fill: none; stroke: #704e3b; stroke-width: 5; }
 .plate { fill: #fff8db; stroke-width: 2; }

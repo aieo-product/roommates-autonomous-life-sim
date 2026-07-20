@@ -70,7 +70,6 @@
       "capacity": 2,
       "defaultOccupancy": 0,
       "anchors": [
-        { "id": "entry_cabinet", "kind": "furniture", "x": 16.5, "y": 1.2, "width": 2, "height": 1 },
         { "id": "entry_pair", "kind": "character", "tags": ["pair"], "x": 16, "y": 0.5, "width": 3, "height": 2 }
       ],
       "blocked": [

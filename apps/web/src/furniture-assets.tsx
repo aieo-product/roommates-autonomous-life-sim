@@ -51,11 +51,20 @@ type FurniturePlacement = {
   anchorId?: string;
   floorContact: Point;
   pivot: Point;
+  assetPivot: Point;
+  flipX: boolean;
   displayScale: number;
 };
 
 const registeredAssetIds = new Set(Object.keys(FURNITURE_ASSET_URLS));
-const manifestAssetIds = new Set(furnitureManifest.assets.map((asset) => asset.id));
+type FurnitureAssetRenderConfig = {
+  id: FurnitureAssetId;
+  pivot?: Point;
+  flipX?: boolean;
+};
+const manifestAssets = furnitureManifest.assets as FurnitureAssetRenderConfig[];
+const manifestAssetById = new Map(manifestAssets.map((asset) => [asset.id, asset]));
+const manifestAssetIds = new Set<string>(manifestAssets.map((asset) => asset.id));
 
 const registryIssues = [
   ...[...manifestAssetIds]
@@ -77,11 +86,17 @@ export const FURNITURE_SCENE_PLACEMENTS = furnitureManifest.defaultScene.instanc
     if (!registeredAssetIds.has(placement.assetId)) {
       throw new Error(`Unknown furniture asset in default scene: ${placement.assetId}`);
     }
+    const asset = manifestAssetById.get(placement.assetId as FurnitureAssetId);
+    if (!asset) {
+      throw new Error(`Missing furniture render config: ${placement.assetId}`);
+    }
 
     return {
       ...placement,
       assetId: placement.assetId as FurnitureAssetId,
       pivot: projectRoomPoint(placement.floorContact.x, placement.floorContact.y),
+      assetPivot: asset.pivot ?? furnitureManifest.pivot,
+      flipX: asset.flipX ?? false,
     };
   })
   .sort((left, right) => left.pivot.y - right.pivot.y);
@@ -92,15 +107,18 @@ export const FURNITURE_SCENE_PLACEMENTS = furnitureManifest.defaultScene.instanc
  * so mounting this layer once keeps every scene on the same asset contract.
  */
 export function FurnitureSpriteLayer() {
-  const { canvas, pivot } = furnitureManifest;
+  const { canvas } = furnitureManifest;
 
   return (
     <g className="furniture-sprite-layer" aria-hidden="true">
       {FURNITURE_SCENE_PLACEMENTS.map((placement) => {
         const width = canvas.width * placement.displayScale;
         const height = canvas.height * placement.displayScale;
-        const x = placement.pivot.x - pivot.x * placement.displayScale;
-        const y = placement.pivot.y - pivot.y * placement.displayScale;
+        const x = placement.pivot.x - placement.assetPivot.x * placement.displayScale;
+        const y = placement.pivot.y - placement.assetPivot.y * placement.displayScale;
+        const flipTransform = placement.flipX
+          ? `translate(${2 * x + width} 0) scale(-1 1)`
+          : undefined;
 
         return (
           <image
@@ -108,11 +126,13 @@ export function FurnitureSpriteLayer() {
             className={`furniture-sprite furniture-${placement.assetId}`}
             data-furniture-asset={placement.assetId}
             data-furniture-instance={placement.instanceId}
+            data-furniture-flip={placement.flipX ? "x" : undefined}
             href={FURNITURE_ASSET_URLS[placement.assetId]}
             x={x}
             y={y}
             width={width}
             height={height}
+            transform={flipTransform}
             preserveAspectRatio="xMidYMid meet"
             style={{ imageRendering: "pixelated", pointerEvents: "none" }}
           />

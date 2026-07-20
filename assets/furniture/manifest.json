@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
@@ -72,14 +72,6 @@
         "displayScale": 0.72
       },
       {
-        "instanceId": "entry-shoe-cabinet",
-        "assetId": "entry-shoe-cabinet",
-        "roomId": "entry",
-        "anchorId": "entry_cabinet",
-        "floorContact": { "x": 18.5, "y": 2.2 },
-        "displayScale": 0.9
-      },
-      {
         "instanceId": "washroom-vanity",
         "assetId": "washroom-vanity",
         "roomId": "washroom",
@@ -93,7 +85,7 @@
         "roomId": "bathroom",
         "anchorId": "bathtub",
         "floorContact": { "x": 24, "y": 5.5 },
-        "displayScale": 1.15
+        "displayScale": 1.5
       },
       {
         "instanceId": "kitchen-counter",
@@ -101,7 +93,7 @@
         "roomId": "kitchen",
         "anchorId": "kitchen_counter",
         "floorContact": { "x": 5, "y": 10 },
-        "displayScale": 1.15
+        "displayScale": 1.2
       },
       {
         "instanceId": "kitchen-refrigerator",
@@ -109,7 +101,7 @@
         "roomId": "kitchen",
         "anchorId": "refrigerator",
         "floorContact": { "x": 7, "y": 10 },
-        "displayScale": 0.95
+        "displayScale": 1.08
       },
       {
         "instanceId": "balcony-laundry-basket",
@@ -124,7 +116,7 @@
         "roomId": "balcony",
         "anchorId": "balcony_drying_rack",
         "floorContact": { "x": 13, "y": 17 },
-        "displayScale": 0.9
+        "displayScale": 1
       },
       {
         "instanceId": "dining-table",
@@ -161,7 +153,7 @@
         "roomId": "living",
         "anchorId": "living_sofa",
         "floorContact": { "x": 23, "y": 11 },
-        "displayScale": 0.9
+        "displayScale": 1
       },
       {
         "instanceId": "living-low-table",
@@ -227,6 +219,7 @@
       "file": "sofa.png",
       "footprintTiles": { "width": 6, "depth": 2 },
       "orientation": "south-west-to-north-east",
+      "pivot": { "x": 173, "y": 236 },
       "anchorIds": ["living_sofa"]
     },
     {
@@ -283,6 +276,8 @@
       "file": "kitchen-counter.png",
       "footprintTiles": { "width": 5, "depth": 2 },
       "orientation": "south-west-to-north-east",
+      "pivot": { "x": 156, "y": 236 },
+      "flipX": true,
       "anchorIds": ["kitchen_counter"]
     },
     {
@@ -290,6 +285,7 @@
       "file": "refrigerator.png",
       "footprintTiles": { "width": 2, "depth": 2 },
       "orientation": "south-west-to-north-east",
+      "pivot": { "x": 130, "y": 236 },
       "anchorIds": ["refrigerator"]
     },
     {
@@ -304,6 +300,8 @@
       "file": "bathtub.png",
       "footprintTiles": { "width": 4, "depth": 2 },
       "orientation": "south-west-to-north-east",
+      "pivot": { "x": 140, "y": 236 },
+      "flipX": true,
       "anchorIds": ["bathtub"]
     },
     {
@@ -311,13 +309,14 @@
       "file": "entry-shoe-cabinet.png",
       "footprintTiles": { "width": 2, "depth": 1 },
       "orientation": "south-west-to-north-east",
-      "anchorIds": ["entry_cabinet"]
+      "anchorIds": []
     },
     {
       "id": "balcony-drying-rack",
       "file": "balcony-drying-rack.png",
       "footprintTiles": { "width": 4, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "pivot": { "x": 154, "y": 236 },
       "anchorIds": ["balcony_drying_rack"]
     }
   ]
