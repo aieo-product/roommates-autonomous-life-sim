@@ -27,7 +27,11 @@ import {
   type CharacterId,
   type Point,
 } from "./room-layout";
-import { ResidentPortrait, ResidentSceneSprite } from "./character-assets";
+import {
+  ResidentPortrait,
+  ResidentSceneSprite,
+  navigatorCharacterAssets,
+} from "./character-assets";
 import {
   createAfterScenePlan,
   type AfterScenePlan,
@@ -286,37 +290,13 @@ function FurnitureLayer() {
   return (
     <g className="furniture-layer" aria-hidden="true">
       <g className="entry-furniture">
-        <polygon className="entry-mat" points="929,329 981,355 956,368 904,342" />
         <path className="door-mark" d="M1016 309v60M1016 369l42 21" />
-      </g>
-      <g className="wash-furniture">
-        <polygon className="wash-unit" points="1062,350 1122,380 1095,394 1035,364" />
-        <polygon className="basin" points="1072,357 1100,371 1087,378 1059,364" />
-        <path d="M1080 355q3-16 14-8" />
-        <rect className="mirror" x="1115" y="325" width="42" height="50" rx="3" />
-      </g>
-      <g className="bath-furniture">
-        <polygon className="tub" points="934,418 1038,470 989,495 885,443" />
-        <polygon className="water" points="942,426 1022,466 987,484 907,444" />
-        <circle className="bubble" cx="952" cy="449" r="5" />
-        <circle className="bubble" cx="975" cy="457" r="3" />
-      </g>
-      <g className="kitchen-furniture">
-        <polygon className="counter-top" points="322,245 475,322 430,345 277,268" />
-        <polygon className="counter-front" points="277,268 430,345 430,382 277,305" />
-        <polygon className="counter-side" points="430,345 475,322 475,359 430,382" />
-        <rect className="hob" x="343" y="280" width="36" height="19" rx="2" transform="rotate(27 343 280)" />
-        <path className="steam" d="M365 273c-8-10 8-12 0-23M381 282c-8-10 8-12 0-23" />
-        <g className="fridge"><polygon points="254,231 302,255 302,326 254,302" /><polygon points="302,255 328,242 328,313 302,326" /><path d="M262 272l30 15" /></g>
       </g>
       <g className="living-furniture">
         <polygon className="rug" points="648,423 846,522 768,561 570,462" />
       </g>
       <g className="balcony-furniture">
         <path className="rail" d="M164 314L752 608M157 329L745 623M164 314v15M260 362v15M356 410v15M452 458v15M548 506v15M644 554v15M752 608v15" />
-        <path className="laundry" d="M559 536l118 59M566 529l-14 28M670 582l15 29" />
-        <path className="shirt" d="M585 551l14-5 14 13-9 8 4 25-28-14 9-21-8-9z" />
-        <path className="towel" d="M625 573l29 14-8 31-29-15z" />
       </g>
       <FurnitureSpriteLayer />
     </g>
@@ -734,7 +714,7 @@ function EventAnnouncementModal({
           {navigatorMessage && (
             <section className="event-announcement-dekopin" aria-label="デコピンの応答">
               <div className="event-announcement-mini-avatar" aria-hidden="true">
-                <span><img src={dekopinSpriteUrl} alt="" /></span>
+                <img src={navigatorCharacterAssets.portraitUrl} alt="" />
               </div>
               <div><small>{DEKOPIN_NAME} · EVENT NAVIGATOR</small><p>「{navigatorMessage}」</p></div>
             </section>
@@ -1692,7 +1672,7 @@ export default function App() {
   return (
     <div className={`app phase-theme-${game.shared.phase}`}>
       <header className="topbar" aria-label="ゲーム情報とメニュー" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
-        <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark"><i /><i /><b>♡</b></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
+        <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark" aria-hidden="true"><img src={navigatorCharacterAssets.portraitUrl} alt="" /></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
         <PhaseRail game={game} />
         <div className="header-stat relationship-status"><small>RELATIONSHIP</small><strong><span aria-hidden="true">♥</span>{RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div>
         <div className="header-stat"><small>MEMORY</small><strong>{game.shared.sharedMemories.length.toString().padStart(2, "0")}</strong></div>

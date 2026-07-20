@@ -1,5 +1,8 @@
 import { forwardRef } from "react";
-import { residentCharacterAssets } from "../character-assets";
+import {
+  navigatorCharacterAssets,
+  residentCharacterAssets,
+} from "../character-assets";
 import type {
   ResultEnding,
   ResultProducer,
@@ -52,7 +55,12 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
           </div>
 
           <aside className="result-score-stamp" aria-label={`デコピンのサポート評価 ${producer.overallScore}点、ランク${producer.rank}`}>
-            <span>DEKOPIN SCORE</span>
+            <div className="result-stamp-heading">
+              <span>DEKOPIN SCORE</span>
+              <span className="result-score-dekopin" aria-hidden="true">
+                <img src={navigatorCharacterAssets.portraitUrl} alt="" />
+              </span>
+            </div>
             <div className="result-rank-line">
               <strong aria-label={`ランク ${producer.rank}`}>{producer.rank}</strong>
               <b><em>{Math.round(producer.overallScore)}</em><small>/ 100</small></b>

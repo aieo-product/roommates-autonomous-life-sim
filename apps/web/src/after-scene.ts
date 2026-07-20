@@ -1,5 +1,7 @@
 import {
   characterAnchor,
+  characterDestinationForLocation,
+  characterDetourCandidates,
   type CharacterId,
   type Point,
 } from "./room-layout.js";
@@ -78,6 +80,7 @@ const SCENE_LOCATION_MARKERS = [
   "洗面", "washroom", "風呂", "浴室", "bathroom",
   "玄関", "entry", "廊下", "hallway",
   "自室", "寝室", "haru", "ハル", "aoi", "アオイ",
+  "作業机", "デスク", "desk", "洗濯", "ランドリー", "laundry",
 ];
 
 const trimmedTurn = (turn: EventConversationTurn): EventConversationTurn | undefined => {
@@ -118,16 +121,21 @@ export const directionForTravel = (start: Point, end: Point): SpriteDirection =>
   return worldY >= 0 ? "south" : "north";
 };
 
-/** A short isometric step used to turn around furniture between long legs. */
-const detourPointFor = (start: Point, previous: SpriteDirection): Point => {
-  const turn: Record<SpriteDirection, Point> = {
-    east: { x: 26, y: -13 },
-    north: { x: -26, y: -13 },
-    west: { x: -26, y: 13 },
-    south: { x: 26, y: 13 },
-  };
-  const offset = turn[previous];
-  return { x: start.x + offset.x, y: start.y + offset.y };
+/** Select a known walkable room point that makes the next leg visibly turn. */
+const detourPointFor = (
+  person: CharacterId,
+  location: string,
+  start: Point,
+  target: Point,
+  previous: SpriteDirection,
+): Point => {
+  const candidates = characterDetourCandidates(person, location)
+    .filter((candidate) => Math.hypot(candidate.x - start.x, candidate.y - start.y) >= 1);
+  return candidates.find((candidate) =>
+    directionForTravel(start, candidate) !== previous
+    || directionForTravel(candidate, target) !== previous)
+    ?? candidates[0]
+    ?? start;
 };
 
 const locationFor = (
@@ -147,43 +155,10 @@ const locationFor = (
     || fallback.location;
 };
 
-/**
- * Room anchors intentionally collapse free-form descriptions to a room. These
- * stable offsets preserve meaningful in-room waypoints such as sofa -> table.
- */
-const spotOffsetFor = (location: string, beatIndex: number): Point => {
-  const value = location.toLowerCase();
-  if (value.includes("ソファ") || value.includes("sofa")) return { x: -34, y: 8 };
-  if (value.includes("ローテーブル") || value.includes("coffee table")) return { x: 30, y: 10 };
-  if (value.includes("テーブル") || value.includes("食卓") || value.includes("table")) return { x: 22, y: -8 };
-  if (value.includes("キッチン台") || value.includes("調理台") || value.includes("counter")) return { x: -28, y: -9 };
-  if (value.includes("窓") || value.includes("window")) return { x: 28, y: -12 };
-  if (value.includes("入口") || value.includes("ドア") || value.includes("door")) return { x: -25, y: -12 };
-
-  // Free-form descriptions still get deterministic, bounded spots. Include
-  // the beat number so two distinct movements within one room remain visible.
-  let hash = beatIndex + 17;
-  for (const character of value) hash = (hash * 31 + character.charCodeAt(0)) | 0;
-  const offsets = [
-    { x: -20, y: -8 },
-    { x: 20, y: -8 },
-    { x: -24, y: 9 },
-    { x: 24, y: 9 },
-    { x: 0, y: 13 },
-  ];
-  return offsets[Math.abs(hash) % offsets.length] ?? { x: 0, y: 0 };
-};
-
 const pointForLocation = (
   person: CharacterId,
   location: string,
-  state: CharacterState,
-  beatIndex: number,
-): Point => {
-  const anchor = characterAnchor(person, { ...state, location });
-  const offset = spotOffsetFor(location, beatIndex);
-  return { x: anchor.x + offset.x, y: anchor.y + offset.y };
-};
+): Point => characterDestinationForLocation(person, location);
 
 const legacyBeatsForEvent = (
   event: GameEvent,
@@ -248,13 +223,13 @@ export const createAfterScenePlan = (
     : legacyBeatsForEvent(event, game, endingLocations);
   const beats: AfterSceneBeat[] = [];
 
-  sourceBeats.forEach((beat, beatIndex) => {
+  sourceBeats.forEach((beat) => {
     if (beat.kind === "move") {
       const movingPeople = new Set(actorsFor(beat.actor));
       const targets = copyPoints(points);
       for (const person of PEOPLE) {
         if (movingPeople.has(person)) {
-          targets[person] = pointForLocation(person, beat.location, game[person], beatIndex);
+          targets[person] = pointForLocation(person, beat.location);
         }
       }
       const detouringPeople = new Set(PEOPLE.filter((person) => {
@@ -280,7 +255,7 @@ export const createAfterScenePlan = (
           const start = { ...points[person] };
           const previous = lastTravelDirections[person] ?? directions[person];
           const end = detouringPeople.has(person)
-            ? detourPointFor(start, previous)
+            ? detourPointFor(person, beat.location, start, targets[person], previous)
             : start;
           const hasTravel = Math.hypot(end.x - start.x, end.y - start.y) >= 1;
           const direction = hasTravel ? directionForTravel(start, end) : directions[person];

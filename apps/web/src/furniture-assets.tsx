@@ -1,32 +1,44 @@
 import aoiBedUrl from "../../../assets/furniture/aoi-bed.png";
+import balconyDryingRackUrl from "../../../assets/furniture/balcony-drying-rack.png";
+import bathtubUrl from "../../../assets/furniture/bathtub.png";
 import deskChairUrl from "../../../assets/furniture/desk-chair.png";
 import diningChairUrl from "../../../assets/furniture/dining-chair.png";
 import diningTableUrl from "../../../assets/furniture/dining-table.png";
+import entryShoeCabinetUrl from "../../../assets/furniture/entry-shoe-cabinet.png";
 import floorLampUrl from "../../../assets/furniture/floor-lamp.png";
 import haruBedUrl from "../../../assets/furniture/haru-bed.png";
+import kitchenCounterUrl from "../../../assets/furniture/kitchen-counter.png";
 import laundryBasketUrl from "../../../assets/furniture/laundry-basket.png";
 import lowTableUrl from "../../../assets/furniture/low-table.png";
 import furnitureManifest from "../../../assets/furniture/manifest.json";
 import pottedPlantUrl from "../../../assets/furniture/potted-plant.png";
+import refrigeratorUrl from "../../../assets/furniture/refrigerator.png";
 import sofaUrl from "../../../assets/furniture/sofa.png";
 import storageShelfUrl from "../../../assets/furniture/storage-shelf.png";
 import tvConsoleUrl from "../../../assets/furniture/tv-console.png";
+import washroomVanityUrl from "../../../assets/furniture/washroom-vanity.png";
 import workDeskUrl from "../../../assets/furniture/work-desk.png";
 import { projectRoomPoint, type Point } from "./room-layout.js";
 
 export const FURNITURE_ASSET_URLS = {
   "aoi-bed": aoiBedUrl,
+  "balcony-drying-rack": balconyDryingRackUrl,
+  bathtub: bathtubUrl,
   "desk-chair": deskChairUrl,
   "dining-chair": diningChairUrl,
   "dining-table": diningTableUrl,
+  "entry-shoe-cabinet": entryShoeCabinetUrl,
   "floor-lamp": floorLampUrl,
   "haru-bed": haruBedUrl,
+  "kitchen-counter": kitchenCounterUrl,
   "laundry-basket": laundryBasketUrl,
   "low-table": lowTableUrl,
   "potted-plant": pottedPlantUrl,
+  refrigerator: refrigeratorUrl,
   sofa: sofaUrl,
   "storage-shelf": storageShelfUrl,
   "tv-console": tvConsoleUrl,
+  "washroom-vanity": washroomVanityUrl,
   "work-desk": workDeskUrl,
 } as const;
 

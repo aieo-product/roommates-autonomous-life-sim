@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
@@ -82,6 +82,7 @@
       "name": "オータニ ハル",
       "role": "resident",
       "animationPreset": "walk",
+      "portrait": "otani-haru/portraits/ui-bust-v2.png",
       "sheet": "otani-haru/walk-cycle.png"
     },
     {
@@ -89,6 +90,7 @@
       "name": "ミズハラ アオイ",
       "role": "resident",
       "animationPreset": "walk",
+      "portrait": "mizuhara-aoi/portraits/ui-bust-v2.png",
       "sheet": "mizuhara-aoi/walk-cycle.png"
     },
     {
@@ -97,6 +99,7 @@
       "role": "player-command-agent",
       "animationPreset": "hover",
       "relativeVisualHeight": 0.85,
+      "portrait": "navigator/portraits/ui-bust-v2.png",
       "sheet": "navigator/walk-cycle.png"
     }
   ]

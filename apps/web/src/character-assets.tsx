@@ -1,10 +1,9 @@
 import type { CharacterId } from "@roommates/shared";
 import haruWalkCycleUrl from "../../../assets/characters/otani-haru/walk-cycle.png";
-import haruSouthIdleUrl from "../../../assets/characters/otani-haru/frames/south-idle.png";
-import haruResultUrl from "../../../assets/characters/otani-haru/frames/east-idle.png";
+import haruPortraitUrl from "../../../assets/characters/otani-haru/portraits/ui-bust-v2.png";
 import aoiWalkCycleUrl from "../../../assets/characters/mizuhara-aoi/walk-cycle.png";
-import aoiSouthIdleUrl from "../../../assets/characters/mizuhara-aoi/frames/south-idle.png";
-import aoiResultUrl from "../../../assets/characters/mizuhara-aoi/frames/west-idle.png";
+import aoiPortraitUrl from "../../../assets/characters/mizuhara-aoi/portraits/ui-bust-v2.png";
+import navigatorPortraitUrl from "../../../assets/characters/navigator/portraits/ui-bust-v2.png";
 import type { SpriteDirection } from "./after-scene.js";
 
 type ResidentCharacterAsset = {
@@ -16,15 +15,19 @@ type ResidentCharacterAsset = {
 export const residentCharacterAssets: Record<CharacterId, ResidentCharacterAsset> = {
   haru: {
     sheetUrl: haruWalkCycleUrl,
-    portraitUrl: haruSouthIdleUrl,
-    resultUrl: haruResultUrl,
+    portraitUrl: haruPortraitUrl,
+    resultUrl: haruPortraitUrl,
   },
   aoi: {
     sheetUrl: aoiWalkCycleUrl,
-    portraitUrl: aoiSouthIdleUrl,
-    resultUrl: aoiResultUrl,
+    portraitUrl: aoiPortraitUrl,
+    resultUrl: aoiPortraitUrl,
   },
 };
+
+export const navigatorCharacterAssets = {
+  portraitUrl: navigatorPortraitUrl,
+} as const;
 
 export function ResidentPortrait({
   person,

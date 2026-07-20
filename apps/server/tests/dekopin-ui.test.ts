@@ -63,6 +63,10 @@ describe("Dekopin web presentation", () => {
 
     expect(DEKOPIN_NAME).toBe("デコピン");
     expect(app).toContain('from "../../../assets/characters/navigator/walk-cycle.png"');
+    expect(app).toContain("navigatorCharacterAssets");
+    expect(app).toContain("navigatorCharacterAssets.portraitUrl");
+    expect(app).toContain('className="brand-mark" aria-hidden="true"');
+    expect(app).toContain('className="event-announcement-mini-avatar"');
     expect(app).toContain('normalizedType === "navigator.completed"');
     expect(app).toContain("デコピンが反映したイベント");
     expect(css).toContain("image-rendering: pixelated");

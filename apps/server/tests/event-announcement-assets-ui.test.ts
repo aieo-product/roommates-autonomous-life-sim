@@ -15,6 +15,7 @@ type LayoutArea = {
   zones?: LayoutArea[];
 };
 type FurnitureManifest = {
+  version: number;
   assets: Array<{
     id: string;
     file: string;
@@ -164,8 +165,9 @@ describe("generated furniture integration", () => {
     };
   };
 
-  it("statically imports and references all 13 furniture PNGs", () => {
-    expect(manifest.assets).toHaveLength(13);
+  it("statically imports and references all 19 furniture PNGs", () => {
+    expect(manifest.version).toBe(4);
+    expect(manifest.assets).toHaveLength(19);
     expect(existsSync(rendererUrl), "the shared furniture renderer should exist").toBe(true);
     const renderer = readFileSync(rendererUrl, "utf8");
 
@@ -260,6 +262,14 @@ describe("generated furniture integration", () => {
       ["function ResolutionProgress", "function EventCard"],
     );
     expect(furnitureLayer).toContain("<FurnitureSpriteLayer");
+    expect(furnitureLayer).toContain('className="door-mark"');
+    expect(furnitureLayer).toContain('className="rug"');
+    expect(furnitureLayer).toContain('className="rail"');
+    expect(furnitureLayer).not.toContain('className="wash-furniture"');
+    expect(furnitureLayer).not.toContain('className="bath-furniture"');
+    expect(furnitureLayer).not.toContain('className="kitchen-furniture"');
+    expect(furnitureLayer).not.toContain('className="entry-mat"');
+    expect(furnitureLayer).not.toContain('className="laundry"');
     expect(apartmentStage).toContain("<FurnitureLayer />");
     expect(app).toContain("<ApartmentStage game={game}");
   });

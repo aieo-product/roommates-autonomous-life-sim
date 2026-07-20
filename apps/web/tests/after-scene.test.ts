@@ -98,6 +98,30 @@ describe("post-event room scene", () => {
     expect(plan.routes.haru.end).not.toEqual(plan.routes.aoi.end);
   });
 
+  it("routes desk and laundry beats to each resident's safe destination", () => {
+    const game: GameState = {
+      ...INITIAL_GAME_STATE,
+      haru: { ...INITIAL_GAME_STATE.haru, location: "作業机" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "洗濯スペース" },
+    };
+    const plan = createAfterScenePlan(event({
+      storyBeats: [
+        { kind: "move", actor: "haru", location: "作業机の前" },
+        { kind: "action", actor: "haru", action: "ノートを開く" },
+        { kind: "move", actor: "aoi", location: "洗濯ラック前" },
+      ],
+    }), game, {
+      haru: { ...INITIAL_GAME_STATE.haru, location: "リビング" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "リビング" },
+    });
+
+    const moves = plan.beats.filter((beat) => beat.kind === "move");
+    expect(moves).toHaveLength(2);
+    expect(moves[0]?.routes.haru.hasTravel).toBe(true);
+    expect(moves[1]?.routes.aoi.hasTravel).toBe(true);
+    expect(plan.finalPoints.haru).not.toEqual(plan.finalPoints.aoi);
+  });
+
   it("preserves a Director story as ordered movement, dialogue, and action beats", () => {
     const game: GameState = {
       ...INITIAL_GAME_STATE,

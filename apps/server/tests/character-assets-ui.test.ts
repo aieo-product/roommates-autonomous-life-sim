@@ -21,6 +21,7 @@ type CharacterManifest = {
     name: string;
     role: string;
     animationPreset: string;
+    portrait: string;
     sheet: string;
   }>;
 };
@@ -120,7 +121,7 @@ const readWebSourceTree = (directory: string): string =>
 describe("resident character asset manifest", () => {
   it("keeps the sprite geometry and the Haru/Aoi runtime mapping explicit", () => {
     expect(manifest).toMatchObject({
-      version: 3,
+      version: 4,
       frameSize: { width: 128, height: 128 },
       displaySize: { width: 64, height: 64 },
       pivot: { x: 64, y: 118 },
@@ -132,12 +133,14 @@ describe("resident character asset manifest", () => {
       name: "オータニ ハル",
       role: "resident",
       animationPreset: "walk",
+      portrait: "otani-haru/portraits/ui-bust-v2.png",
       sheet: "otani-haru/walk-cycle.png",
     });
     expect(manifest.characters.find(({ id }) => id === "mizuhara-aoi")).toMatchObject({
       name: "ミズハラ アオイ",
       role: "resident",
       animationPreset: "walk",
+      portrait: "mizuhara-aoi/portraits/ui-bust-v2.png",
       sheet: "mizuhara-aoi/walk-cycle.png",
     });
     expect(manifest.characters.some(({ id }) => id === "producer")).toBe(false);
@@ -145,6 +148,13 @@ describe("resident character asset manifest", () => {
 
   it("has a correctly sized sheet and every manifest-derived frame", () => {
     for (const character of manifest.characters) {
+      const portraitUrl = new URL(character.portrait, characterRootUrl);
+      expect(existsSync(portraitUrl), `${character.portrait} should exist`).toBe(true);
+      expect(pngDimensions(portraitUrl), `${character.portrait} should be a 256px UI portrait`).toEqual({
+        width: 256,
+        height: 256,
+      });
+
       const sheetUrl = new URL(character.sheet, characterRootUrl);
       expect(existsSync(sheetUrl), `${character.sheet} should exist`).toBe(true);
       expect(pngDimensions(sheetUrl), `${character.sheet} should match manifest.sheet`).toEqual({
@@ -173,13 +183,12 @@ describe("resident character asset registry", () => {
   const requiredImports = [
     "otani-haru/walk-cycle.png",
     "mizuhara-aoi/walk-cycle.png",
-    "otani-haru/frames/south-idle.png",
-    "mizuhara-aoi/frames/south-idle.png",
-    "otani-haru/frames/east-idle.png",
-    "mizuhara-aoi/frames/west-idle.png",
+    "otani-haru/portraits/ui-bust-v2.png",
+    "mizuhara-aoi/portraits/ui-bust-v2.png",
+    "navigator/portraits/ui-bust-v2.png",
   ];
 
-  it("statically imports and references every runtime Haru/Aoi image", () => {
+  it("statically imports and references every runtime resident and navigator image", () => {
     for (const assetPath of requiredImports) {
       const importPattern = new RegExp(
         `^import\\s+([A-Za-z_$][\\w$]*)\\s+from\\s+["'][^"']*assets/characters/${escapeRegex(assetPath)}(?:\\?url)?["'];?\\s*$`,
@@ -201,6 +210,7 @@ describe("resident character asset registry", () => {
 
   it("exports the shared registry and both resident renderers", () => {
     expectNamedExport(characterAssets, "residentCharacterAssets");
+    expectNamedExport(characterAssets, "navigatorCharacterAssets");
     expectNamedExport(characterAssets, "ResidentPortrait");
     expectNamedExport(characterAssets, "ResidentSceneSprite");
     expect(characterAssets).toMatch(
@@ -208,6 +218,13 @@ describe("resident character asset registry", () => {
     );
     expect(characterAssets).toMatch(
       /residentCharacterAssets(?:\s*:\s*[^=]+)?\s*=\s*\{[\s\S]*?\baoi\s*:/,
+    );
+    expect(characterAssets).toMatch(/navigatorCharacterAssets\s*=\s*\{[\s\S]*?portraitUrl\s*:/);
+    expect(characterAssets).toMatch(
+      /haru\s*:\s*\{[\s\S]*?portraitUrl\s*:\s*haruPortraitUrl,[\s\S]*?resultUrl\s*:\s*haruPortraitUrl/,
+    );
+    expect(characterAssets).toMatch(
+      /aoi\s*:\s*\{[\s\S]*?portraitUrl\s*:\s*aoiPortraitUrl,[\s\S]*?resultUrl\s*:\s*aoiPortraitUrl/,
     );
   });
 
@@ -259,8 +276,10 @@ describe("resident character images across the UI", () => {
 
   it("uses resident images in the result hero, highlights, and reflections", () => {
     expectNamedImport(resultHero, "residentCharacterAssets", "../character-assets");
+    expectNamedImport(resultHero, "navigatorCharacterAssets", "../character-assets");
     expect(resultHero).toMatch(/residentCharacterAssets\.haru\.resultUrl/);
     expect(resultHero).toMatch(/residentCharacterAssets\.aoi\.resultUrl/);
+    expect(resultHero).toMatch(/navigatorCharacterAssets\.portraitUrl/);
 
     for (const [name, source] of [
       ["Highlights", highlights],
@@ -270,5 +289,17 @@ describe("resident character images across the UI", () => {
       expect(source, `${name} should render ResidentPortrait`).toMatch(/<ResidentPortrait\b/);
     }
 
+  });
+
+  it("keeps the result portraits large, contained, and responsive", () => {
+    expect(residentCss).toMatch(
+      /\.result-resident-pair img\s*\{[^}]*width:\s*112px;[^}]*height:\s*112px;[^}]*object-fit:\s*contain;[^}]*image-rendering:\s*pixelated;/,
+    );
+    expect(residentCss).toMatch(
+      /@media \(max-width:\s*560px\)[\s\S]*?\.result-resident-pair img\s*\{[^}]*width:\s*88px;[^}]*height:\s*88px;/,
+    );
+    expect(residentCss).toMatch(
+      /\.result-score-dekopin img\s*\{[^}]*object-fit:\s*contain;[^}]*image-rendering:\s*pixelated;/,
+    );
   });
 });

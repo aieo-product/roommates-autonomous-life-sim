@@ -70,6 +70,7 @@
       "capacity": 2,
       "defaultOccupancy": 0,
       "anchors": [
+        { "id": "entry_cabinet", "kind": "furniture", "x": 16.5, "y": 1.2, "width": 2, "height": 1 },
         { "id": "entry_pair", "kind": "character", "tags": ["pair"], "x": 16, "y": 0.5, "width": 3, "height": 2 }
       ],
       "blocked": [
@@ -85,11 +86,10 @@
       "capacity": 1,
       "defaultOccupancy": 0,
       "anchors": [
+        { "id": "washroom_vanity", "kind": "furniture", "x": 19.5, "y": 0.2, "width": 2, "height": 1 },
         { "id": "washroom_solo", "kind": "character", "tags": ["solo"], "x": 20.5, "y": 1, "width": 2, "height": 2 }
       ],
-      "blocked": [
-        { "reason": "fixed_plumbing", "x": 19, "y": 0, "width": 5, "height": 1 }
-      ]
+      "blocked": []
     },
     {
       "id": "hallway",
@@ -116,11 +116,10 @@
       "capacity": 1,
       "defaultOccupancy": 0,
       "anchors": [
+        { "id": "bathtub", "kind": "furniture", "x": 20, "y": 3.5, "width": 4, "height": 2 },
         { "id": "bathroom_solo", "kind": "character", "tags": ["solo"], "x": 19.5, "y": 5, "width": 2, "height": 2 }
       ],
-      "blocked": [
-        { "reason": "fixed_bathtub", "x": 21.5, "y": 3.5, "width": 2, "height": 4 }
-      ]
+      "blocked": []
     },
     {
       "id": "ldk",
@@ -136,11 +135,11 @@
           "name": "キッチン",
           "bounds": { "x": 0, "y": 8, "width": 7, "height": 8 },
           "anchors": [
+            { "id": "kitchen_counter", "kind": "furniture", "x": 0, "y": 8, "width": 5, "height": 2 },
+            { "id": "refrigerator", "kind": "furniture", "x": 5, "y": 8, "width": 2, "height": 2 },
             { "id": "kitchen_pair", "kind": "character", "tags": ["pair", "cooking"], "x": 2, "y": 11, "width": 4, "height": 2 }
           ],
-          "blocked": [
-            { "reason": "fixed_kitchen", "x": 0, "y": 8, "width": 7, "height": 2 }
-          ]
+          "blocked": []
         },
         {
           "id": "dining",
@@ -180,7 +179,8 @@
       "defaultOccupancy": 0,
       "anchors": [
         { "id": "balcony_pair", "kind": "character", "tags": ["pair", "conversation"], "x": 15, "y": 16, "width": 5, "height": 2 },
-        { "id": "laundry", "kind": "prop", "tags": ["laundry"], "x": 2, "y": 16, "width": 6, "height": 2 }
+        { "id": "laundry", "kind": "prop", "tags": ["laundry"], "x": 2, "y": 16, "width": 6, "height": 2 },
+        { "id": "balcony_drying_rack", "kind": "furniture", "tags": ["laundry"], "x": 9, "y": 16, "width": 4, "height": 1 }
       ],
       "blocked": [
         { "reason": "balcony_door_clearance", "x": 20, "y": 16, "width": 3, "height": 2 }
