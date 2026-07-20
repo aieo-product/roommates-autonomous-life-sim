@@ -1,6 +1,14 @@
 import type { DirectorAgent, DirectorInput, ProposalTag, ResolvedEvent, StatDelta } from "@roommates/shared";
 
 const cooperative = new Set(["ACCEPT", "MODIFY", "INITIATE"]);
+const OPEN_LOW_PRESSURE_EVENT_ID = "open-low-pressure-activity";
+const openActivityEffects: StatDelta = {
+  energy: -2,
+  stress: -3,
+  affection: 2,
+  trust: 2,
+  romanticAwareness: 1,
+};
 
 const effects: Record<ProposalTag, StatDelta> = {
   cook: { energy: -6, stress: -3, affection: 8, trust: 7, romanticAwareness: 5 },
@@ -48,6 +56,8 @@ const sharedRoutes: Record<ProposalTag, readonly [string, string]> = {
 export class MockDirectorAgent implements DirectorAgent {
   async resolve(input: DirectorInput): Promise<ResolvedEvent> {
     const tag = input.suggestion.tags.find((value) => value !== "pressure") ?? "other";
+    const openActivity =
+      input.suggestion.eventDefinitionId === OPEN_LOW_PRESSURE_EVENT_ID;
     const haruJoins = cooperative.has(input.haruDecision.decision);
     const aoiJoins = cooperative.has(input.aoiDecision.decision);
     const together = haruJoins && aoiJoins;
@@ -102,7 +112,7 @@ export class MockDirectorAgent implements DirectorAgent {
       };
     }
 
-    const base = effects[tag];
+    const base = openActivity ? openActivityEffects : effects[tag];
     const titles: Record<ProposalTag, string> = {
       cook: "少し不格好な共同料理",
       movie: "ソファの端から始まる映画会",
@@ -115,13 +125,19 @@ export class MockDirectorAgent implements DirectorAgent {
       pressure: "急かされた心",
       other: "二人なりの小さな挑戦",
     };
+    const eventTitle = openActivity ? "二人で試す小さな提案" : titles[tag];
     const haruDialogue = input.haruDecision.dialogue || "一緒にやってみようか。";
     const aoiDialogue = input.aoiDecision.dialogue || "うん、やってみよう。";
-    const [openingLocation, destination] = sharedRoutes[tag];
+    const [openingLocation, destination] = openActivity
+      ? ["安全確認済みの共有スペース", "安全確認済みの共有スペース"]
+      : sharedRoutes[tag];
+    const sharedAction = openActivity
+      ? `「${input.suggestion.text}」を20分以内の安全な形へ整えて試す`
+      : sharedActions[tag];
     const haruFollowUp = "それじゃ、できるところから始めよう。";
     const aoiFollowUp = "うん。二人のペースで進めよう。";
     return {
-      eventTitle: titles[tag],
+      eventTitle,
       narration: `二人は提案をそのまま命令としてではなく、自分たちなりのきっかけとして選び取った。${input.haruDecision.action}Haruと、${input.aoiDecision.action}Aoiの間に、少しだけ自然な空気が流れた。`,
       haruDialogue: input.haruDecision.dialogue,
       aoiDialogue: input.aoiDecision.dialogue,
@@ -135,14 +151,14 @@ export class MockDirectorAgent implements DirectorAgent {
         { kind: "move", actor: "both", location: openingLocation },
         { kind: "dialogue", actor: "haru", text: haruDialogue },
         { kind: "dialogue", actor: "aoi", text: aoiDialogue },
-        { kind: "action", actor: "both", action: sharedActions[tag] },
+        { kind: "action", actor: "both", action: sharedAction },
         { kind: "move", actor: "both", location: destination },
         { kind: "dialogue", actor: "haru", text: haruFollowUp },
         { kind: "dialogue", actor: "aoi", text: aoiFollowUp },
       ],
       effects: { haru: base, aoi: scale(base, tag === "cook" ? 1.1 : 1) },
       memory: {
-        title: titles[tag],
+        title: eventTitle,
         summary: `${input.suggestion.text}というきっかけから、二人が自分の意思で時間を共有した`,
         emotionalImpact: pressure ? -2 : 6,
         importance: tag === "confession" ? 9 : 7,

@@ -36,7 +36,7 @@ describe("MockNavigatorAgent", () => {
   });
 
   it("explains a locked fallback without echoing untrusted raw input", async () => {
-    const rawInput = "映画を見よう";
+    const rawInput = "タイムマシンで月へ行こう";
     const current = input(rawInput);
     const output = await new MockNavigatorAgent().respond(current);
     const response = buildNavigatorResponse(current, output);
