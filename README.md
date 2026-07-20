@@ -1,5 +1,17 @@
 # ROOMMATES
 
+[**▶ Try the live demo**](https://roommates-heart-game.donald-25.chatgpt.site)
+· [**OpenAI Build Week submission pack (English)**](./docs/openai-build-week-submission.md)
+· [**Visual field guide**](https://roommates-build-week-guide.donald-25.chatgpt.site)
+· [Submission checklist #57](https://github.com/aieo-product/teamOtaniHackathon/issues/57)
+
+**ROOMMATES is a seven-day autonomous relationship simulation where the player
+offers everyday cues instead of directly controlling the two residents.** Haru and
+Aoi decide independently from the same frozen world state, and a Director agent
+reconciles their choices into one shared event.
+
+![ROOMMATES map-first apartment layout guide](./docs/assets/room-game-view.svg)
+
 > **ハッカソン審査員の方へ**
 > ROOMMATESは、プレイヤーがキャラクターを操作するのではなく、二人のAIエージェントへ生活上の「きっかけ」だけを与える自律型恋愛シミュレーションです。HaruとAoiは同じ世界状態から独立して行動を決め、Directorエージェントが二人の意思を尊重しながら出来事を調停します。プレイヤーが望む展開になる保証はありません。
 
@@ -38,7 +50,7 @@ flowchart LR
 - [基本間取りと2Dゲーム画面](./docs/room-layout.md)
 - [キャラクタースプライト](./docs/character-sprites.md)
 - [家具・生活小物2Dドット素材](./docs/furniture-assets.md)
-- [7日間の総集編・Agent感想・Producer評価リザルト](./docs/result-experience.md) — Issue #22で採用したP0設計。実装は進行中です。
+- [7日間の総集編・Agent感想・Producer評価リザルト](./docs/result-experience.md) — PR #36で実装済みのP0体験仕様です。
 - [Producer Score v1](./docs/result-scoring-v1.md) — 決定的な採点ルール、根拠、coverage、テストベクトル。
 - [GameState v2](./docs/game-state-v2.md) — 全28ターンの正本ログ、Result状態、privacy、migration。
 - [高速スキップ設計 v1](./docs/fast-skip.md) — Issue #33。決定論的ローカル進行、job、checkpoint、cancel、採点境界。
@@ -215,22 +227,33 @@ AGENT_MODE=mock npm run dev
 
 モックは固定シナリオではありません。料理、映画、掃除、謝罪、会話、花などの提案を分類し、各キャラクターの体力、ストレス、信頼、性格、時間帯、デモseedから判断します。同じseedと同じ状態なら再現可能で、入力や状態が変われば反応も変わります。
 
-## 3分デモ手順
+## 3分未満の提出デモ手順
 
-審査デモは`AGENT_MODE=mock`が最も再現性があります。実接続を見せる場合は`auto`で起動し、接続バッジとthread IDも合わせて紹介してください。
+公式ルールに合わせ、提出動画は**公開YouTube・音声説明付き・3分未満**とし、
+2分48秒を目標にします。英語ナレーション案と提出文は
+[OpenAI Build Week submission pack](./docs/openai-build-week-submission.md)にまとめています。
 
-1. **0:00–0:30 — コンセプト**
-   Day 1 / Morning、常時見える2LDKの全景とそこで暮らす二人、右の状態／予定タブを見せ、「操作ではなく、生活を見守ってきっかけだけを与えるゲーム」と説明します。
-2. **0:30–1:15 — 独立判断**
-   「一緒に夕食を作ってみたら？」と入力します。住人の頭上と画面上部の3段階インジケーターが、Haru、Aoi、できごとの順に進み、キッチンへ注目が移る様子を見せます。
-3. **1:15–1:45 — 結果と記憶**
-   部屋の中の短い会話、二人の異なる判断、Directorのナレーション、energy・trust・affection等の変化を示します。必要なら下部の「最新の生活ログ」から全記録を開きます。
-4. **1:45–2:20 — 自律性**
-   「何もせず見守る」または別のプリセットを選び、二人が拒否・修正・自発行動も選べることを見せます。
-5. **2:20–2:45 — 7日間の変化**
-   `Fast Forward`で数日進め、恋愛の緊張、告白機会、または別のエンディングまで進めます。好感度だけでは恋人にならない点を説明します。
-6. **2:45–3:00 — App Server runtime**
-   デバッグ表示でHaru/Aoi/Directorの独立thread IDと、各役割の`app_server`・`openai_api`・`mock`・`fallback`状態を見せます。
+本番公開版では2026-07-20の匿名スモークテストで、Navigator / Haru / Aoi /
+Directorの4役がすべて`openai_api`として1ターンを完了しました。公開APIはモデル名を
+返さないため、収録前にSitesの`OPENAI_API_MODEL=gpt-5.6-terra`をOwnerが確認し、
+動画では実際に表示されたprovider attributionだけを説明します。
+
+1. **0:00–0:18 — 課題とコンセプト**
+   常時見える2LDKを映し、「相手を操作する恋愛ゲームではなく、二人が自分で選べる環境をつくるゲーム」と説明します。
+2. **0:18–0:38 — Character Studio**
+   二人のプロフィールと10項目の個性値が、同じ提案への解釈を変えることを示します。
+3. **0:38–1:18 — 独立判断**
+   「一緒に夕食を作ってみたら？」と入力し、同じ固定スナップショットからHaruとAoiが独立して判断する進捗を見せます。
+4. **1:18–1:42 — Directorと状態変化**
+   受諾・修正・拒否・無視・自発行動をDirectorが一つの出来事へ統合し、ゲームエンジンだけが検証済みの変化を適用することを示します。
+5. **1:42–2:02 — 自律性**
+   拒否や変更も失敗ではなく、キャラクターが意思を持つ証拠であることを対照的な結果で説明します。
+6. **2:02–2:24 — 7日間の変化**
+   現行の同期`Fast Forward`でDay 7へ進め、総集編、二人の振り返り、根拠付きProducer Scoreを見せます。
+7. **2:24–2:42 — Codex / GPT-5.6**
+   デバッグ表示で各役割のprovider attributionを映し、Codexとの開発協働とGPT-5.6のランタイム利用を説明します。
+8. **2:42–2:48 — 締め**
+   公開URLと「二人を恋に落とすのではない。恋が始まる場所をつくる。」を表示します。
 
 ## API概要
 
@@ -260,16 +283,17 @@ AGENT_MODE=mock npm run dev
 - 実App Serverの応答速度と内容は、インストール済みCodex CLI、モデル、実行環境に依存します。
 - 実接続が利用できても、個別エージェントのタイムアウトや不正出力により一部ターンだけモックへ切り替わることがあります。
 - モックの自然言語理解は日本語キーワードと状態ベースの簡易判定です。
-- PCでの短時間デモを優先しており、モバイル最適化や網羅的なUIテストは限定的です。
+- PCでの短時間デモに加え、390〜430px幅のスマートフォン操作とマップ情報の表示切替に対応しています。より小さい画面や全ブラウザの網羅検証は今後の対象です。
 - 今日の予定はUI検証用のデイリープランです。現在の目標と場所はゲーム状態へ追従しますが、予定そのものの永続化やエージェント判断への入力は今後の拡張対象です。
-- 間取りは24×18タイルの論理座標を1280×720のアイソメトリック表示へ投影しています。家具は生成済みPNGを共通manifestから配置し、住人の全景表示はSVG/CSSの簡易表現、デコピンとリザルト内の住人は生成スプライトを使用します。
+- 間取りは24×18タイルの論理座標を1280×720のアイソメトリック表示へ投影しています。家具とHaru/Aoi/デコピンの生成済みPNG素材を共通manifestから配置しています。
 - キャラクター移動はイベント／部屋ごとの固定アンカーです。自由歩行、経路探索、家具との詳細な当たり判定は今後の拡張対象です。
 - 本格的な3D描画、音声、認証、ランキング、家具購入は対象外です。
 
-## 設計済み・実装中のP0
+## 実装済みのP0と残作業
 
-- 7日間の総集編、注目イベント、Haru/Aoiの振り返り、説明可能なProducer評価リザルト
-- 決定論的ローカル進行による高速スキップjob、進捗、cancel、再起動復旧
+- **実装済み:** 7日間の総集編、注目イベント、Haru/Aoiの振り返り、説明可能なProducer評価リザルト
+- **現行デモで実装済み:** 同期`Fast Forward`による決定論的ローカル進行
+- **設計済み・未実装（Issue #33）:** 高速スキップの非同期job、進捗、cancel、再起動復旧
 
 ## 今後の発展案
 
