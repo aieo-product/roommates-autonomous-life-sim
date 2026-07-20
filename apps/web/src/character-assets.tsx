@@ -5,6 +5,7 @@ import aoiWalkCycleUrl from "../../../assets/characters/mizuhara-aoi/walk-cycle.
 import aoiPortraitUrl from "../../../assets/characters/mizuhara-aoi/portraits/ui-bust-v2.png";
 import navigatorPortraitUrl from "../../../assets/characters/navigator/portraits/ui-bust-v2.png";
 import type { SpriteDirection } from "./after-scene.js";
+import { useManagedCharacterAsset } from "./assets-manager/index.js";
 
 type ResidentCharacterAsset = {
   sheetUrl: string;
@@ -40,12 +41,13 @@ export function ResidentPortrait({
   className?: string;
   thinking?: boolean;
 }) {
+  const managedAsset = useManagedCharacterAsset(person);
   return (
     <span
       className={`resident-portrait portrait-${person} ${className}`.trim()}
       aria-hidden={alt ? undefined : true}
     >
-      <img src={residentCharacterAssets[person].portraitUrl} alt={alt} />
+      <img src={managedAsset?.portraitUrl ?? residentCharacterAssets[person].portraitUrl} alt={alt} />
       {thinking && <span className="resident-portrait-thinking">•••</span>}
     </span>
   );
@@ -60,12 +62,13 @@ export function ResidentSceneSprite({
   direction?: SpriteDirection;
   moving?: boolean;
 }) {
+  const managedAsset = useManagedCharacterAsset(person);
   return (
     <span
       className={`resident-scene-sprite direction-${direction} ${moving ? "is-moving" : ""}`}
       aria-hidden="true"
     >
-      <img src={residentCharacterAssets[person].sheetUrl} alt="" />
+      <img src={managedAsset?.imageUrl ?? residentCharacterAssets[person].sheetUrl} alt="" />
     </span>
   );
 }

@@ -1,0 +1,77 @@
+{
+  "$schema": "../../schemas/roommates-asset-format-v1.schema.json",
+  "format": "roommates.character-pack",
+  "formatVersion": 1,
+  "id": "roommates.sample-characters",
+  "name": "ROOMMATES v1 sample characters",
+  "packVersion": "1.0.0",
+  "license": {
+    "spdx": "CC-BY-4.0",
+    "attribution": "ROOMMATES contributors",
+    "source": "https://github.com/aieo-product/teamOtaniHackathon"
+  },
+  "characters": [
+    {
+      "id": "sample.haru",
+      "label": "Sample Haru",
+      "role": "resident",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "render": {
+        "canvas": { "width": 128, "height": 128 },
+        "contentBounds": { "x": 28, "y": 14, "width": 72, "height": 104 },
+        "pivot": { "x": 64, "y": 118 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1
+      },
+      "portrait": {
+        "file": "images/haru-portrait.png",
+        "canvas": { "width": 256, "height": 256 }
+      },
+      "spriteSheet": {
+        "file": "images/haru-walk-cycle.png",
+        "canvas": { "width": 384, "height": 512 },
+        "frameSize": { "width": 128, "height": 128 },
+        "columns": 3,
+        "rows": 4,
+        "directionRows": { "south": 0, "east": 1, "north": 2, "west": 3 },
+        "animations": {
+          "idle": { "frames": [1], "frameDurationMs": 170, "loop": true },
+          "walk": { "frames": [0, 1, 2, 1], "frameDurationMs": 170, "loop": true }
+        }
+      }
+    },
+    {
+      "id": "sample.aoi",
+      "label": "Sample Aoi",
+      "role": "resident",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "render": {
+        "canvas": { "width": 128, "height": 128 },
+        "contentBounds": { "x": 28, "y": 14, "width": 72, "height": 104 },
+        "pivot": { "x": 64, "y": 118 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1
+      },
+      "portrait": {
+        "file": "images/aoi-portrait.png",
+        "canvas": { "width": 256, "height": 256 }
+      },
+      "spriteSheet": {
+        "file": "images/aoi-walk-cycle.png",
+        "canvas": { "width": 384, "height": 512 },
+        "frameSize": { "width": 128, "height": 128 },
+        "columns": 3,
+        "rows": 4,
+        "directionRows": { "south": 0, "east": 1, "north": 2, "west": 3 },
+        "animations": {
+          "idle": { "frames": [1], "frameDurationMs": 170, "loop": true },
+          "walk": { "frames": [0, 1, 2, 1], "frameDurationMs": 170, "loop": true }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "../../schemas/roommates-asset-format-v1.schema.json",
+  "format": "roommates.room-pack",
+  "formatVersion": 1,
+  "id": "roommates.sample-room",
+  "name": "ROOMMATES v1 sample room",
+  "packVersion": "1.0.0",
+  "license": {
+    "spdx": "CC-BY-4.0",
+    "attribution": "ROOMMATES contributors",
+    "source": "https://github.com/aieo-product/teamOtaniHackathon"
+  },
+  "grid": {
+    "type": "square",
+    "columns": 12,
+    "rows": 8,
+    "tileSize": 1
+  },
+  "projection": {
+    "type": "isometric-cutaway",
+    "tileWidthPx": 50,
+    "tileHeightPx": 25,
+    "origin": { "x": 300, "y": 50 },
+    "cameraDirection": "south-west-to-north-east"
+  },
+  "dependencies": {
+    "assetPacks": [{ "id": "roommates.sample-furniture", "version": "^1.0.0" }],
+    "characterPacks": [{ "id": "roommates.sample-characters", "version": "^1.0.0" }]
+  },
+  "rooms": [
+    { "id": "entry", "name": "玄関", "bounds": { "x": 0, "y": 0, "width": 4, "height": 3 } },
+    { "id": "kitchen", "name": "キッチン", "bounds": { "x": 4, "y": 0, "width": 4, "height": 4 } },
+    { "id": "bathroom", "name": "浴室", "bounds": { "x": 8, "y": 0, "width": 4, "height": 4 } },
+    { "id": "living", "name": "リビング", "bounds": { "x": 0, "y": 4, "width": 8, "height": 4 } },
+    { "id": "balcony", "name": "バルコニー", "bounds": { "x": 8, "y": 4, "width": 4, "height": 4 } }
+  ],
+  "placements": {
+    "assets": [
+      { "instanceId": "entry-rug", "assetId": "sample.entry-rug", "roomId": "entry", "floorContact": { "x": 3, "y": 2 } },
+      { "instanceId": "island", "assetId": "sample.island-kitchen", "roomId": "kitchen", "floorContact": { "x": 6, "y": 3 } },
+      { "instanceId": "fridge", "assetId": "sample.refrigerator", "roomId": "kitchen", "floorContact": { "x": 8, "y": 4 } },
+      { "instanceId": "bath", "assetId": "sample.bathtub", "roomId": "bathroom", "floorContact": { "x": 11, "y": 3 } },
+      { "instanceId": "sofa", "assetId": "sample.sofa", "roomId": "living", "floorContact": { "x": 4, "y": 7 } },
+      { "instanceId": "rack", "assetId": "sample.drying-rack", "roomId": "balcony", "floorContact": { "x": 11, "y": 7 } }
+    ],
+    "characters": [
+      { "instanceId": "haru", "assetId": "sample.haru", "roomId": "kitchen", "floorContact": { "x": 5, "y": 2 }, "facing": "east" },
+      { "instanceId": "aoi", "assetId": "sample.aoi", "roomId": "kitchen", "floorContact": { "x": 7, "y": 2 }, "facing": "west" }
+    ]
+  }
+}

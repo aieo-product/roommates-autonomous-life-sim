@@ -25,6 +25,7 @@ import {
   roomForEvent,
   roomForLocation,
   type CharacterId,
+  type GridObstacle,
   type Point,
 } from "./room-layout";
 import {
@@ -37,7 +38,12 @@ import {
   type AfterScenePlan,
   type SpriteDirection,
 } from "./after-scene";
-import { FurnitureSpriteLayer } from "./furniture-assets";
+import {
+  AssetManagerLauncher,
+  ManagedFurnitureSpriteLayer,
+  useAssetManager,
+  useManagedCharacterAsset,
+} from "./assets-manager";
 import { buildMemoryArticle, type MemoryArticle } from "./memory-article";
 import { ResultScreen } from "./result";
 import {
@@ -190,11 +196,12 @@ function RuntimeBadge({ runtime, offline }: { runtime: RuntimeInfo; offline: boo
 }
 
 function DekopinGuide({ presentation }: { presentation: DekopinPresentation }) {
+  const managedNavigator = useManagedCharacterAsset("navigator");
   return (
     <div className={`dekopin-guide is-${presentation.mood}`}>
       <span className="dekopin-avatar" aria-hidden="true">
         <span className="dekopin-sprite-window">
-          <img className="dekopin-sprite-sheet" src={dekopinSpriteUrl} alt="" />
+          <img className="dekopin-sprite-sheet" src={managedNavigator?.imageUrl ?? dekopinSpriteUrl} alt="" />
         </span>
         <i />
       </span>
@@ -290,8 +297,6 @@ function FurnitureLayer() {
   return (
     <g className="furniture-layer" aria-hidden="true">
       <g className="entry-furniture">
-        <polygon className="entry-rug" points="982.5,321.25 1032.5,346.25 1007.5,358.75 957.5,333.75" />
-        <polygon className="entry-rug-inset" points="983.75,325.625 1023.75,345.625 1006.25,354.375 966.25,334.375" />
         <path className="door-mark" d="M1016 309v60M1016 369l42 21" />
       </g>
       <g className="living-furniture">
@@ -300,7 +305,7 @@ function FurnitureLayer() {
       <g className="balcony-furniture">
         <path className="rail" d="M164 314L752 608M157 329L745 623M164 314v15M260 362v15M356 410v15M452 458v15M548 506v15M644 554v15M752 608v15" />
       </g>
-      <FurnitureSpriteLayer />
+      <ManagedFurnitureSpriteLayer />
     </g>
   );
 }
@@ -617,6 +622,7 @@ function EventAnnouncementModal({
   onOpenLog: () => void;
   onAdvance: () => void;
 }) {
+  const managedNavigator = useManagedCharacterAsset("navigator");
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const phase = PHASES.find((item) => item.id === event.phase) ?? PHASES[0];
@@ -716,7 +722,7 @@ function EventAnnouncementModal({
           {navigatorMessage && (
             <section className="event-announcement-dekopin" aria-label="デコピンの応答">
               <div className="event-announcement-mini-avatar" aria-hidden="true">
-                <img src={navigatorCharacterAssets.portraitUrl} alt="" />
+                <img src={managedNavigator?.portraitUrl ?? navigatorCharacterAssets.portraitUrl} alt="" />
               </div>
               <div><small>{DEKOPIN_NAME} · EVENT NAVIGATOR</small><p>「{navigatorMessage}」</p></div>
             </section>
@@ -1094,6 +1100,23 @@ function LogDrawer({
 
 export default function App() {
   const characterSettings = useCharacterSettings();
+  const { document: assetDocument } = useAssetManager();
+  const managedNavigator = useManagedCharacterAsset("navigator");
+  const furnitureObstacles = useMemo<GridObstacle[]>(() => {
+    const assets = new Map(assetDocument.assets.furniture.map((asset) => [asset.id, asset]));
+    const roomIds = new Set(ROOM_ZONES.map((room) => room.id));
+    return assetDocument.placements.furniture.flatMap((placement) => {
+      const asset = assets.get(placement.assetId);
+      if (!asset || !roomIds.has(placement.roomId as GridObstacle["roomId"])) return [];
+      return [{
+        roomId: placement.roomId as GridObstacle["roomId"],
+        x: placement.floorContact.x - asset.footprintTiles.width,
+        y: placement.floorContact.y - asset.footprintTiles.depth,
+        width: asset.footprintTiles.width,
+        depth: asset.footprintTiles.depth,
+      }];
+    });
+  }, [assetDocument]);
   const people = useMemo<People>(() => ({
     haru: {
       name: characterSettings.savedSettings.characters.haru.profile.name,
@@ -1545,11 +1568,11 @@ export default function App() {
     if (playedAfterSceneIdsRef.current.has(event.id)) return;
     playedAfterSceneIdsRef.current.add(event.id);
     setAfterScene({
-      plan: createAfterScenePlan(event, game, turnStartStatesRef.current),
+      plan: createAfterScenePlan(event, game, turnStartStatesRef.current, furnitureObstacles),
       beatIndex: -1,
     });
     turnStartStatesRef.current = undefined;
-  }, [game]);
+  }, [furnitureObstacles, game]);
 
   useEffect(() => {
     if (initialLoading) return;
@@ -1674,12 +1697,13 @@ export default function App() {
   return (
     <div className={`app phase-theme-${game.shared.phase}`}>
       <header className="topbar" aria-label="ゲーム情報とメニュー" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
-        <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark" aria-hidden="true"><img src={navigatorCharacterAssets.portraitUrl} alt="" /></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
+        <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark" aria-hidden="true"><img src={managedNavigator?.portraitUrl ?? navigatorCharacterAssets.portraitUrl} alt="" /></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
         <PhaseRail game={game} />
         <div className="header-stat relationship-status"><small>RELATIONSHIP</small><strong><span aria-hidden="true">♥</span>{RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div>
         <div className="header-stat"><small>MEMORY</small><strong>{game.shared.sharedMemories.length.toString().padStart(2, "0")}</strong></div>
         <div className="header-meta">
           <RuntimeBadge runtime={game.runtime} offline={offline} />
+          <AssetManagerLauncher />
           <button ref={personalityButtonRef} className="personality-open-button" type="button" aria-haspopup="dialog" aria-expanded={personalityOpen} onClick={() => setPersonalityOpen(true)}><span aria-hidden="true">◆</span>個性設定</button>
           <button className={`header-log-button ${logOpen ? "is-open" : ""}`} type="button" aria-controls="life-log-drawer" aria-expanded={logOpen} onClick={() => setLogOpen((open) => !open)}><span aria-hidden="true">▤</span>生活ログ</button>
           <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={initialLoading || Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す" aria-label="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>

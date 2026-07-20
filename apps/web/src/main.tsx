@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { ResultScreen } from "./result";
 import { RESULT_PREVIEW_GAME } from "./result/preview";
+import { AssetManagerProvider } from "./assets-manager";
 import "./styles.css";
 
 const showResultPreview = import.meta.env.DEV &&
@@ -10,6 +11,8 @@ const showResultPreview = import.meta.env.DEV &&
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {showResultPreview ? <ResultScreen game={RESULT_PREVIEW_GAME} /> : <App />}
+    <AssetManagerProvider>
+      {showResultPreview ? <ResultScreen game={RESULT_PREVIEW_GAME} /> : <App />}
+    </AssetManagerProvider>
   </StrictMode>,
 );

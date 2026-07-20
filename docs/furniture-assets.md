@@ -1,49 +1,77 @@
 # 家具・生活小物 2Dドット素材
 
-Issue #7 の間取り描画と Issue #6 のキャラクターに合わせた、等角投影の家具素材です。
+ROOMMATESの部屋・キャラクター・家具は、同じ24 × 18の正方形ワールドグリッドを正本として扱います。SVG上の等角投影は表示方法であり、素材や配置データに画面座標を埋め込みません。
 
-## 描画仕様
+## Grid Asset v5
 
-- 投影: 2:1 等角投影
+- 論理グリッド: 24 × 18の正方形セル
+- キャラクター占有: 1 × 1セル
+- 投影: 2:1 等角投影（1セルを50 × 25pxのひし形として表示）
 - カメラ: 南西から北東
-- キャンバス: 256 × 256 px、RGBA PNG
-- 既定ピボット: `(128, 236)`（実画像の足元が異なる素材はmanifestのasset別 `pivot` を優先）
-- 推奨表示倍率: 0.5（128 × 128 px相当）
-- 背景、床面、影、文字、ロゴは素材に含めない
-- 拡大縮小時は nearest-neighbor を使用する
+- 素材キャンバス: 原則256 × 256pxのRGBA PNG
+- `floorContact`: ワールドグリッド上の足元接地点
+- `footprintTiles`: `width × depth` の占有セル数
+- `render.pivot`: 素材キャンバス上で`floorContact`へ合わせるピクセル
+- `render.contentBounds`: 透明余白を除く実画像の範囲
+- `render.fitScale`: 自動フィット後の微調整倍率。絶対表示倍率ではない
+
+表示倍率は次の式から自動算出します。
+
+```text
+projectedFootprintWidth = (width + depth) × 25
+scale = projectedFootprintWidth ÷ contentBounds.width × fitScale
+```
+
+この規格により、同じ`footprintTiles`、`contentBounds`、`pivot`を満たす画像へ差し替えても、部屋の配置とキャラクター導線は変わりません。
 
 ## 収録素材
 
-| ID | タイル占有 | 間取りアンカー |
-| --- | --- | --- |
-| `haru-bed` | 3 × 5 | `haru_bed` |
-| `aoi-bed` | 3 × 5 | `aoi_bed` |
-| `work-desk` | 3 × 2 | `haru_desk`, `aoi_desk` |
-| `desk-chair` | 1 × 1 | - |
-| `storage-shelf` | 2 × 1 | - |
-| `sofa` | 6 × 2 | `living_sofa` |
-| `low-table` | 3 × 2 | - |
-| `dining-table` | 5 × 3 | `dining_table` |
-| `dining-chair` | 1 × 1 | - |
-| `tv-console` | 4 × 1 | - |
-| `potted-plant` | 1 × 1 | - |
-| `floor-lamp` | 1 × 1 | - |
-| `laundry-basket` | 2 × 1 | - |
-| `kitchen-counter` | 5 × 2 | `kitchen_counter` |
-| `refrigerator` | 2 × 2 | `refrigerator` |
-| `washroom-vanity` | 2 × 1 | `washroom_vanity` |
-| `bathtub` | 4 × 2 | `bathtub` |
-| `entry-shoe-cabinet` | 2 × 1 | -（素材カタログのみ。既定シーンでは未使用） |
-| `balcony-drying-rack` | 4 × 1 | `balcony_drying_rack` |
+| ID | 占有セル | 既定用途 |
+| --- | ---: | --- |
+| `haru-bed` | 2 × 3 | Haruのベッド |
+| `aoi-bed` | 2 × 3 | Aoiのベッド |
+| `work-desk` | 2 × 1 | 両個室の机 |
+| `desk-chair` | 1 × 1 | 机の椅子 |
+| `storage-shelf` | 1 × 1 | 個室の棚 |
+| `sofa` | 3 × 1 | リビング |
+| `low-table` | 2 × 1 | リビング |
+| `dining-table` | 3 × 2 | ダイニング |
+| `dining-chair` | 1 × 1 | ダイニング |
+| `tv-console` | 2 × 1 | リビング |
+| `potted-plant` | 1 × 1 | リビング |
+| `floor-lamp` | 1 × 1 | リビング |
+| `laundry-basket` | 1 × 1 | バルコニー |
+| `island-kitchen` | 1 × 2 | 2マスの対面アイランドキッチン |
+| `refrigerator` | 1 × 1 | キッチン |
+| `washroom-vanity` | 1 × 1 | 洗面所 |
+| `bathtub` | 1 × 2 | 浴室。奥行き軸に沿って配置 |
+| `entry-rug` | 2 × 1 | 玄関。収納棚は置かない |
+| `balcony-drying-rack` | 2 × 1 | バルコニー |
+| `kitchen-counter` | 3 × 1 | 旧レイアウト互換カタログ |
+| `entry-shoe-cabinet` | 1 × 1 | 旧レイアウト互換カタログ |
 
-正確な配置情報は `assets/furniture/manifest.json` を参照してください。各instanceの `floorContact` は、PNGの足元ピボットを合わせる24 × 18タイル間取り上の座標です。SVGのピクセル座標を直接保存しません。
+正確な素材メタデータと既定配置は`assets/furniture/manifest.json`を参照してください。既定シーンでは`island-kitchen`と`entry-rug`を使い、旧キッチンカウンターと玄関収納は配置しません。
 
-## Webゲームへの組み込み
+## Webゲームと管理画面
 
-`apps/web/src/furniture-assets.tsx` が19種類すべてを静的importし、`FurnitureSpriteLayer` として共通の部屋SVGへ描画します。ライブ画面、メモリー記事、リザルトのイベント再現は同じ `ApartmentStage` を利用するため、家具構成も共通です。玄関収納は素材カタログには残しつつ既定シーンから外し、玄関はドアとコード描画のラグだけで表現します。
+`apps/web/src/asset-grid.ts`がグリッド投影、footprint自動フィット、pivot補正、v4互換読み込み、manifest検証を提供します。実画面は`ManagedFurnitureSpriteLayer`から同じ計算を利用し、Y座標順に描画します。
 
-間取り側に家具アンカーがあるベッド、デスク、ダイニングテーブル、ソファ、キッチン設備、水回り設備、物干し台は、そのアンカーを既定配置の正本とします。アンカーを持たない椅子、棚、ローテーブル、テレビ台、植物、フロアランプ、洗濯かごは、manifestの `defaultScene.instances` に部屋別の既定配置を記録しています。
+ゲーム上部の「Assets」から管理画面を開くと、次をブラウザ内で変更できます。
 
-Web側は `floorContact` を間取りと共通の式 `screenX = 600 + 25x - 25y`、`screenY = 100 + 12.5x + 12.5y` で投影し、各instanceの `displayScale` を適用したPNGピボットをその点へ合わせてY座標順に描画します。生成PNGごとに実際の不透明ピクセルの足元が異なるため、ソファ、キッチン台、冷蔵庫、浴槽、物干し台はasset別 `pivot` で補正します。キッチン台と浴槽は間取りの等角軸へ沿うよう `flipX` も適用します。論理footprintとキャラクターの移動可能領域は変えず、見た目だけを正しい接地点へ揃えます。
+- 家具・キャラクター画像（URLまたはData URL）
+- 占有セル数、キャンバス、実画像範囲、pivot、向き、flip、fitScale
+- 部屋、`floorContact`、複数インスタンス
+- JSONのimport / export / reset
 
-アンカー付き家具の `floorContact` はアンカー矩形の遠端 `(x + width, y + height)` と一致します。アンカーを持たない家具も、`floorContact` から素材の `footprintTiles` を引いた矩形が担当する部屋内に収まり、ほかの家具や `blocked` 領域へ重ならない位置を使います。この契約により、画面サイズや利用シーンが変わっても家具の足元が床・壁からずれません。
+変更はメインの部屋へ即時反映され、検証済みデータだけがlocalStorageへ保存されます。配布用のポータブル形式は`docs/schemas/roommates-asset-format-v1.schema.json`と`docs/examples/roommates-asset-format-v1/`を参照してください。
+
+## 既定レイアウト
+
+- アイランドキッチン: 1 × 2セル。HaruとAoiは長辺の左右へ1 × 1セルずつ立ち、会話時は互いを向く
+- 冷蔵庫: 1 × 1セル。アイランドから離して動線を確保
+- 浴槽: 1 × 2セル。浴室内の奥行き軸へ合わせ、画像幅を占有セルへ自動フィット
+- ソファ: 3 × 1セル。リビング内へ収める
+- 物干し: 2 × 1セル。バルコニー内へ収める
+- 玄関: 2 × 1セルのラグのみを置き、収納棚を置かない
+
+部屋境界、家具anchor、blocked領域、キャラクター立ち位置は`docs/room-layout.json`に記録します。

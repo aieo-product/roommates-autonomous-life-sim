@@ -1,10 +1,18 @@
 {
   "version": 5,
+  "format": "roommates-grid-assets",
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
     "camera": "south-west-to-north-east",
     "origin": "top-left"
+  },
+  "grid": {
+    "columns": 24,
+    "rows": 18,
+    "tileWidth": 50,
+    "tileHeight": 25,
+    "characterFootprint": { "width": 1, "depth": 1 }
   },
   "canvas": {
     "width": 256,
@@ -23,158 +31,144 @@
         "assetId": "haru-bed",
         "roomId": "haru_room",
         "anchorId": "haru_bed",
-        "floorContact": { "x": 3.5, "y": 5.5 },
-        "displayScale": 0.9
+        "floorContact": { "x": 3.5, "y": 5.5 }
       },
       {
         "instanceId": "haru-storage-shelf",
         "assetId": "storage-shelf",
         "roomId": "haru_room",
-        "floorContact": { "x": 5.5, "y": 4 },
-        "displayScale": 0.72
+        "floorContact": { "x": 5.5, "y": 4 }
       },
       {
         "instanceId": "haru-work-desk",
         "assetId": "work-desk",
         "roomId": "haru_room",
         "anchorId": "haru_desk",
-        "floorContact": { "x": 7.5, "y": 2.5 },
-        "displayScale": 0.8
+        "floorContact": { "x": 7.5, "y": 2.5 }
       },
       {
         "instanceId": "haru-desk-chair",
         "assetId": "desk-chair",
         "roomId": "haru_room",
-        "floorContact": { "x": 6.5, "y": 3.5 },
-        "displayScale": 0.72
+        "floorContact": { "x": 6.5, "y": 3.5 }
       },
       {
         "instanceId": "aoi-bed",
         "assetId": "aoi-bed",
         "roomId": "aoi_room",
         "anchorId": "aoi_bed",
-        "floorContact": { "x": 11.5, "y": 5.5 },
-        "displayScale": 0.9
+        "floorContact": { "x": 11.5, "y": 5.5 }
       },
       {
         "instanceId": "aoi-work-desk",
         "assetId": "work-desk",
         "roomId": "aoi_room",
         "anchorId": "aoi_desk",
-        "floorContact": { "x": 15.5, "y": 2.5 },
-        "displayScale": 0.8
+        "floorContact": { "x": 15.5, "y": 2.5 }
       },
       {
         "instanceId": "aoi-desk-chair",
         "assetId": "desk-chair",
         "roomId": "aoi_room",
-        "floorContact": { "x": 14.5, "y": 3.5 },
-        "displayScale": 0.72
+        "floorContact": { "x": 14.5, "y": 3.5 }
+      },
+      {
+        "instanceId": "entry-rug",
+        "assetId": "entry-rug",
+        "roomId": "entry",
+        "anchorId": "entry_rug",
+        "floorContact": { "x": 18.5, "y": 2.2 }
       },
       {
         "instanceId": "washroom-vanity",
         "assetId": "washroom-vanity",
         "roomId": "washroom",
         "anchorId": "washroom_vanity",
-        "floorContact": { "x": 21.5, "y": 1.2 },
-        "displayScale": 1
+        "floorContact": { "x": 21.5, "y": 1.2 }
       },
       {
         "instanceId": "bathroom-bathtub",
         "assetId": "bathtub",
         "roomId": "bathroom",
         "anchorId": "bathtub",
-        "floorContact": { "x": 24, "y": 5.5 },
-        "displayScale": 1.5
+        "floorContact": { "x": 22, "y": 6 }
       },
       {
-        "instanceId": "kitchen-counter",
-        "assetId": "kitchen-counter",
+        "instanceId": "kitchen-island",
+        "assetId": "island-kitchen",
         "roomId": "kitchen",
-        "anchorId": "kitchen_counter",
-        "floorContact": { "x": 5, "y": 10 },
-        "displayScale": 1.2
+        "anchorId": "kitchen_island",
+        "floorContact": { "x": 4, "y": 12 }
       },
       {
         "instanceId": "kitchen-refrigerator",
         "assetId": "refrigerator",
         "roomId": "kitchen",
         "anchorId": "refrigerator",
-        "floorContact": { "x": 7, "y": 10 },
-        "displayScale": 1.08
+        "floorContact": { "x": 6, "y": 9 }
       },
       {
         "instanceId": "balcony-laundry-basket",
         "assetId": "laundry-basket",
         "roomId": "balcony",
-        "floorContact": { "x": 8, "y": 18 },
-        "displayScale": 0.72
+        "floorContact": { "x": 8, "y": 18 }
       },
       {
         "instanceId": "balcony-drying-rack",
         "assetId": "balcony-drying-rack",
         "roomId": "balcony",
         "anchorId": "balcony_drying_rack",
-        "floorContact": { "x": 13, "y": 17 },
-        "displayScale": 1
+        "floorContact": { "x": 14, "y": 18 }
       },
       {
         "instanceId": "dining-table",
         "assetId": "dining-table",
         "roomId": "dining",
         "anchorId": "dining_table",
-        "floorContact": { "x": 13, "y": 13 },
-        "displayScale": 0.95
+        "floorContact": { "x": 13, "y": 13 }
       },
       {
         "instanceId": "dining-chair-west",
         "assetId": "dining-chair",
         "roomId": "dining",
-        "floorContact": { "x": 11, "y": 14 },
-        "displayScale": 0.72
+        "floorContact": { "x": 11, "y": 14 }
       },
       {
         "instanceId": "dining-chair-east",
         "assetId": "dining-chair",
         "roomId": "dining",
-        "floorContact": { "x": 14, "y": 12 },
-        "displayScale": 0.72
+        "floorContact": { "x": 14, "y": 12 }
       },
       {
         "instanceId": "living-floor-lamp",
         "assetId": "floor-lamp",
         "roomId": "living",
-        "floorContact": { "x": 21, "y": 12 },
-        "displayScale": 0.7
+        "floorContact": { "x": 18, "y": 11 }
       },
       {
         "instanceId": "living-sofa",
         "assetId": "sofa",
         "roomId": "living",
         "anchorId": "living_sofa",
-        "floorContact": { "x": 23, "y": 11 },
-        "displayScale": 1
+        "floorContact": { "x": 21, "y": 12 }
       },
       {
         "instanceId": "living-low-table",
         "assetId": "low-table",
         "roomId": "living",
-        "floorContact": { "x": 20, "y": 14 },
-        "displayScale": 0.9
+        "floorContact": { "x": 20, "y": 14 }
       },
       {
         "instanceId": "living-tv-console",
         "assetId": "tv-console",
         "roomId": "living",
-        "floorContact": { "x": 18, "y": 16 },
-        "displayScale": 0.76
+        "floorContact": { "x": 18, "y": 16 }
       },
       {
         "instanceId": "living-potted-plant",
         "assetId": "potted-plant",
         "roomId": "living",
-        "floorContact": { "x": 24, "y": 9 },
-        "displayScale": 0.72
+        "floorContact": { "x": 24, "y": 9 }
       }
     ]
   },
@@ -182,22 +176,37 @@
     {
       "id": "haru-bed",
       "file": "haru-bed.png",
-      "footprintTiles": { "width": 3, "depth": 5 },
+      "footprintTiles": { "width": 2, "depth": 3 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 59, "y": 116, "width": 139, "height": 120 },
+        "pivot": { "x": 113, "y": 236 },
+        "fitScale": 1
+      },
       "anchorIds": ["haru_bed"]
     },
     {
       "id": "aoi-bed",
       "file": "aoi-bed.png",
-      "footprintTiles": { "width": 3, "depth": 5 },
+      "footprintTiles": { "width": 2, "depth": 3 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 53, "y": 116, "width": 150, "height": 120 },
+        "pivot": { "x": 112, "y": 236 },
+        "fitScale": 1
+      },
       "anchorIds": ["aoi_bed"]
     },
     {
       "id": "work-desk",
       "file": "work-desk.png",
-      "footprintTiles": { "width": 3, "depth": 2 },
+      "footprintTiles": { "width": 2, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 60, "y": 116, "width": 136, "height": 120 },
+        "pivot": { "x": 157, "y": 236 },
+        "fitScale": 1.35
+      },
       "anchorIds": ["haru_desk", "aoi_desk"]
     },
     {
@@ -205,35 +214,59 @@
       "file": "desk-chair.png",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 99, "y": 136, "width": 59, "height": 100 },
+        "pivot": { "x": 128, "y": 236 },
+        "fitScale": 0.9
+      },
       "anchorIds": []
     },
     {
       "id": "storage-shelf",
       "file": "storage-shelf.png",
-      "footprintTiles": { "width": 2, "depth": 1 },
+      "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 86, "y": 66, "width": 84, "height": 170 },
+        "pivot": { "x": 146, "y": 236 },
+        "fitScale": 1.2
+      },
       "anchorIds": []
     },
     {
       "id": "sofa",
       "file": "sofa.png",
-      "footprintTiles": { "width": 6, "depth": 2 },
+      "footprintTiles": { "width": 3, "depth": 1 },
       "orientation": "south-west-to-north-east",
-      "pivot": { "x": 173, "y": 236 },
+      "render": {
+        "contentBounds": { "x": 31, "y": 96, "width": 194, "height": 140 },
+        "pivot": { "x": 173, "y": 236 },
+        "fitScale": 1.35
+      },
       "anchorIds": ["living_sofa"]
     },
     {
       "id": "low-table",
       "file": "low-table.png",
-      "footprintTiles": { "width": 3, "depth": 2 },
+      "footprintTiles": { "width": 2, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 71, "y": 151, "width": 115, "height": 85 },
+        "pivot": { "x": 136, "y": 236 },
+        "fitScale": 1.25
+      },
       "anchorIds": []
     },
     {
       "id": "dining-table",
       "file": "dining-table.png",
-      "footprintTiles": { "width": 5, "depth": 3 },
+      "footprintTiles": { "width": 3, "depth": 2 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 45, "y": 111, "width": 167, "height": 125 },
+        "pivot": { "x": 115, "y": 236 },
+        "fitScale": 1.15
+      },
       "anchorIds": ["dining_table"]
     },
     {
@@ -241,13 +274,23 @@
       "file": "dining-chair.png",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 91, "y": 136, "width": 74, "height": 100 },
+        "pivot": { "x": 128, "y": 236 },
+        "fitScale": 1.05
+      },
       "anchorIds": []
     },
     {
       "id": "tv-console",
       "file": "tv-console.png",
-      "footprintTiles": { "width": 4, "depth": 1 },
+      "footprintTiles": { "width": 2, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 53, "y": 76, "width": 151, "height": 160 },
+        "pivot": { "x": 161, "y": 236 },
+        "fitScale": 1.35
+      },
       "anchorIds": []
     },
     {
@@ -255,6 +298,11 @@
       "file": "potted-plant.png",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 88, "y": 132, "width": 80, "height": 104 },
+        "pivot": { "x": 129, "y": 236 },
+        "fitScale": 0.95
+      },
       "anchorIds": []
     },
     {
@@ -262,46 +310,85 @@
       "file": "floor-lamp.png",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 98, "y": 66, "width": 61, "height": 170 },
+        "pivot": { "x": 129, "y": 236 },
+        "fitScale": 0.85
+      },
       "anchorIds": []
     },
     {
       "id": "laundry-basket",
       "file": "laundry-basket.png",
-      "footprintTiles": { "width": 2, "depth": 1 },
+      "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 83, "y": 165, "width": 90, "height": 71 },
+        "pivot": { "x": 124, "y": 236 },
+        "fitScale": 1.3
+      },
       "anchorIds": []
     },
     {
       "id": "kitchen-counter",
       "file": "kitchen-counter.png",
-      "footprintTiles": { "width": 5, "depth": 2 },
+      "footprintTiles": { "width": 3, "depth": 1 },
       "orientation": "south-west-to-north-east",
-      "pivot": { "x": 156, "y": 236 },
-      "flipX": true,
-      "anchorIds": ["kitchen_counter"]
+      "render": {
+        "contentBounds": { "x": 55, "y": 91, "width": 145, "height": 145 },
+        "pivot": { "x": 100, "y": 236 },
+        "flipX": true,
+        "fitScale": 1.1
+      },
+      "anchorIds": []
+    },
+    {
+      "id": "island-kitchen",
+      "file": "island-kitchen.png",
+      "footprintTiles": { "width": 1, "depth": 2 },
+      "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 80, "y": 91, "width": 148, "height": 145 },
+        "pivot": { "x": 128, "y": 236 },
+        "fitScale": 1.25
+      },
+      "anchorIds": ["kitchen_island"]
     },
     {
       "id": "refrigerator",
       "file": "refrigerator.png",
-      "footprintTiles": { "width": 2, "depth": 2 },
+      "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
-      "pivot": { "x": 130, "y": 236 },
+      "render": {
+        "contentBounds": { "x": 82, "y": 70, "width": 92, "height": 166 },
+        "pivot": { "x": 130, "y": 236 },
+        "fitScale": 1.15
+      },
       "anchorIds": ["refrigerator"]
     },
     {
       "id": "washroom-vanity",
       "file": "washroom-vanity.png",
-      "footprintTiles": { "width": 2, "depth": 1 },
+      "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 94, "y": 111, "width": 67, "height": 125 },
+        "pivot": { "x": 132, "y": 236 },
+        "fitScale": 1.1
+      },
       "anchorIds": ["washroom_vanity"]
     },
     {
       "id": "bathtub",
       "file": "bathtub.png",
-      "footprintTiles": { "width": 4, "depth": 2 },
+      "footprintTiles": { "width": 1, "depth": 2 },
       "orientation": "south-west-to-north-east",
-      "pivot": { "x": 140, "y": 236 },
-      "flipX": true,
+      "render": {
+        "contentBounds": { "x": 79, "y": 127, "width": 97, "height": 109 },
+        "pivot": { "x": 116, "y": 236 },
+        "flipX": false,
+        "fitScale": 1
+      },
       "anchorIds": ["bathtub"]
     },
     {
@@ -309,14 +396,35 @@
       "file": "entry-shoe-cabinet.png",
       "footprintTiles": { "width": 2, "depth": 1 },
       "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 72, "y": 104, "width": 111, "height": 132 },
+        "pivot": { "x": 134, "y": 236 },
+        "fitScale": 1
+      },
       "anchorIds": []
+    },
+    {
+      "id": "entry-rug",
+      "file": "entry-rug.png",
+      "footprintTiles": { "width": 2, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "render": {
+        "contentBounds": { "x": 41, "y": 167, "width": 130, "height": 69 },
+        "pivot": { "x": 128, "y": 236 },
+        "fitScale": 1
+      },
+      "anchorIds": ["entry_rug"]
     },
     {
       "id": "balcony-drying-rack",
       "file": "balcony-drying-rack.png",
-      "footprintTiles": { "width": 4, "depth": 1 },
+      "footprintTiles": { "width": 2, "depth": 1 },
       "orientation": "south-west-to-north-east",
-      "pivot": { "x": 154, "y": 236 },
+      "render": {
+        "contentBounds": { "x": 66, "y": 94, "width": 124, "height": 142 },
+        "pivot": { "x": 154, "y": 236 },
+        "fitScale": 1.15
+      },
       "anchorIds": ["balcony_drying_rack"]
     }
   ]

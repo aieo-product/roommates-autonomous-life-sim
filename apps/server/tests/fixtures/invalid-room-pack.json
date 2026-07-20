@@ -1,0 +1,42 @@
+{
+  "format": "roommates.room-pack",
+  "formatVersion": 1,
+  "id": "roommates.invalid-room",
+  "name": "Invalid collision fixture",
+  "packVersion": "1.0.0",
+  "license": {
+    "spdx": "CC0-1.0",
+    "attribution": "ROOMMATES test fixture"
+  },
+  "grid": {
+    "type": "square",
+    "columns": 4,
+    "rows": 4,
+    "tileSize": 1
+  },
+  "projection": {
+    "type": "isometric-cutaway",
+    "tileWidthPx": 50,
+    "tileHeightPx": 25,
+    "origin": { "x": 100, "y": 20 },
+    "cameraDirection": "south-west-to-north-east"
+  },
+  "dependencies": {
+    "assetPacks": [{ "id": "roommates.sample-furniture", "version": "^1.0.0" }],
+    "characterPacks": [{ "id": "roommates.sample-characters", "version": "^1.0.0" }]
+  },
+  "rooms": [
+    { "id": "test-room", "name": "Test room", "bounds": { "x": 0, "y": 0, "width": 4, "height": 4 } }
+  ],
+  "placements": {
+    "assets": [
+      { "instanceId": "fridge-a", "assetId": "sample.refrigerator", "roomId": "test-room", "floorContact": { "x": 2, "y": 2 } },
+      { "instanceId": "rug-a", "assetId": "sample.entry-rug", "roomId": "test-room", "floorContact": { "x": 2, "y": 2 } },
+      { "instanceId": "bath-a", "assetId": "sample.bathtub", "roomId": "test-room", "floorContact": { "x": 4, "y": 5 } }
+    ],
+    "characters": [
+      { "instanceId": "resident-a", "assetId": "sample.haru", "roomId": "test-room", "floorContact": { "x": 2, "y": 2 }, "facing": "east" },
+      { "instanceId": "resident-b", "assetId": "sample.aoi", "roomId": "test-room", "floorContact": { "x": 4, "y": 4 }, "facing": "west" }
+    ]
+  }
+}

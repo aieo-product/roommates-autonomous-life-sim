@@ -2,7 +2,9 @@ import {
   characterAnchor,
   characterDestinationForLocation,
   characterDetourCandidates,
+  roomForLocation,
   type CharacterId,
+  type GridObstacle,
   type Point,
 } from "./room-layout.js";
 import type {
@@ -72,6 +74,20 @@ const copyDirections = (
   value: Record<CharacterId, SpriteDirection>,
 ): Record<CharacterId, SpriteDirection> => ({ ...value });
 
+const faceResidentsWhenSharingRoom = (
+  locations: Record<CharacterId, string>,
+  points: Record<CharacterId, Point>,
+  directions: Record<CharacterId, SpriteDirection>,
+): void => {
+  const haruRoom = roomForLocation(locations.haru, "haru");
+  const aoiRoom = roomForLocation(locations.aoi, "aoi");
+  if (haruRoom !== aoiRoom) return;
+  if (Math.hypot(points.aoi.x - points.haru.x, points.aoi.y - points.haru.y) < 1) return;
+
+  directions.haru = directionForTravel(points.haru, points.aoi);
+  directions.aoi = directionForTravel(points.aoi, points.haru);
+};
+
 const SCENE_LOCATION_MARKERS = [
   "リビング", "ソファ", "living",
   "キッチン", "台所", "kitchen",
@@ -128,8 +144,9 @@ const detourPointFor = (
   start: Point,
   target: Point,
   previous: SpriteDirection,
+  obstacles: readonly GridObstacle[],
 ): Point => {
-  const candidates = characterDetourCandidates(person, location)
+  const candidates = characterDetourCandidates(person, location, obstacles)
     .filter((candidate) => Math.hypot(candidate.x - start.x, candidate.y - start.y) >= 1);
   return candidates.find((candidate) =>
     directionForTravel(start, candidate) !== previous
@@ -158,7 +175,8 @@ const locationFor = (
 const pointForLocation = (
   person: CharacterId,
   location: string,
-): Point => characterDestinationForLocation(person, location);
+  obstacles: readonly GridObstacle[],
+): Point => characterDestinationForLocation(person, location, obstacles);
 
 const legacyBeatsForEvent = (
   event: GameEvent,
@@ -201,6 +219,7 @@ export const createAfterScenePlan = (
   event: GameEvent,
   game: GameState,
   turnStart?: Partial<Record<CharacterId, CharacterState>>,
+  obstacles: readonly GridObstacle[] = [],
 ): AfterScenePlan => {
   const startingLocations: Record<CharacterId, string> = {
     haru: locationFor(event, "haru", "before", turnStart?.haru ?? game.haru),
@@ -229,7 +248,7 @@ export const createAfterScenePlan = (
       const targets = copyPoints(points);
       for (const person of PEOPLE) {
         if (movingPeople.has(person)) {
-          targets[person] = pointForLocation(person, beat.location);
+          targets[person] = pointForLocation(person, beat.location, obstacles);
         }
       }
       const detouringPeople = new Set(PEOPLE.filter((person) => {
@@ -255,7 +274,7 @@ export const createAfterScenePlan = (
           const start = { ...points[person] };
           const previous = lastTravelDirections[person] ?? directions[person];
           const end = detouringPeople.has(person)
-            ? detourPointFor(person, beat.location, start, targets[person], previous)
+            ? detourPointFor(person, beat.location, start, targets[person], previous, obstacles)
             : start;
           const hasTravel = Math.hypot(end.x - start.x, end.y - start.y) >= 1;
           const direction = hasTravel ? directionForTravel(start, end) : directions[person];
@@ -302,6 +321,10 @@ export const createAfterScenePlan = (
     }
 
     const focusPerson = beat.actor === "both" ? "haru" : beat.actor;
+    // Dialogue/action beats happen after every independently planned route is
+    // ready. When both residents arrived in the same room, face them toward
+    // one another instead of leaving each sprite on its last walking row.
+    faceResidentsWhenSharingRoom(locations, points, directions);
     beats.push({
       ...beat,
       points: copyPoints(points),

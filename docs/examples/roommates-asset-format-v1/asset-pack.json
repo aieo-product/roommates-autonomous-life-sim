@@ -1,0 +1,117 @@
+{
+  "$schema": "../../schemas/roommates-asset-format-v1.schema.json",
+  "format": "roommates.asset-pack",
+  "formatVersion": 1,
+  "id": "roommates.sample-furniture",
+  "name": "ROOMMATES v1 sample furniture",
+  "packVersion": "1.0.0",
+  "license": {
+    "spdx": "CC-BY-4.0",
+    "attribution": "ROOMMATES contributors",
+    "source": "https://github.com/aieo-product/teamOtaniHackathon"
+  },
+  "assets": [
+    {
+      "id": "sample.island-kitchen",
+      "label": "対面アイランドキッチン",
+      "kind": "fixture",
+      "file": "images/island-kitchen.png",
+      "footprintTiles": { "width": 1, "depth": 2 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["kitchen_island"],
+      "render": {
+        "canvas": { "width": 256, "height": 256 },
+        "contentBounds": { "x": 80, "y": 91, "width": 148, "height": 145 },
+        "pivot": { "x": 128, "y": 236 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1.25
+      }
+    },
+    {
+      "id": "sample.refrigerator",
+      "label": "冷蔵庫",
+      "kind": "fixture",
+      "file": "images/refrigerator.png",
+      "footprintTiles": { "width": 1, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["refrigerator"],
+      "render": {
+        "canvas": { "width": 256, "height": 256 },
+        "contentBounds": { "x": 82, "y": 70, "width": 92, "height": 166 },
+        "pivot": { "x": 130, "y": 236 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1.15
+      }
+    },
+    {
+      "id": "sample.bathtub",
+      "label": "浴槽",
+      "kind": "fixture",
+      "file": "images/bathtub.png",
+      "footprintTiles": { "width": 1, "depth": 2 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["bathtub"],
+      "render": {
+        "canvas": { "width": 256, "height": 256 },
+        "contentBounds": { "x": 79, "y": 127, "width": 97, "height": 109 },
+        "pivot": { "x": 116, "y": 236 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1
+      }
+    },
+    {
+      "id": "sample.sofa",
+      "label": "3人掛けソファ",
+      "kind": "furniture",
+      "file": "images/sofa.png",
+      "footprintTiles": { "width": 3, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["living_sofa"],
+      "render": {
+        "canvas": { "width": 256, "height": 256 },
+        "contentBounds": { "x": 31, "y": 96, "width": 194, "height": 140 },
+        "pivot": { "x": 173, "y": 236 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1.35
+      }
+    },
+    {
+      "id": "sample.drying-rack",
+      "label": "物干しラック",
+      "kind": "furniture",
+      "file": "images/balcony-drying-rack.png",
+      "footprintTiles": { "width": 2, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["balcony_drying_rack"],
+      "render": {
+        "canvas": { "width": 256, "height": 256 },
+        "contentBounds": { "x": 66, "y": 94, "width": 124, "height": 142 },
+        "pivot": { "x": 154, "y": 236 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1.15
+      }
+    },
+    {
+      "id": "sample.entry-rug",
+      "label": "玄関ラグ",
+      "kind": "prop",
+      "file": "images/entry-rug.png",
+      "footprintTiles": { "width": 2, "depth": 1 },
+      "orientation": "south-west-to-north-east",
+      "anchorIds": ["entry_rug"],
+      "render": {
+        "canvas": { "width": 256, "height": 256 },
+        "contentBounds": { "x": 41, "y": 167, "width": 130, "height": 69 },
+        "pivot": { "x": 128, "y": 236 },
+        "flipX": false,
+        "flipY": false,
+        "fitScale": 1
+      }
+    }
+  ]
+}

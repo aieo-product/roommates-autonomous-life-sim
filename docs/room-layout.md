@@ -118,7 +118,7 @@ flowchart TB
 - 部屋の外形、床の段差、壁
 - 扉、窓、バルコニー開口部
 - 玄関の上がり框
-- キッチンカウンター、シンク、コンロ
+- 給排水接続領域（既定packでは1×2の対面アイランドキッチン）
 - 洗面台、洗濯機置き場、浴槽
 - 各部屋を結ぶ主要動線
 - カメラの向きとキャラクターの基準スケール
@@ -163,4 +163,4 @@ flowchart TB
 - `blocked`: 固定設備や通行確保のため配置できない領域
 - `situationMappings`: シチュエーションから表示シーンへの既定マッピング
 
-家具素材の配置は [`../assets/furniture/manifest.json`](../assets/furniture/manifest.json) の `floorContact` を使う。これはPNGの足元ピボットに対応するタイル座標で、アンカー付き家具ではアンカー矩形の遠端 `(x + width, y + height)` と一致させる。SVGピクセル座標は保存せず、Web側でこの間取りと同じ等角投影を適用する。
+家具素材の配置は [`../assets/furniture/manifest.json`](../assets/furniture/manifest.json) の `floorContact` と整数 `footprintTiles` を使う。占有矩形は `[x - width, x) × [y - depth, y)` で、PNGの`render.pivot`を投影後の接地点へ合わせる。SVGピクセル座標や絶対表示倍率は保存しない。既定packではキャラクター=1×1、冷蔵庫=1×1、アイランドキッチンと浴槽=1×2とし、Assets管理画面で画像・規格・配置を変更しても同じ契約で描画と移動衝突を解決する。

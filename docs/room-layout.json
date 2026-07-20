@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "layoutId": "roommates-2ldk-v1",
+  "schemaVersion": 2,
+  "layoutId": "roommates-2ldk-grid-v2",
   "name": "ROOMMATES 基本2LDK",
   "orientation": {
     "north": "top",
@@ -10,7 +10,15 @@
     "width": 24,
     "interiorHeight": 16,
     "balconyHeight": 2,
-    "tileSizeMeters": 0.4
+    "tileSizeMeters": 0.4,
+    "coordinateSystem": "square-world-grid",
+    "projection": {
+      "type": "isometric-2-to-1",
+      "tileWidthPx": 50,
+      "tileHeightPx": 25,
+      "originPx": { "x": 600, "y": 100 }
+    },
+    "characterFootprint": { "width": 1, "depth": 1 }
   },
   "viewport": {
     "aspectRatio": "16:9",
@@ -34,8 +42,8 @@
       "capacity": 2,
       "defaultOccupancy": 1,
       "anchors": [
-        { "id": "haru_bed", "kind": "furniture", "x": 0.5, "y": 0.5, "width": 3, "height": 5 },
-        { "id": "haru_desk", "kind": "furniture", "x": 4.5, "y": 0.5, "width": 3, "height": 2 },
+        { "id": "haru_bed", "kind": "furniture", "x": 1.5, "y": 2.5, "width": 2, "height": 3 },
+        { "id": "haru_desk", "kind": "furniture", "x": 5.5, "y": 1.5, "width": 2, "height": 1 },
         { "id": "haru_solo", "kind": "character", "tags": ["solo"], "x": 4.5, "y": 3, "width": 2, "height": 2 },
         { "id": "haru_guest", "kind": "character", "tags": ["pair"], "x": 2.5, "y": 3, "width": 2, "height": 2 }
       ],
@@ -52,8 +60,8 @@
       "capacity": 2,
       "defaultOccupancy": 1,
       "anchors": [
-        { "id": "aoi_bed", "kind": "furniture", "x": 8.5, "y": 0.5, "width": 3, "height": 5 },
-        { "id": "aoi_desk", "kind": "furniture", "x": 12.5, "y": 0.5, "width": 3, "height": 2 },
+        { "id": "aoi_bed", "kind": "furniture", "x": 9.5, "y": 2.5, "width": 2, "height": 3 },
+        { "id": "aoi_desk", "kind": "furniture", "x": 13.5, "y": 1.5, "width": 2, "height": 1 },
         { "id": "aoi_solo", "kind": "character", "tags": ["solo"], "x": 12.5, "y": 3, "width": 2, "height": 2 },
         { "id": "aoi_guest", "kind": "character", "tags": ["pair"], "x": 10.5, "y": 3, "width": 2, "height": 2 }
       ],
@@ -70,6 +78,7 @@
       "capacity": 2,
       "defaultOccupancy": 0,
       "anchors": [
+        { "id": "entry_rug", "kind": "furniture", "x": 16.5, "y": 1.2, "width": 2, "height": 1 },
         { "id": "entry_pair", "kind": "character", "tags": ["pair"], "x": 16, "y": 0.5, "width": 3, "height": 2 }
       ],
       "blocked": [
@@ -85,7 +94,7 @@
       "capacity": 1,
       "defaultOccupancy": 0,
       "anchors": [
-        { "id": "washroom_vanity", "kind": "furniture", "x": 19.5, "y": 0.2, "width": 2, "height": 1 },
+        { "id": "washroom_vanity", "kind": "furniture", "x": 20.5, "y": 0.2, "width": 1, "height": 1 },
         { "id": "washroom_solo", "kind": "character", "tags": ["solo"], "x": 20.5, "y": 1, "width": 2, "height": 2 }
       ],
       "blocked": []
@@ -115,7 +124,7 @@
       "capacity": 1,
       "defaultOccupancy": 0,
       "anchors": [
-        { "id": "bathtub", "kind": "furniture", "x": 20, "y": 3.5, "width": 4, "height": 2 },
+        { "id": "bathtub", "kind": "furniture", "x": 21, "y": 4, "width": 1, "height": 2 },
         { "id": "bathroom_solo", "kind": "character", "tags": ["solo"], "x": 19.5, "y": 5, "width": 2, "height": 2 }
       ],
       "blocked": []
@@ -134,9 +143,9 @@
           "name": "キッチン",
           "bounds": { "x": 0, "y": 8, "width": 7, "height": 8 },
           "anchors": [
-            { "id": "kitchen_counter", "kind": "furniture", "x": 0, "y": 8, "width": 5, "height": 2 },
-            { "id": "refrigerator", "kind": "furniture", "x": 5, "y": 8, "width": 2, "height": 2 },
-            { "id": "kitchen_pair", "kind": "character", "tags": ["pair", "cooking"], "x": 2, "y": 11, "width": 4, "height": 2 }
+            { "id": "kitchen_island", "kind": "furniture", "x": 3, "y": 10, "width": 1, "height": 2 },
+            { "id": "refrigerator", "kind": "furniture", "x": 5, "y": 8, "width": 1, "height": 1 },
+            { "id": "kitchen_pair", "kind": "character", "tags": ["pair", "cooking", "face-to-face"], "x": 2, "y": 11, "width": 4, "height": 1 }
           ],
           "blocked": []
         },
@@ -145,7 +154,7 @@
           "name": "ダイニング",
           "bounds": { "x": 7, "y": 8, "width": 7, "height": 8 },
           "anchors": [
-            { "id": "dining_table", "kind": "furniture", "x": 8, "y": 10, "width": 5, "height": 3 },
+            { "id": "dining_table", "kind": "furniture", "x": 10, "y": 11, "width": 3, "height": 2 },
             { "id": "dining_pair", "kind": "character", "tags": ["pair", "eating", "conversation"], "x": 8, "y": 13, "width": 5, "height": 2 }
           ],
           "blocked": []
@@ -155,7 +164,7 @@
           "name": "リビング",
           "bounds": { "x": 14, "y": 8, "width": 10, "height": 8 },
           "anchors": [
-            { "id": "living_sofa", "kind": "furniture", "x": 17, "y": 9, "width": 6, "height": 2 },
+            { "id": "living_sofa", "kind": "furniture", "x": 18, "y": 11, "width": 3, "height": 1 },
             { "id": "living_pair", "kind": "character", "tags": ["pair", "movie", "conversation", "relax"], "x": 17, "y": 12, "width": 5, "height": 2 }
           ],
           "blocked": [
@@ -179,7 +188,7 @@
       "anchors": [
         { "id": "balcony_pair", "kind": "character", "tags": ["pair", "conversation"], "x": 15, "y": 16, "width": 5, "height": 2 },
         { "id": "laundry", "kind": "prop", "tags": ["laundry"], "x": 2, "y": 16, "width": 6, "height": 2 },
-        { "id": "balcony_drying_rack", "kind": "furniture", "tags": ["laundry"], "x": 9, "y": 16, "width": 4, "height": 1 }
+        { "id": "balcony_drying_rack", "kind": "furniture", "tags": ["laundry"], "x": 12, "y": 17, "width": 2, "height": 1 }
       ],
       "blocked": [
         { "reason": "balcony_door_clearance", "x": 20, "y": 16, "width": 3, "height": 2 }
@@ -213,7 +222,7 @@
       "doors",
       "windows",
       "plumbing",
-      "kitchen_counter",
+      "grid_asset_schema",
       "main_circulation",
       "camera_orientation",
       "character_scale"

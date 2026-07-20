@@ -189,8 +189,26 @@ describe("whole-apartment UI layout contract", () => {
     expect(counter.y).toBeGreaterThan(10);
     expect(sofa.x).toBeGreaterThan(21);
     expect(desk).toEqual({ x: 7.3, y: 3.2 });
-    expect(laundry).toEqual({ x: 12.3, y: 17.4 });
+    expect(laundry).toEqual({ x: 14.6, y: 17.4 });
+    expect(worldDestinationForLocation("aoi", "アイランドキッチンの向かい側")).toEqual({ x: 5, y: 11 });
     expect(worldDestinationForLocation("haru", "Aoiのデスク前")).toEqual({ x: 15.2, y: 3.2 });
+  });
+
+  it("moves a resident to another 1x1 cell when an edited asset covers the preferred spot", () => {
+    const preferred = worldDestinationForLocation("haru", "アイランドキッチン");
+    const adjusted = worldDestinationForLocation("haru", "アイランドキッチン", [{
+      roomId: "kitchen",
+      x: preferred.x - 0.5,
+      y: preferred.y - 0.5,
+      width: 1,
+      depth: 1,
+    }]);
+
+    expect(adjusted).not.toEqual(preferred);
+    expect(adjusted.x).toBeGreaterThanOrEqual(0.5);
+    expect(adjusted.x).toBeLessThanOrEqual(6.5);
+    expect(adjusted.y).toBeGreaterThanOrEqual(8.5);
+    expect(adjusted.y).toBeLessThanOrEqual(15.5);
   });
 
   it("keeps every resident stand, turn, and named destination off furniture and blocked paths", () => {

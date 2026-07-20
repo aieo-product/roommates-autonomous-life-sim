@@ -1,0 +1,29 @@
+{
+  "format": "roommates.asset-pack",
+  "formatVersion": 2,
+  "id": "Broken Pack",
+  "name": "Broken example",
+  "packVersion": "latest",
+  "license": {
+    "spdx": "CC-BY-4.0",
+    "attribution": ""
+  },
+  "assets": [
+    {
+      "id": "broken.asset",
+      "label": "Broken asset",
+      "kind": "fixture",
+      "file": "../outside.png",
+      "footprintTiles": { "width": 0, "depth": 1 },
+      "orientation": "sideways",
+      "render": {
+        "canvas": { "width": 64, "height": 64 },
+        "contentBounds": { "x": 50, "y": 48, "width": 30, "height": 20 },
+        "pivot": { "x": 70, "y": 64 },
+        "flipX": "yes",
+        "flipY": false,
+        "fitScale": 0
+      }
+    }
+  ]
+}

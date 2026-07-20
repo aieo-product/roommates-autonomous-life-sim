@@ -1,0 +1,500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Roommates Asset Format v1",
+  "description": "Portable furniture, character, room and editor project manifests for ROOMMATES-compatible runtimes.",
+  "oneOf": [
+    { "$ref": "#/$defs/assetPack" },
+    { "$ref": "#/$defs/characterPack" },
+    { "$ref": "#/$defs/roomPack" },
+    { "$ref": "#/$defs/project" }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+    },
+    "relativeFile": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "nonNegativePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0 },
+        "y": { "type": "number", "minimum": 0 }
+      }
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "gridRect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "footprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "depth"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "depth": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "characterFootprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "depth"],
+      "properties": {
+        "width": { "const": 1 },
+        "depth": { "const": 1 }
+      }
+    },
+    "orientation": {
+      "enum": [
+        "north",
+        "north-east",
+        "east",
+        "south-east",
+        "south",
+        "south-west",
+        "west",
+        "north-west",
+        "south-west-to-north-east",
+        "south-east-to-north-west",
+        "north-east-to-south-west",
+        "north-west-to-south-east"
+      ]
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spdx", "attribution"],
+      "properties": {
+        "spdx": { "type": "string", "minLength": 1 },
+        "attribution": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": { "pattern": "\\." },
+      "additionalProperties": true
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canvas", "contentBounds", "pivot"],
+      "properties": {
+        "canvas": { "$ref": "#/$defs/size" },
+        "contentBounds": { "$ref": "#/$defs/rect" },
+        "pivot": { "$ref": "#/$defs/nonNegativePoint" },
+        "flipX": { "type": "boolean", "default": false },
+        "flipY": { "type": "boolean", "default": false },
+        "fitScale": { "type": "number", "exclusiveMinimum": 0, "default": 1 }
+      }
+    },
+    "editorRender": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canvas", "pivot", "flipX", "flipY", "fitScale"],
+      "properties": {
+        "canvas": { "$ref": "#/$defs/size" },
+        "contentBounds": { "$ref": "#/$defs/rect" },
+        "pivot": { "$ref": "#/$defs/nonNegativePoint" },
+        "flipX": { "type": "boolean" },
+        "flipY": { "type": "boolean" },
+        "fitScale": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "header": {
+      "type": "object",
+      "required": ["format", "formatVersion", "id", "name", "packVersion", "license"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "format": {
+          "enum": ["roommates.asset-pack", "roommates.character-pack", "roommates.room-pack"]
+        },
+        "formatVersion": { "const": 1 },
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "packVersion": {
+          "type": "string",
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "license": { "$ref": "#/$defs/license" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "file", "footprintTiles", "orientation", "render"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["furniture", "fixture", "prop"] },
+        "file": { "$ref": "#/$defs/relativeFile" },
+        "footprintTiles": { "$ref": "#/$defs/footprint" },
+        "orientation": { "$ref": "#/$defs/orientation" },
+        "anchorIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "render": { "$ref": "#/$defs/render" },
+        "license": { "$ref": "#/$defs/license" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "animation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frames", "frameDurationMs"],
+      "properties": {
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "frameDurationMs": { "type": "integer", "minimum": 1 },
+        "loop": { "type": "boolean", "default": true }
+      }
+    },
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "label", "role", "footprintTiles", "orientation", "render", "portrait", "spriteSheet"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "footprintTiles": { "$ref": "#/$defs/characterFootprint" },
+        "orientation": { "$ref": "#/$defs/orientation" },
+        "render": { "$ref": "#/$defs/render" },
+        "portrait": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file", "canvas"],
+          "properties": {
+            "file": { "$ref": "#/$defs/relativeFile" },
+            "canvas": { "$ref": "#/$defs/size" }
+          }
+        },
+        "spriteSheet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file", "canvas", "frameSize", "columns", "rows", "directionRows", "animations"
+          ],
+          "properties": {
+            "file": { "$ref": "#/$defs/relativeFile" },
+            "canvas": { "$ref": "#/$defs/size" },
+            "frameSize": { "$ref": "#/$defs/size" },
+            "columns": { "type": "integer", "minimum": 1 },
+            "rows": { "type": "integer", "minimum": 1 },
+            "directionRows": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["south", "east", "north", "west"],
+              "properties": {
+                "south": { "type": "integer", "minimum": 0 },
+                "east": { "type": "integer", "minimum": 0 },
+                "north": { "type": "integer", "minimum": 0 },
+                "west": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "animations": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": { "$ref": "#/$defs/animation" }
+            }
+          }
+        },
+        "license": { "$ref": "#/$defs/license" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "columns", "rows", "tileSize"],
+      "properties": {
+        "type": { "const": "square" },
+        "columns": { "type": "integer", "minimum": 1 },
+        "rows": { "type": "integer", "minimum": 1 },
+        "tileSize": { "const": 1 }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tileWidthPx", "tileHeightPx", "origin", "cameraDirection"],
+      "properties": {
+        "type": { "const": "isometric-cutaway" },
+        "tileWidthPx": { "type": "number", "exclusiveMinimum": 0 },
+        "tileHeightPx": { "type": "number", "exclusiveMinimum": 0 },
+        "origin": { "$ref": "#/$defs/point" },
+        "cameraDirection": { "const": "south-west-to-north-east" }
+      }
+    },
+    "room": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "bounds"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "bounds": {
+          "oneOf": [
+            { "$ref": "#/$defs/gridRect" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/gridRect" }
+            }
+          ]
+        },
+        "zones": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/room" }
+        },
+        "blocked": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gridRect" }
+        },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "assetPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instanceId", "assetId", "roomId", "floorContact"],
+      "properties": {
+        "instanceId": { "$ref": "#/$defs/id" },
+        "assetId": { "$ref": "#/$defs/id" },
+        "roomId": { "$ref": "#/$defs/id" },
+        "floorContact": { "$ref": "#/$defs/nonNegativePoint" },
+        "orientation": { "$ref": "#/$defs/orientation" },
+        "flipX": { "type": "boolean" },
+        "flipY": { "type": "boolean" },
+        "displayScale": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "characterPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instanceId", "assetId", "roomId", "floorContact"],
+      "properties": {
+        "instanceId": { "$ref": "#/$defs/id" },
+        "assetId": { "$ref": "#/$defs/id" },
+        "roomId": { "$ref": "#/$defs/id" },
+        "floorContact": { "$ref": "#/$defs/nonNegativePoint" },
+        "orientation": { "$ref": "#/$defs/orientation" },
+        "facing": { "enum": ["north", "east", "south", "west"] },
+        "flipX": { "type": "boolean" },
+        "flipY": { "type": "boolean" },
+        "displayScale": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "assetPack": {
+      "allOf": [
+        { "$ref": "#/$defs/header" },
+        {
+          "type": "object",
+          "required": ["assets"],
+          "properties": {
+            "format": { "const": "roommates.asset-pack" },
+            "assets": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/asset" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "characterPack": {
+      "allOf": [
+        { "$ref": "#/$defs/header" },
+        {
+          "type": "object",
+          "required": ["characters"],
+          "properties": {
+            "format": { "const": "roommates.character-pack" },
+            "characters": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/character" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "roomPack": {
+      "allOf": [
+        { "$ref": "#/$defs/header" },
+        {
+          "type": "object",
+          "required": ["grid", "projection", "dependencies", "rooms", "placements"],
+          "properties": {
+            "format": { "const": "roommates.room-pack" },
+            "grid": { "$ref": "#/$defs/grid" },
+            "projection": { "$ref": "#/$defs/projection" },
+            "dependencies": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["assetPacks", "characterPacks"],
+              "properties": {
+                "assetPacks": { "type": "array", "items": { "$ref": "#/$defs/dependency" } },
+                "characterPacks": { "type": "array", "items": { "$ref": "#/$defs/dependency" } }
+              }
+            },
+            "rooms": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/room" }
+            },
+            "placements": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["assets", "characters"],
+              "properties": {
+                "assets": { "type": "array", "items": { "$ref": "#/$defs/assetPlacement" } },
+                "characters": { "type": "array", "items": { "$ref": "#/$defs/characterPlacement" } }
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "editorFurniture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "label", "file", "imageUrl", "footprintTiles", "orientation", "anchorIds", "render"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "file": { "$ref": "#/$defs/relativeFile" },
+        "imageUrl": { "type": "string", "minLength": 1 },
+        "footprintTiles": { "$ref": "#/$defs/footprint" },
+        "orientation": { "$ref": "#/$defs/orientation" },
+        "anchorIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "render": { "$ref": "#/$defs/editorRender" },
+        "license": { "$ref": "#/$defs/license" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "editorCharacter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "label", "role", "animationPreset", "file", "imageUrl", "portraitFile",
+        "portraitUrl", "footprintTiles", "orientation", "render"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "runtimeId": { "enum": ["haru", "aoi", "navigator"] },
+        "role": { "type": "string", "minLength": 1 },
+        "animationPreset": { "type": "string", "minLength": 1 },
+        "file": { "$ref": "#/$defs/relativeFile" },
+        "imageUrl": { "type": "string", "minLength": 1 },
+        "portraitFile": { "$ref": "#/$defs/relativeFile" },
+        "portraitUrl": { "type": "string", "minLength": 1 },
+        "footprintTiles": { "$ref": "#/$defs/characterFootprint" },
+        "orientation": { "$ref": "#/$defs/orientation" },
+        "render": { "$ref": "#/$defs/editorRender" },
+        "license": { "$ref": "#/$defs/license" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "formatVersion", "id", "name", "assets", "placements"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "format": { "const": "roommates.project" },
+        "formatVersion": { "const": 1 },
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "packVersion": { "type": "string" },
+        "license": { "$ref": "#/$defs/license" },
+        "grid": { "$ref": "#/$defs/grid" },
+        "projection": { "$ref": "#/$defs/projection" },
+        "rooms": { "type": "array", "items": { "$ref": "#/$defs/room" } },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["furniture", "characters"],
+          "properties": {
+            "furniture": { "type": "array", "items": { "$ref": "#/$defs/editorFurniture" } },
+            "characters": { "type": "array", "items": { "$ref": "#/$defs/editorCharacter" } }
+          }
+        },
+        "placements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["furniture", "characters"],
+          "properties": {
+            "furniture": { "type": "array", "items": { "$ref": "#/$defs/assetPlacement" } },
+            "characters": { "type": "array", "items": { "$ref": "#/$defs/assetPlacement" } }
+          }
+        },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    }
+  }
+}

@@ -22,6 +22,13 @@
     "width": 1,
     "height": 1
   },
+  "gridContract": {
+    "coordinateSystem": "square-world-grid",
+    "footprintTiles": { "width": 1, "depth": 1 },
+    "floorContact": "bottom-center",
+    "projectionTilePx": { "width": 50, "height": 25 },
+    "note": "The visible sprite may rise above its occupied cell; movement and collision always use the 1x1 floor footprint."
+  },
   "placementClearanceTiles": {
     "width": 2,
     "height": 2

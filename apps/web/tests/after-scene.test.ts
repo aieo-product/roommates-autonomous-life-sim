@@ -122,6 +122,29 @@ describe("post-event room scene", () => {
     expect(plan.finalPoints.haru).not.toEqual(plan.finalPoints.aoi);
   });
 
+  it("places both residents on opposite sides of the island and faces them together", () => {
+    const game: GameState = {
+      ...INITIAL_GAME_STATE,
+      haru: { ...INITIAL_GAME_STATE.haru, location: "アイランドキッチン" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "アイランドキッチン" },
+    };
+    const plan = createAfterScenePlan(event({
+      storyBeats: [
+        { kind: "move", actor: "both", location: "アイランドキッチン" },
+        { kind: "dialogue", actor: "haru", text: "向かいで野菜を切るね。" },
+        { kind: "dialogue", actor: "aoi", text: "顔が見えると作りやすいね。" },
+      ],
+    }), game, {
+      haru: { ...INITIAL_GAME_STATE.haru, location: "Haru room" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "Aoi room" },
+    });
+
+    const move = plan.beats.find((beat) => beat.kind === "move");
+    const dialogue = plan.beats.find((beat) => beat.kind === "dialogue");
+    expect(move?.points.haru).not.toEqual(move?.points.aoi);
+    expect(dialogue?.directions).toEqual({ haru: "east", aoi: "west" });
+  });
+
   it("preserves a Director story as ordered movement, dialogue, and action beats", () => {
     const game: GameState = {
       ...INITIAL_GAME_STATE,

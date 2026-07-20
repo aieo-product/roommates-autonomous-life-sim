@@ -3,6 +3,7 @@ import {
   navigatorCharacterAssets,
   residentCharacterAssets,
 } from "../character-assets";
+import { useManagedCharacterAsset } from "../assets-manager/index.js";
 import type {
   ResultEnding,
   ResultProducer,
@@ -27,6 +28,9 @@ const STATUS_LABELS: Record<ResultStatus, string> = {
 export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
   function ResultHero({ ending, producer, relationshipLabel, status }, ref) {
     const styleLabel = STYLE_LABELS[producer.producerStyle] ?? producer.producerStyle;
+    const managedHaru = useManagedCharacterAsset("haru");
+    const managedAoi = useManagedCharacterAsset("aoi");
+    const managedNavigator = useManagedCharacterAsset("navigator");
 
     return (
       <header className={`result-hero result-rank-${producer.rank.toLowerCase()}`}>
@@ -44,11 +48,11 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
             </p>
             <div className="result-resident-pair" role="img" aria-label={`${CHARACTER_NAMES.haru}と${CHARACTER_NAMES.aoi}`}>
               <span className="is-haru">
-                <img src={residentCharacterAssets.haru.resultUrl} alt="" />
+                <img src={managedHaru?.portraitUrl ?? residentCharacterAssets.haru.resultUrl} alt="" />
                 <small>{CHARACTER_NAMES.haru}</small>
               </span>
               <span className="is-aoi">
-                <img src={residentCharacterAssets.aoi.resultUrl} alt="" />
+                <img src={managedAoi?.portraitUrl ?? residentCharacterAssets.aoi.resultUrl} alt="" />
                 <small>{CHARACTER_NAMES.aoi}</small>
               </span>
             </div>
@@ -58,7 +62,7 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
             <div className="result-stamp-heading">
               <span>DEKOPIN SCORE</span>
               <span className="result-score-dekopin" aria-hidden="true">
-                <img src={navigatorCharacterAssets.portraitUrl} alt="" />
+                <img src={managedNavigator?.portraitUrl ?? navigatorCharacterAssets.portraitUrl} alt="" />
               </span>
             </div>
             <div className="result-rank-line">

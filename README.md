@@ -38,6 +38,8 @@ flowchart LR
 - [基本間取りと2Dゲーム画面](./docs/room-layout.md)
 - [キャラクタースプライト](./docs/character-sprites.md)
 - [家具・生活小物2Dドット素材](./docs/furniture-assets.md)
+- [Roommates Asset Format v1](./docs/roommates-asset-format-v1.md) — 家具・キャラクター・間取りを配布可能にするOSS向けJSON仕様。
+- [Asset制作ガイド](./docs/asset-authoring-guide.md) — 1マス規格、pivot、content bounds、検証、pack公開手順。
 - [7日間の総集編・Agent感想・Producer評価リザルト](./docs/result-experience.md) — Issue #22で採用したP0設計。実装は進行中です。
 - [Producer Score v1](./docs/result-scoring-v1.md) — 決定的な採点ルール、根拠、coverage、テストベクトル。
 - [GameState v2](./docs/game-state-v2.md) — 全28ターンの正本ログ、Result状態、privacy、migration。
@@ -54,6 +56,12 @@ flowchart LR
 - 各ターンに同じ検証済み設定を送り、MockとCodex App Serverの両方で利用
 
 ゲームをリセットしてもCharacter Studioの保存内容は残ります。保存済みJSONが壊れている場合は、安全に初期プリセットへ戻します。
+
+## Assets管理
+
+ゲーム上部の「Assets」から、家具・キャラクター画像、1×1/1×2等の占有マス、pivot、向き、部屋、floor contactを編集できます。変更は部屋へ即時反映され、家具を移動した場合はキャラクターの1×1占有セルが重ならない移動先を選び直します。設定はブラウザへ保存でき、`roommates.project` JSONとしてimport/exportできます。
+
+公開用packは`npm run validate:assets`で検証します。キャラクターは必ず1×1、冷蔵庫は1×1、対面アイランドキッチンと浴槽は1×2を標準とし、画像サイズではなく論理footprintで衝突と移動を制御します。
 
 ## Codex App Serverをゲームランタイムとして使う
 
@@ -148,7 +156,7 @@ npm run dev
 npm run check
 ```
 
-これはTypeScript型チェック、単体テスト、プロダクションビルドを順に実行します。
+これはasset manifest検証、TypeScript型チェック、単体テスト、プロダクションビルドを順に実行します。
 
 ## 実App Serverモードの設定
 
@@ -263,7 +271,7 @@ AGENT_MODE=mock npm run dev
 - PCでの短時間デモを優先しており、モバイル最適化や網羅的なUIテストは限定的です。
 - 今日の予定はUI検証用のデイリープランです。現在の目標と場所はゲーム状態へ追従しますが、予定そのものの永続化やエージェント判断への入力は今後の拡張対象です。
 - 間取りは24×18タイルの論理座標を1280×720のアイソメトリック表示へ投影しています。家具は生成済みPNGを共通manifestから配置し、住人の全景表示はSVG/CSSの簡易表現、デコピンとリザルト内の住人は生成スプライトを使用します。
-- キャラクター移動はイベント／部屋ごとの固定アンカーです。自由歩行、経路探索、家具との詳細な当たり判定は今後の拡張対象です。
+- キャラクター移動はイベント／部屋ごとの候補地点から選び、Assets管理で変更した家具footprintとの重なりを回避します。任意セルを巡回する本格的な経路探索は今後の拡張対象です。
 - 本格的な3D描画、音声、認証、ランキング、家具購入は対象外です。
 
 ## 設計済み・実装中のP0
@@ -287,6 +295,7 @@ AGENT_MODE=mock npm run dev
 npm run dev        # Web + API
 npm run dev:agent-worker # 認証付きApp Serverゲートウェイ
 npm run typecheck  # 全workspaceの型チェック
+npm run validate:assets # runtime manifestとOSS pack例を検証
 npm test           # 主要ロジックとAPIテスト
 npm run build      # 全workspaceの本番ビルド
 npm run check      # typecheck + test + build

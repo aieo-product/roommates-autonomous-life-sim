@@ -16,6 +16,14 @@ export type RoomId =
 
 export type Point = { x: number; y: number };
 
+export type GridObstacle = {
+  roomId: RoomId;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+};
+
 type CharacterSpots = Record<CharacterId, Point>;
 
 export type RoomZone = {
@@ -91,8 +99,10 @@ export const ROOM_STAND_SPOTS: Record<RoomId, CharacterSpots> = {
   entry: { haru: { x: 16.4, y: 2.6 }, aoi: { x: 18.7, y: 2.6 } },
   washroom: { haru: { x: 22.2, y: 2.2 }, aoi: { x: 23.2, y: 1.8 } },
   hallway: { haru: { x: 9.1, y: 6.9 }, aoi: { x: 11, y: 6.8 } },
-  bathroom: { haru: { x: 19.4, y: 5.8 }, aoi: { x: 21.2, y: 6.4 } },
-  kitchen: { haru: { x: 2.4, y: 14.4 }, aoi: { x: 4.7, y: 14.5 } },
+  bathroom: { haru: { x: 19.6, y: 5.2 }, aoi: { x: 23, y: 5.2 } },
+  // The 1x2 island occupies x=3..4 / y=10..12. Residents stand on its
+  // opposite long sides so conversation can resolve as a face-to-face beat.
+  kitchen: { haru: { x: 2, y: 11 }, aoi: { x: 5, y: 11 } },
   dining: { haru: { x: 10.2, y: 14.8 }, aoi: { x: 12.6, y: 14.8 } },
   living: { haru: { x: 18.7, y: 14.6 }, aoi: { x: 22.3, y: 13.4 } },
   balcony: { haru: { x: 16.3, y: 16.8 }, aoi: { x: 18.1, y: 16.5 } },
@@ -106,8 +116,8 @@ export const ROOM_TURN_SPOTS: Record<RoomId, CharacterSpots> = {
   entry: { haru: { x: 18.7, y: 2.6 }, aoi: { x: 16.4, y: 2.6 } },
   washroom: { haru: { x: 23.2, y: 1.8 }, aoi: { x: 22.2, y: 2.2 } },
   hallway: { haru: { x: 10.7, y: 7.2 }, aoi: { x: 9.4, y: 6.7 } },
-  bathroom: { haru: { x: 21.2, y: 6.4 }, aoi: { x: 19.4, y: 5.8 } },
-  kitchen: { haru: { x: 4.6, y: 14.7 }, aoi: { x: 2.5, y: 14.5 } },
+  bathroom: { haru: { x: 19.8, y: 6.7 }, aoi: { x: 23, y: 6.6 } },
+  kitchen: { haru: { x: 2.1, y: 13.4 }, aoi: { x: 5.2, y: 13.4 } },
   dining: { haru: { x: 12.7, y: 14.8 }, aoi: { x: 9.3, y: 13.8 } },
   living: { haru: { x: 22.3, y: 13.4 }, aoi: { x: 18.7, y: 14.6 } },
   balcony: { haru: { x: 18.2, y: 16.6 }, aoi: { x: 16.4, y: 16.8 } },
@@ -117,13 +127,85 @@ export const DESTINATION_STAND_SPOTS = {
   sofa: { haru: { x: 21.5, y: 12.2 }, aoi: { x: 22.7, y: 12.7 } },
   lowTable: { haru: { x: 20.7, y: 13.8 }, aoi: { x: 22.1, y: 13.7 } },
   diningTable: { haru: { x: 9.2, y: 13.8 }, aoi: { x: 13.3, y: 13.4 } },
-  kitchenCounter: { haru: { x: 1.8, y: 10.7 }, aoi: { x: 4.2, y: 10.7 } },
+  kitchenCounter: { haru: { x: 2, y: 11 }, aoi: { x: 5, y: 11 } },
   livingWindow: { haru: { x: 23.3, y: 10.2 }, aoi: { x: 23.4, y: 11.7 } },
   balconyWindow: { haru: { x: 15.8, y: 16.6 }, aoi: { x: 17.3, y: 16.6 } },
   entryDoor: { haru: { x: 16.4, y: 2.6 }, aoi: { x: 18.7, y: 2.6 } },
   workDesk: { haru: { x: 7.3, y: 3.2 }, aoi: { x: 15.2, y: 3.2 } },
-  laundryRack: { haru: { x: 9.7, y: 17.4 }, aoi: { x: 12.3, y: 17.4 } },
+  laundryRack: { haru: { x: 9.7, y: 17.4 }, aoi: { x: 14.6, y: 17.4 } },
 } satisfies Record<string, CharacterSpots>;
+
+const ROOM_WORLD_BOUNDS: Record<RoomId, Array<{ x: number; y: number; width: number; height: number }>> = {
+  haru_room: [{ x: 0, y: 0, width: 8, height: 6 }],
+  aoi_room: [{ x: 8, y: 0, width: 8, height: 6 }],
+  entry: [{ x: 16, y: 0, width: 3, height: 3 }],
+  washroom: [{ x: 19, y: 0, width: 5, height: 3 }],
+  hallway: [
+    { x: 0, y: 6, width: 19, height: 2 },
+    { x: 16, y: 3, width: 3, height: 3 },
+  ],
+  bathroom: [{ x: 19, y: 3, width: 5, height: 5 }],
+  kitchen: [{ x: 0, y: 8, width: 7, height: 8 }],
+  dining: [{ x: 7, y: 8, width: 7, height: 8 }],
+  living: [{ x: 14, y: 8, width: 10, height: 8 }],
+  balcony: [{ x: 0, y: 16, width: 24, height: 2 }],
+};
+
+const characterRect = (point: Point) => ({
+  x: point.x - 0.5,
+  y: point.y - 0.5,
+  width: 1,
+  height: 1,
+});
+
+const SAFE_DESTINATION_OFFSETS: ReadonlyArray<readonly [number, number]> = [
+  [-1, 0], [1, 0], [0, -1], [0, 1],
+  [-1, -1], [1, -1], [-1, 1], [1, 1],
+  [-2, 0], [2, 0], [0, -2], [0, 2],
+];
+
+const rectanglesOverlap = (
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number },
+): boolean => left.x < right.x + right.width
+  && left.x + left.width > right.x
+  && left.y < right.y + right.height
+  && left.y + left.height > right.y;
+
+const safeDestination = (
+  person: CharacterId,
+  room: RoomId,
+  preferred: Point,
+  obstacles: readonly GridObstacle[],
+): Point => {
+  if (obstacles.length === 0) return preferred;
+  const roomObstacles = obstacles.filter((obstacle) => obstacle.roomId === room);
+  const candidates = [
+    preferred,
+    ROOM_STAND_SPOTS[room][person],
+    ROOM_TURN_SPOTS[room][person],
+    ...SAFE_DESTINATION_OFFSETS.map(([x, y]) => ({
+      x: preferred.x + x,
+      y: preferred.y + y,
+    })),
+  ];
+
+  return candidates.find((candidate) => {
+    const occupied = characterRect(candidate);
+    const insideRoom = ROOM_WORLD_BOUNDS[room].some((bounds) =>
+      occupied.x >= bounds.x
+      && occupied.y >= bounds.y
+      && occupied.x + occupied.width <= bounds.x + bounds.width
+      && occupied.y + occupied.height <= bounds.y + bounds.height);
+    if (!insideRoom) return false;
+    return roomObstacles.every((obstacle) => !rectanglesOverlap(occupied, {
+      x: obstacle.x,
+      y: obstacle.y,
+      width: obstacle.width,
+      height: obstacle.depth,
+    }));
+  }) ?? preferred;
+};
 
 const EVENT_ROOMS: Partial<Record<string, RoomId>> = {
   "shared-cooking": "kitchen",
@@ -193,7 +275,7 @@ export const characterAnchor = (
   return projectCharacterFloorPoint(ROOM_STAND_SPOTS[room][person]);
 };
 
-export const worldDestinationForLocation = (
+const rawWorldDestinationForLocation = (
   person: CharacterId,
   location: string,
 ): Point => {
@@ -207,7 +289,7 @@ export const worldDestinationForLocation = (
       ? DESTINATION_STAND_SPOTS.workDesk.aoi
       : DESTINATION_STAND_SPOTS.workDesk.haru;
   }
-  if (containsAny(value, ["キッチン台", "調理台", "カウンター", "counter"])) return DESTINATION_STAND_SPOTS.kitchenCounter[person];
+  if (containsAny(value, ["アイランド", "キッチン台", "調理台", "カウンター", "island", "counter"])) return DESTINATION_STAND_SPOTS.kitchenCounter[person];
   if (containsAny(value, ["洗濯スペース", "洗濯ラック", "ランドリー", "laundry"])) return DESTINATION_STAND_SPOTS.laundryRack[person];
   if (containsAny(value, ["窓", "window"])) {
     return room === "balcony"
@@ -224,19 +306,45 @@ export const worldDestinationForLocation = (
   return ROOM_STAND_SPOTS[room][person];
 };
 
+export const worldDestinationForLocation = (
+  person: CharacterId,
+  location: string,
+  obstacles: readonly GridObstacle[] = [],
+): Point => {
+  const room = roomForLocation(location, person);
+  return safeDestination(
+    person,
+    room,
+    rawWorldDestinationForLocation(person, location),
+    obstacles,
+  );
+};
+
 export const characterDestinationForLocation = (
   person: CharacterId,
   location: string,
-): Point => projectCharacterFloorPoint(worldDestinationForLocation(person, location));
+  obstacles: readonly GridObstacle[] = [],
+): Point => projectCharacterFloorPoint(worldDestinationForLocation(person, location, obstacles));
 
 export const characterDetourCandidates = (
   person: CharacterId,
   location: string,
+  obstacles: readonly GridObstacle[] = [],
 ): Point[] => {
   const room = roomForLocation(location, person);
   return [
-    projectCharacterFloorPoint(ROOM_TURN_SPOTS[room][person]),
-    projectCharacterFloorPoint(ROOM_STAND_SPOTS[room][person]),
+    projectCharacterFloorPoint(safeDestination(
+      person,
+      room,
+      ROOM_TURN_SPOTS[room][person],
+      obstacles,
+    )),
+    projectCharacterFloorPoint(safeDestination(
+      person,
+      room,
+      ROOM_STAND_SPOTS[room][person],
+      obstacles,
+    )),
   ];
 };
 
