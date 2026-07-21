@@ -77,7 +77,7 @@ The player's role is to create conditions for connection—not to force an outco
 
 | Build Week judging lens | Evidence in ROOMMATES |
 | --- | --- |
-| Technical implementation | Isolated resident decisions, schema-validated multi-agent orchestration, one state writer, per-role fallback, SSE, and 617 automated tests |
+| Technical implementation | Isolated resident decisions, schema-validated multi-agent orchestration, one state writer, per-role fallback, SSE, and 618 automated tests |
 | Design | A map-first 2LDK home, Character Studio, visible agent progress, responsive controls, and an explainable Day 7 result |
 | Impact | Makes AI agency understandable through an everyday experience where rejection and uncertainty are valid—not errors |
 | Quality of the idea | Reframes relationship simulation around mutual intent instead of optimizing affection or selecting a scripted route |
@@ -121,19 +121,15 @@ role-specific schema; deterministic code owns the committed result.
 
 ### Production evidence
 
-On July 20, 2026 at 12:00 JST, an isolated anonymous production test completed
-one turn from revision 0 to 1 in approximately 11.2 seconds. Navigator, Haru,
-Aoi, and Director all reported `openai_api`.
-
 Provider attribution proves that the public turn used the real OpenAI path, but
-does not reveal the model name. The repository defaults to `gpt-5.6-terra`;
-deployment configuration can override it and must be verified separately.
+does not reveal the model name. On July 22, 2026, the production Sites
+configuration was set explicitly to `OPENAI_API_MODEL=gpt-5.6-terra`; the OpenAI
+Project API key remains a server-side secret.
 
-On July 21, the production Sites configuration was checked again: the OpenAI
-Project API key is registered as a server-side secret, no `OPENAI_API_MODEL`
-override is present, and `/api/health` reports `openaiApiConfigured: true`.
-The deployed Worker therefore uses the checked-in `gpt-5.6-terra` default for
-the direct Responses API path.
+After deploying the final integrated `main`, an isolated anonymous production
+test completed one turn from revision 0 to 1. Navigator, Haru, Aoi, and Director
+all reported `openai_api`, while `/api/health` returned HTTP 200 and
+`openaiApiConfigured: true`.
 
 ## How Codex accelerated development
 
@@ -149,7 +145,7 @@ Codex collaborated across the build loop with reviewable GitHub evidence:
   and Cloudflare runtime in [PR #47](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/47),
   [PR #54](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/54), and
   [PR #56](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/56);
-- expanded unit, contract, API, D1, provider, asset, and UI verification to 617 tests.
+- expanded unit, contract, API, D1, provider, asset, and UI verification to 618 tests.
 
 The human team retained the defining product decisions:
 
@@ -459,12 +455,12 @@ rate-limit, and deployment settings. Never commit credentials.
 
 ## Verification
 
-Validated on July 21, 2026:
+Validated on July 22, 2026 against the final integrated `main`:
 
 | Check | Result |
 | --- | --- |
 | TypeScript | ✅ |
-| Server tests | ✅ 547 passed |
+| Server tests | ✅ 548 passed |
 | Web tests | ✅ 70 passed |
 | Production build | ✅ |
 | Cloudflare Worker and Sites package | ✅ |

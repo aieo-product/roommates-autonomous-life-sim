@@ -142,9 +142,10 @@ role-specific schema, and deterministic engine rules own the committed result.
 The direct API path uses `store: false`, exposes no tools, keeps its key server-side,
 and treats player text as untrusted game data.
 
-Before the final submission, capture one live turn whose runtime panel reports
-`openai_api` or `app_server`, and make that provider evidence visible in the demo
-video. Do not claim a provider that the recorded run did not use.
+The July 22 final production verification completed one live turn whose runtime
+panel reported `openai_api` for all four roles. Make comparable provider evidence
+visible in the demo video. Do not claim a provider that the recorded run did not
+use.
 
 ### Live runtime verification
 
@@ -154,13 +155,12 @@ returned HTTP 200 and completed one turn from revision 0 to 1 in approximately
 roles—navigator, Haru, Aoi, and Director—to `openai_api`.
 
 The public endpoint intentionally does not expose a model name. The checked-in
-server default is `gpt-5.6-terra`, but deployment configuration can override it.
-On **July 21, 2026**, the Sites environment was checked directly: the OpenAI
-Project API key was present as a server-side secret, no `OPENAI_API_MODEL`
-override was configured, and `/api/health` reported `openaiApiConfigured: true`.
-The deployed direct Responses API path therefore uses the checked-in
-`gpt-5.6-terra` default. The final video should still show a successful
-provider-attributed turn; do not claim a provider that the recorded run did not use.
+server default is `gpt-5.6-terra`. On **July 22, 2026**, the Sites environment was
+set explicitly to `OPENAI_API_MODEL=gpt-5.6-terra`; the OpenAI Project API key
+remained a server-side secret. After the final integrated `main` was deployed,
+`/api/health` returned HTTP 200 with `openaiApiConfigured: true`, and a fresh
+anonymous turn completed from revision 0 to 1 with all four roles attributed to
+`openai_api`. The final video should still show its own successful attributed turn.
 
 ### How Codex accelerated the work
 
@@ -178,9 +178,9 @@ Codex was used as a build collaborator across the entire product loop:
 The human team retained the core decisions: the player may influence but not
 control, both residents decide independently, becoming a couple requires an
 eligible confession event and two cooperative decisions, model output cannot
-mutate state directly, and graceful
-fallback is preferable to a broken demo. `[OWNER: add concrete personal examples
-and the primary /feedback Session ID.]`
+mutate state directly, and graceful fallback is preferable to a broken demo. The
+Devpost form should add the team's concrete personal examples and the primary
+`/feedback` Session ID.
 
 ### Challenges
 
@@ -332,18 +332,18 @@ complete configuration matrix. Never commit credentials.
 
 ## Verification snapshot
 
-Verified on July 21, 2026 against the final local integration:
+Verified on July 22, 2026 against the final integrated `main`:
 
-- `npm run check`: asset validation, TypeScript checks, **547 server tests**,
+- `npm run check`: asset validation, TypeScript checks, **548 server tests**,
   **70 web tests**,
   and production builds passed.
-- `npm run check:sites`: the same checks plus the Cloudflare Worker build,
-  Sites assembly, and deployment package creation passed.
+- `npm run prepare:sites`: Cloudflare Worker build, Sites assembly, validation,
+  and deployment package creation passed.
 - `npm audit --omit=dev`: **0 production dependency vulnerabilities** reported.
 - Production smoke test: HTTP 200 and one completed anonymous turn with navigator,
   Haru, Aoi, and Director all attributed to `openai_api`.
 
-These checks should be repeated after the final submission changes are merged.
+GitHub CI passed on the final runtime PR before it was merged into `main`.
 
 ## Safety, privacy, and known limitations
 
@@ -367,9 +367,8 @@ These checks should be repeated after the final submission changes are merged.
 - [ ] Select **Apps for Your Life**.
 - [x] Add the repository MIT `LICENSE`.
 - [ ] Review third-party materials and explicit asset-pack licenses.
-- [ ] Replace the remaining `[OWNER: ...]` fields and personally review this
-  AI-assisted copy.
-- [ ] Run `npm run check` and `npm run check:sites` on the final commit.
+- [ ] Personally review the AI-assisted submission copy in the team's own voice.
+- [x] Run repository checks and prepare the final Sites package.
 - [ ] Record and publish the public, voiced, under-three-minute YouTube demo.
 - [ ] Run `/feedback` in the primary Codex build task and add the Session ID.
 - [ ] Add the final commit SHA, video, Session ID, and screenshots.
