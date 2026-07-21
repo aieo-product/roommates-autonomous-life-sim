@@ -885,8 +885,10 @@ a:focus-visible,
 .resident-hud {
   position: absolute;
   z-index: 7;
-  top: 12px;
-  left: 12px;
+  top: auto;
+  right: 12px;
+  bottom: 12px;
+  left: auto;
   width: 226px;
   display: grid;
   gap: 7px;
@@ -3132,9 +3134,12 @@ a:focus-visible,
   .camera-note { display: none; }
 
   .resident-hud {
-    top: 8px;
-    left: 8px;
-    width: 160px;
+    top: auto;
+    right: 8px;
+    bottom: 120px;
+    left: auto;
+    width: min(324px, calc(100% - 16px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
   }
   .resident-chip {
@@ -3152,9 +3157,9 @@ a:focus-visible,
   .resident-cue { font-size: 16px; }
 
   .resolution-progress {
-    top: 126px;
+    top: 8px;
     left: 8px;
-    right: 8px;
+    right: 124px;
     width: auto;
     max-width: none;
     min-width: 0;
@@ -3162,21 +3167,36 @@ a:focus-visible,
   }
   .resolution-label { padding-inline: 4px; font-size: 7px; }
   .progress-step b { display: none; }
+  .resolution-progress p { display: none; }
 
   .event-card {
     left: 8px;
     bottom: 8px;
     width: calc(100% - 16px);
+    height: 104px;
+    max-height: 104px;
     grid-template-columns: 46px minmax(0,1fr);
     gap: 7px;
     padding: 7px;
+    overflow: hidden;
     border-width: 2px;
     box-shadow: 3px 3px 0 rgba(30,46,62,.28);
   }
   .event-card.is-fresh { min-height: 104px; }
   .event-icon { width: 43px; height: 43px; border-width: 2px; }
-  .event-card h2 { font-size: 14px; }
-  .event-card p { font-size: 9px; }
+  .event-card h2 {
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .event-card p {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 9px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
   .event-card .event-dekopin-message { padding-right: 102px; }
   .event-card-open {
     min-width: 94px;
