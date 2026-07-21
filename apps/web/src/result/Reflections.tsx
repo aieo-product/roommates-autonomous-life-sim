@@ -1,7 +1,7 @@
 import { ResidentPortrait } from "../character-assets";
 import { EvidenceLinks } from "./EvidenceLinks";
 import type { ResultAgentReflection, ResultCharacterId, ResultStatus } from "./types";
-import { useResultCharacterNames } from "./character-names";
+import { useResultCharacterNames, useResultCharacterText } from "./character-names";
 
 function ReflectionCard({
   person,
@@ -13,6 +13,7 @@ function ReflectionCard({
   status: ResultStatus;
 }) {
   const characterNames = useResultCharacterNames();
+  const displayText = useResultCharacterText();
   if (!reflection) {
     return (
       <article className={`result-reflection-card is-${person} is-missing`}>
@@ -27,7 +28,7 @@ function ReflectionCard({
   return (
     <article className={`result-reflection-card is-${person}`}>
       <header><ResidentPortrait person={person} className="result-character-avatar" /><h3>{characterNames[person]}</h3></header>
-      <blockquote>「{reflection.seasonImpression}」</blockquote>
+      <blockquote>「{displayText(reflection.seasonImpression)}」</blockquote>
       <dl>
         <div>
           <dt>いちばん印象に残った出来事</dt>
@@ -48,7 +49,7 @@ function ReflectionCard({
       </dl>
       <div className="result-producer-message">
         <strong>デコピンへ</strong>
-        <p>「{reflection.messageToProducer}」</p>
+        <p>「{displayText(reflection.messageToProducer)}」</p>
       </div>
     </article>
   );

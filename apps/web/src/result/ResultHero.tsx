@@ -10,7 +10,7 @@ import type {
   ResultRelationshipLabel,
   ResultStatus,
 } from "./types";
-import { useResultCharacterNames } from "./character-names";
+import { useResultCharacterNames, useResultCharacterText } from "./character-names";
 import { RELATIONSHIP_LABELS, STYLE_LABELS } from "./utils";
 
 type ResultHeroProps = {
@@ -33,6 +33,7 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
     const managedAoi = useManagedCharacterAsset("aoi");
     const managedNavigator = useManagedCharacterAsset("navigator");
     const characterNames = useResultCharacterNames();
+    const displayText = useResultCharacterText();
 
     return (
       <header className={`result-hero result-rank-${producer.rank.toLowerCase()}`}>
@@ -43,8 +44,8 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
         <div className="result-hero-grid">
           <div className="result-ending-copy">
             <p className="result-section-label">二人が選んだ結末</p>
-            <h1 ref={ref} tabIndex={-1}>{ending.title}</h1>
-            <p className="result-ending-narration">{ending.narration}</p>
+            <h1 ref={ref} tabIndex={-1}>{displayText(ending.title)}</h1>
+            <p className="result-ending-narration">{displayText(ending.narration)}</p>
             <p className="result-relationship">
               最後の関係 <strong>{RELATIONSHIP_LABELS[relationshipLabel]}</strong>
             </p>

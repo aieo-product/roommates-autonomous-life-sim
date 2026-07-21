@@ -13,7 +13,15 @@ import type {
   ResolvedEvent,
   StreamEvent,
 } from "@roommates/shared";
-import { createInitialGameState, getDefaultCharacterSettings, mutableStatKeys } from "@roommates/shared";
+import {
+  EVENT_CONVERSATION_TEXT_MAX_LENGTH,
+  EVENT_STORY_BEAT_CONTENT_MAX_LENGTH,
+  EVENT_STORY_BEAT_LOCATION_MAX_LENGTH,
+  createInitialGameState,
+  gameStateSchema,
+  getDefaultCharacterSettings,
+  mutableStatKeys,
+} from "@roommates/shared";
 import { GameConflictError, GameEngine } from "../src/engine/game-engine.js";
 import { buildAutonomousActionCandidates } from "../src/engine/autonomy/action-elements.js";
 import { EVENT_DEFINITIONS_BY_ID } from "../src/engine/event-definitions.js";
@@ -187,7 +195,15 @@ describe("GameEngine", () => {
   });
 
   it("passes the selected profile and personality to both agents and exposes their chosen goals", async () => {
-    const agents = new StaticAgentCoordinator();
+    const agents = new StaticAgentCoordinator({}, {
+      ...resolvedEvent,
+      // Presentation metadata returned by an agent is untrusted. The engine
+      // must replace it with the validated request settings below.
+      characterRoster: {
+        haru: { id: "haru", displayName: "偽名1", role: "male" },
+        aoi: { id: "aoi", displayName: "偽名2", role: "female" },
+      },
+    });
     const { engine } = await engineWith(agents);
     const settings = getDefaultCharacterSettings();
     settings.characters.haru.profile.name = "春";
@@ -213,13 +229,202 @@ describe("GameEngine", () => {
       agents.inputs.haru?.snapshot.characterRoster,
     );
     expect(result.characterRoster).toEqual(agents.inputs.haru?.snapshot.characterRoster);
+    expect(result.lastEvent?.characterRoster).toEqual(
+      agents.inputs.haru?.snapshot.characterRoster,
+    );
+    expect(result.eventLog[0]?.characterRoster).toEqual(
+      agents.inputs.haru?.snapshot.characterRoster,
+    );
     expect(streamed.filter((event) => event.type === "agent.thinking").map((event) => event.message))
       .toEqual(["春 is thinking…", "葵子 is thinking…"]);
     expect(streamed.filter((event) => event.type === "agent.completed").map((event) => event.message))
       .toEqual(["春: ACCEPT", "葵子: ACCEPT"]);
+    expect(streamed.find((event) => event.type === "director.completed")?.data)
+      .toMatchObject({
+        characterRoster: agents.inputs.haru?.snapshot.characterRoster,
+        conversation: expect.arrayContaining([
+          expect.objectContaining({ speaker: "haru" }),
+          expect.objectContaining({ speaker: "aoi" }),
+        ]),
+        storyBeats: expect.arrayContaining([
+          expect.objectContaining({ actor: "haru" }),
+          expect.objectContaining({ actor: "aoi" }),
+        ]),
+      });
+    expect(streamed.find((event) => event.type === "turn.completed")?.data)
+      .toMatchObject({ characterRoster: agents.inputs.haru?.snapshot.characterRoster });
     expect(agents.inputs.haru?.character).not.toBe(settings.characters.haru);
     expect(result.characters.haru.state.currentGoal).toBe(acceptedDecision.action);
     expect(result.characters.aoi.state.currentGoal).toBe(acceptedDecision.action);
+  });
+
+  it("normalizes legacy resident names in newly generated public prose and SSE", async () => {
+    const legacyHaruDecision: CharacterDecision = {
+      ...acceptedDecision,
+      action: "HaruがAoiのために飲み物を用意する",
+      dialogue: "Aoi、少し話そう。",
+      publicReason: "アオイと落ち着いて話したいから",
+    };
+    const legacyAoiDecision: CharacterDecision = {
+      ...acceptedDecision,
+      action: "AoiがHaruの隣へ座る",
+      dialogue: "うん、ハル。",
+      publicReason: "Haruの気持ちを聞きたいから",
+    };
+    const agents = new StaticAgentCoordinator(
+      { haru: legacyHaruDecision, aoi: legacyAoiDecision },
+      {
+        ...resolvedEvent,
+        eventTitle: "HaruとAoiの穏やかな時間",
+        narration: "ハルはアオイへ声をかけた。",
+        memory: {
+          ...resolvedEvent.memory,
+          title: "HaruとAoiの会話",
+          summary: "ハルとアオイが言葉を交わした",
+        },
+      },
+      { message: "HaruとAoiへきっかけを届けるね。" },
+    );
+    const { engine } = await engineWith(agents);
+    const settings = getDefaultCharacterSettings();
+    settings.characters.haru.profile.name = "春";
+    settings.characters.aoi.profile.name = "葵子";
+    const streamed: StreamEvent[] = [];
+
+    const result = await engine.resolveTurn(
+      "二人で話してみて",
+      "turn-key-normalized-public-names",
+      0,
+      (event) => streamed.push(event),
+      settings,
+    );
+
+    expect(JSON.stringify(result.lastEvent)).not.toMatch(/Haru|Aoi|ハル|アオイ/u);
+    expect(JSON.stringify(result.eventLog.at(-1))).not.toMatch(/Haru|Aoi|ハル|アオイ/u);
+    expect(result.lastEvent?.eventTitle).toBe("春と葵子の穏やかな時間");
+    expect(result.lastEvent?.conversation?.map(({ speaker }) => speaker))
+      .toEqual(expect.arrayContaining(["haru", "aoi"]));
+    expect(result.lastEvent?.storyBeats?.map(({ actor }) => actor))
+      .toEqual(expect.arrayContaining(["haru", "aoi"]));
+    expect(result.characters.haru.lastDecision?.action).toContain("春が葵子");
+    expect(result.navigator?.message).toBe("春と葵子へきっかけを届けるね。");
+    expect(streamed.find((event) => event.type === "navigator.completed")?.message)
+      .toBe("春と葵子へきっかけを届けるね。");
+    expect(streamed.find((event) => event.type === "agent.completed" && event.agent === "haru")?.data)
+      .toMatchObject({ dialogue: "葵子、少し話そう。" });
+  });
+
+  it("clips max-length generated prose after expanding configured names and saves a valid state", async () => {
+    const legacyText = (maxLength: number): string =>
+      "ハル".repeat(Math.floor(maxLength / 2));
+    const maxDecision: CharacterDecision = {
+      ...acceptedDecision,
+      action: legacyText(2_000),
+      dialogue: legacyText(2_000),
+      publicReason: legacyText(2_000),
+    };
+    const maxEvent: ResolvedEvent = {
+      ...resolvedEvent,
+      eventTitle: legacyText(2_000),
+      narration: legacyText(2_000),
+      conversation: [
+        { speaker: "haru", text: legacyText(EVENT_CONVERSATION_TEXT_MAX_LENGTH) },
+        { speaker: "aoi", text: legacyText(EVENT_CONVERSATION_TEXT_MAX_LENGTH) },
+        { speaker: "haru", text: legacyText(EVENT_CONVERSATION_TEXT_MAX_LENGTH) },
+      ],
+      memory: {
+        ...resolvedEvent.memory,
+        title: legacyText(2_000),
+        summary: legacyText(2_000),
+      },
+      scene: {
+        haru: legacyText(EVENT_STORY_BEAT_LOCATION_MAX_LENGTH),
+        aoi: legacyText(EVENT_STORY_BEAT_LOCATION_MAX_LENGTH),
+      },
+      conflictUpdate: { add: [legacyText(2_000)] },
+    };
+    const agents = new StaticAgentCoordinator(
+      { haru: maxDecision, aoi: maxDecision },
+      maxEvent,
+      { message: legacyText(240) },
+    );
+    const { engine, repository } = await engineWith(agents);
+    const settings = getDefaultCharacterSettings();
+    settings.characters.haru.profile.name = "春".repeat(20);
+    settings.characters.aoi.profile.name = "葵".repeat(20);
+
+    const result = await engine.resolveTurn(
+      "一緒に夕食を作ってみたら？",
+      "turn-key-max-name-schema-regression",
+      0,
+      undefined,
+      settings,
+    );
+    const stored = await repository.load();
+
+    expect(() => gameStateSchema.parse(result)).not.toThrow();
+    expect(() => gameStateSchema.parse(stored)).not.toThrow();
+    expect(result.navigator?.message).toHaveLength(240);
+    expect(result.lastEvent?.navigatorMessage).toHaveLength(240);
+    expect(result.characters.haru.lastDecision?.action.length).toBe(2_000);
+    expect(result.eventLog.at(-1)?.haruReaction.length).toBe(2_000);
+    expect(result.eventLog.at(-1)?.aoiReaction.length).toBe(2_000);
+    expect(result.lastEvent?.conversation?.every(
+      ({ text }) => text.length <= EVENT_CONVERSATION_TEXT_MAX_LENGTH,
+    )).toBe(true);
+    expect(result.lastEvent?.storyBeats?.every((beat) =>
+      beat.kind === "move"
+        ? beat.location.length <= EVENT_STORY_BEAT_LOCATION_MAX_LENGTH
+        : (beat.kind === "dialogue" ? beat.text : beat.action).length <=
+          EVENT_STORY_BEAT_CONTENT_MAX_LENGTH,
+    )).toBe(true);
+    expect(result.shared.unresolvedConflicts).toHaveLength(1);
+    expect(result.shared.unresolvedConflicts[0]).toHaveLength(2_000);
+  });
+
+  it("keeps the confession narration valid after appending the server-authored ending", async () => {
+    const repository = new MemoryGameRepository();
+    const initial = createInitialGameState();
+    initial.shared.day = 4;
+    initial.shared.phase = "evening";
+    initial.shared.relationshipLabel = "romantic_tension";
+    initial.shared.sharedMemories.push({
+      id: "memory-positive",
+      day: 3,
+      phase: "evening",
+      title: "互いを知った時間",
+      summary: "二人が自分の意思で穏やかに話した",
+      emotionalImpact: 5,
+      participants: ["haru", "aoi"],
+      importance: 7,
+    });
+    for (const characterId of ["haru", "aoi"] as const) {
+      Object.assign(initial.characters[characterId].state, {
+        energy: 70,
+        stress: 20,
+        affection: 70,
+        trust: 70,
+        romanticAwareness: 60,
+      });
+    }
+    await repository.save(initial);
+    const agents = new StaticAgentCoordinator({}, {
+      ...resolvedEvent,
+      narration: "語".repeat(2_000),
+    });
+    const engine = new GameEngine(repository, agents);
+    await engine.initialize();
+
+    const state = await engine.resolveTurn(
+      "二人が告白について話せる場所を用意する",
+      "turn-key-confession-max-narration",
+      0,
+    );
+
+    expect(state.eventLog.at(-1)?.eventDefinitionId).toBe("confession-space");
+    expect(state.shared.relationshipLabel).toBe("couple");
+    expect(state.lastEvent?.narration).toHaveLength(2_000);
+    expect(() => gameStateSchema.parse(state)).not.toThrow();
   });
 
   it("composes an offered autonomous initiative into the event that actually resolves", async () => {
@@ -559,6 +764,38 @@ describe("GameEngine", () => {
     expect(state.eventLog.at(-1)?.eventDefinitionId).toBe("targeted-apology");
     expect(state.lastEvent?.conflictUpdate?.resolve).toEqual(["食器を片づけなかった"]);
     expect(state.shared.unresolvedConflicts).toEqual(["掃除の分担"]);
+  });
+
+  it("keeps an exact legacy-name conflict identifier while resolving it", async () => {
+    const repository = new MemoryGameRepository();
+    const initial = createInitialGameState();
+    initial.shared.phase = "afternoon";
+    initial.shared.unresolvedConflicts = ["HaruがAoiのカップを片づけなかった"];
+    await repository.save(initial);
+    const agents = new StaticAgentCoordinator({}, {
+      ...resolvedEvent,
+      conflictUpdate: {
+        resolve: ["HaruがAoiのカップを片づけなかった"],
+      },
+    });
+    const engine = new GameEngine(repository, agents);
+    await engine.initialize();
+    const settings = getDefaultCharacterSettings();
+    settings.characters.haru.profile.name = "春";
+    settings.characters.aoi.profile.name = "葵子";
+
+    const state = await engine.resolveTurn(
+      "昨日のカップのことを謝ってみて",
+      "turn-key-exact-legacy-conflict",
+      0,
+      undefined,
+      settings,
+    );
+
+    expect(state.lastEvent?.conflictUpdate?.resolve).toEqual([
+      "HaruがAoiのカップを片づけなかった",
+    ]);
+    expect(state.shared.unresolvedConflicts).toEqual([]);
   });
 
   it("rejects a stale revision without invoking agents or changing state", async () => {

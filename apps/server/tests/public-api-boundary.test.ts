@@ -111,7 +111,7 @@ describe("public API boundary", () => {
     expect(game.status).toBe(200);
     expect(game.body.characters.haru.lastDecision).toEqual({
       decision: "ACCEPT",
-      action: "haruはテーブルにつく",
+      action: "Haruはテーブルにつく",
       dialogue: "一緒に過ごそう。",
       publicReason: "落ち着いて話せそうだから",
     });

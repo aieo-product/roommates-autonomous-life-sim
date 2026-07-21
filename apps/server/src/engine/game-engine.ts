@@ -26,6 +26,7 @@ import {
   characterDisplayName,
   createCharacterRoster,
   createInitialGameState,
+  gameStateSchema,
   mutableStatKeys,
 } from "@roommates/shared";
 import type { AgentCoordinator, AgentResult } from "../agents/coordinator.js";
@@ -57,6 +58,13 @@ import {
 } from "./autonomy/composer.js";
 import { EVENT_DEFINITIONS_BY_ID } from "./event-definitions.js";
 import { constrainResolvedEvent } from "./event-policy.js";
+import {
+  PUBLIC_PROSE_MAX_LENGTH,
+  clipPublicText,
+  normalizeDecisionCharacterNames,
+  normalizeNavigatorResponseCharacterNames,
+  normalizeResolvedEventCharacterNames,
+} from "./character-presentation.js";
 import {
   buildProducerResult,
   buildResultNarrative,
@@ -381,7 +389,10 @@ export class GameEngine {
         }
       };
       const navigatorPromise = navigatorTask().then((navigator) => {
-        const navigatorResponse = buildNavigatorResponse(navigatorInput, navigator.value);
+        const navigatorResponse = normalizeNavigatorResponseCharacterNames(
+          buildNavigatorResponse(navigatorInput, navigator.value),
+          characterRoster,
+        );
         emit({
           type: "navigator.completed",
           agent: "navigator",
@@ -412,17 +423,23 @@ export class GameEngine {
         decisions: { haru: haru.value, aoi: aoi.value },
         offeredCandidates: autonomousCandidates,
       });
-      const haruDecision = normalizeAutonomousDecision(
-        "haru",
-        haru.value,
-        suggestion,
-        autonomousPlan,
+      const haruDecision = normalizeDecisionCharacterNames(
+        normalizeAutonomousDecision(
+          "haru",
+          haru.value,
+          suggestion,
+          autonomousPlan,
+        ),
+        characterRoster,
       );
-      const aoiDecision = normalizeAutonomousDecision(
-        "aoi",
-        aoi.value,
-        suggestion,
-        autonomousPlan,
+      const aoiDecision = normalizeDecisionCharacterNames(
+        normalizeAutonomousDecision(
+          "aoi",
+          aoi.value,
+          suggestion,
+          autonomousPlan,
+        ),
+        characterRoster,
       );
       const activeSuggestion = autonomousPlan?.suggestion ?? suggestion;
       const activeEventDefinition = autonomousPlan?.definition ?? eventDefinition;
@@ -469,12 +486,12 @@ export class GameEngine {
             characterRoster,
           },
         );
-      let resolved = {
+      let resolved = normalizeResolvedEventCharacterNames({
         ...(autonomousPlan
           ? finalizeAutonomousResolvedEvent(autonomousPlan, policyResolved)
           : policyResolved),
         navigatorMessage: navigatorResponse.message,
-      };
+      }, characterRoster);
       emit({ type: "director.completed", agent: "director", message: resolved.eventTitle, data: resolved });
 
       const nextCharacters = {
@@ -492,12 +509,12 @@ export class GameEngine {
       const independentYes = cooperative.has(haruDecision.decision) && cooperative.has(aoiDecision.decision);
       if (activeEventDefinition.category === "confession" && independentYes && confessionEligible(snapshot)) {
         relationship = "couple";
-        resolved = {
+        resolved = normalizeResolvedEventCharacterNames({
           ...resolved,
           eventTitle: "二人が選んだ告白",
           narration: `${resolved.narration} きっかけに急かされるのではなく、二人はそれぞれの意志で気持ちを伝え、受け止めた。`,
           memory: { ...resolved.memory, title: "二人が選んだ告白" },
-        };
+        }, characterRoster);
         memory.title = "二人が選んだ告白";
       }
 
@@ -557,6 +574,7 @@ export class GameEngine {
           ...before.eventLog,
           {
             id: `log-${turnId}`,
+            characterRoster: structuredClone(characterRoster),
             turnId,
             day: before.shared.day,
             phase: before.shared.phase,
@@ -566,8 +584,14 @@ export class GameEngine {
             cooldownPhases: activeEventDefinition.cooldownPhases,
             cueSafetyFlags: suggestion.cue.safetyFlags,
             suggestion: activeSuggestion.text,
-            haruReaction: `${haruDecision.decision}: ${haruDecision.action}`,
-            aoiReaction: `${aoiDecision.decision}: ${aoiDecision.action}`,
+            haruReaction: clipPublicText(
+              `${haruDecision.decision}: ${haruDecision.action}`,
+              PUBLIC_PROSE_MAX_LENGTH,
+            ),
+            aoiReaction: clipPublicText(
+              `${aoiDecision.decision}: ${aoiDecision.action}`,
+              PUBLIC_PROSE_MAX_LENGTH,
+            ),
             haruDecision: haruDecision.decision,
             aoiDecision: aoiDecision.decision,
             haruAction: haruDecision.action,
@@ -625,7 +649,10 @@ export class GameEngine {
         ending: isLastTurn ? endingFor(relationship, nextCharacters) : undefined,
       };
 
-      this.state = nextState;
+      // Validate the complete persisted contract after every piece of public
+      // prose has been normalized. This prevents a D1 write that only fails
+      // schema validation on the next request/load.
+      this.state = gameStateSchema.parse(nextState) as GameState;
       await this.repository.save(this.state);
       turnCommitted = true;
       if (isLastTurn) this.state = await this.generateResult(this.state, emit);

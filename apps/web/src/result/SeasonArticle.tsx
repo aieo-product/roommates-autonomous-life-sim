@@ -1,4 +1,5 @@
 import { EvidenceLinks } from "./EvidenceLinks";
+import { useResultCharacterText } from "./character-names";
 import type { ResultDailyNarrative, ResultNarrative, ResultStatus } from "./types";
 
 const paragraphsFrom = (
@@ -24,6 +25,7 @@ export function SeasonArticle({
   narrative?: ResultNarrative;
   status: ResultStatus;
 }) {
+  const displayText = useResultCharacterText();
   if (!narrative) {
     return (
       <section className="result-article result-empty-panel" aria-live="polite" aria-busy={status === "generating"}>
@@ -45,11 +47,11 @@ export function SeasonArticle({
     <article className="result-article">
       <header className="result-article-header">
         <p className="result-section-label">7日間のシーズン総集編</p>
-        <h2>{narrative.headline}</h2>
+        <h2>{displayText(narrative.headline)}</h2>
         <div className="result-article-lead">
           {paragraphsFrom(narrative.lead).map((paragraph, index) => (
             <p key={`${paragraph.text}-${index}`}>
-              {paragraph.text} <EvidenceLinks eventLogIds={paragraph.sourceEventLogIds} />
+              {displayText(paragraph.text)} <EvidenceLinks eventLogIds={paragraph.sourceEventLogIds} />
             </p>
           ))}
         </div>
@@ -62,10 +64,10 @@ export function SeasonArticle({
             <section className="result-day-chapter" key={day} aria-labelledby={`result-day-${day}-title`}>
               <div className="result-day-marker" aria-hidden="true"><span>DAY</span><strong>{day}</strong></div>
               <div>
-                <h3 id={`result-day-${day}-title`}>{section?.title ?? `Day ${day}の記録`}</h3>
+                <h3 id={`result-day-${day}-title`}>{displayText(section?.title) ?? `Day ${day}の記録`}</h3>
                 {section ? sectionParagraphs(section).map((paragraph, index) => (
                   <p key={`${day}-${index}`}>
-                    {paragraph.text} <EvidenceLinks eventLogIds={paragraph.sourceEventLogIds} />
+                    {displayText(paragraph.text)} <EvidenceLinks eventLogIds={paragraph.sourceEventLogIds} />
                   </p>
                 )) : (
                   <p className="result-missing-copy">この日の記事データはありません。詳細ログで記録を確認できます。</p>
@@ -80,7 +82,7 @@ export function SeasonArticle({
         <footer className="result-article-closing">
           {paragraphsFrom(narrative.closing).map((paragraph, index) => (
             <p key={`${paragraph.text}-${index}`}>
-              {paragraph.text} <EvidenceLinks eventLogIds={paragraph.sourceEventLogIds} />
+              {displayText(paragraph.text)} <EvidenceLinks eventLogIds={paragraph.sourceEventLogIds} />
             </p>
           ))}
         </footer>

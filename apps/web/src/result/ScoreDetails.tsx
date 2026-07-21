@@ -5,7 +5,7 @@ import type {
   ResultMetricKey,
   ResultProducer,
 } from "./types";
-import { useResultCharacterNames } from "./character-names";
+import { useResultCharacterNames, useResultCharacterText } from "./character-names";
 import {
   AXIS_LABELS,
   METRIC_LABELS,
@@ -16,6 +16,7 @@ import {
 const METRIC_KEYS: ResultMetricKey[] = ["energy", "stress", "affection", "trust", "romanticAwareness"];
 
 function EvidenceList({ items, empty }: { items: ResultProducer["topStrengths"]; empty: string }) {
+  const displayText = useResultCharacterText();
   if (!items?.length) return <p className="result-missing-copy">{empty}</p>;
   return (
     <ol className="result-score-evidence-list">
@@ -24,7 +25,7 @@ function EvidenceList({ items, empty }: { items: ResultProducer["topStrengths"];
           <span className={item.points >= 0 ? "is-positive" : "is-negative"}>
             {item.points >= 0 ? "+" : ""}{item.points}点
           </span>
-          <p>{item.message}</p>
+          <p>{displayText(item.message)}</p>
           <EvidenceLinks eventLogIds={item.eventLogIds} />
         </li>
       ))}
@@ -68,6 +69,7 @@ function StatJourney({ producer }: { producer: ResultProducer }) {
 }
 
 export function ScoreDetails({ producer }: { producer: ResultProducer }) {
+  const displayText = useResultCharacterText();
   const coverage = typeof producer.coverage === "number"
     ? { ratio: producer.coverage, completeTurns: Math.round(producer.coverage * 28), expectedTurns: 28, missing: [] }
     : producer.coverage;
@@ -103,7 +105,7 @@ export function ScoreDetails({ producer }: { producer: ResultProducer }) {
             >
               <span style={{ width: `${clampPercent(axis.score, axis.maxScore)}%` }} />
             </div>
-            <p>{axis.summary}</p>
+            <p>{displayText(axis.summary)}</p>
           </article>
         ))}
       </div>
@@ -129,8 +131,8 @@ export function ScoreDetails({ producer }: { producer: ResultProducer }) {
         <aside className="result-data-warning" aria-label="データ品質に関する注意">
           <h3>データ品質</h3>
           <ul>
-            {coverage?.missing.map((message) => <li key={message}>{message}</li>)}
-            {producer.warnings?.map((message) => <li key={message}>{message}</li>)}
+            {coverage?.missing.map((message) => <li key={message}>{displayText(message)}</li>)}
+            {producer.warnings?.map((message) => <li key={message}>{displayText(message)}</li>)}
           </ul>
         </aside>
       )}

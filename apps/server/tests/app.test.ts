@@ -13,6 +13,21 @@ async function testApp() {
   return { app: createApp(engine), engine, agents };
 }
 
+function sseData(text: string, eventName: string): Array<Record<string, unknown>> {
+  return text
+    .split(/\r?\n\r?\n/u)
+    .filter((block) => block.includes(`event: ${eventName}`))
+    .flatMap((block) => {
+      const data = block
+        .split(/\r?\n/u)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!data) return [];
+      return [JSON.parse(data) as Record<string, unknown>];
+    });
+}
+
 describe("game API", () => {
   beforeEach(() => {
     process.env.NODE_ENV = "test";
@@ -54,6 +69,22 @@ describe("game API", () => {
     expect(turn.text).toContain("event: director.completed");
     expect(turn.text).toContain("event: turn.completed");
     expect(agents.inputs.haru?.character.profile.name).toBe("春");
+    const directorCompleted = sseData(turn.text, "director.completed")[0] as {
+      data?: {
+        characterRoster?: { haru?: { displayName?: string } };
+        conversation?: Array<{ speaker?: string }>;
+        storyBeats?: Array<{ actor?: string }>;
+      };
+    };
+    expect(directorCompleted.data?.characterRoster?.haru?.displayName).toBe("春");
+    expect(directorCompleted.data?.conversation?.map(({ speaker }) => speaker))
+      .toEqual(expect.arrayContaining(["haru", "aoi"]));
+    expect(directorCompleted.data?.storyBeats?.map(({ actor }) => actor))
+      .toEqual(expect.arrayContaining(["haru", "aoi"]));
+    const turnCompleted = sseData(turn.text, "turn.completed")[0] as {
+      data?: { characterRoster?: { haru?: { displayName?: string } } };
+    };
+    expect(turnCompleted.data?.characterRoster?.haru?.displayName).toBe("春");
 
     const resolved = await request(app).get("/api/game");
     expect(resolved.body.status).toBe("resolved");
@@ -64,6 +95,8 @@ describe("game API", () => {
       eventDefinitionId: "shared-cooking",
     });
     expect(resolved.body.lastEvent.navigatorMessage).toBe("デコピンが二人へきっかけを届けるね。");
+    expect(resolved.body.lastEvent.characterRoster.haru.displayName).toBe("春");
+    expect(resolved.body.eventLog.at(-1).characterRoster.haru.displayName).toBe("春");
 
     const advanced = await request(app).post("/api/game/advance").send({});
     expect(advanced.status).toBe(200);

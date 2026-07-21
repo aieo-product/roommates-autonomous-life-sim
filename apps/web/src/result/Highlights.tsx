@@ -9,7 +9,7 @@ import type {
   ResultProducer,
   ResultStatus,
 } from "./types";
-import { useResultCharacterNames } from "./character-names";
+import { useResultCharacterNames, useResultCharacterText } from "./character-names";
 import {
   DECISION_LABELS,
   METRIC_LABELS,
@@ -70,6 +70,7 @@ function AgentMoment({
   status: ResultStatus;
 }) {
   const characterNames = useResultCharacterNames();
+  const displayText = useResultCharacterText();
   const decision = decisionFor(event, person);
   const comment = reflection?.notableEventComments.find((item) => item.eventLogId === event.id)?.comment;
   const delta = deltasFor(event, person);
@@ -81,9 +82,9 @@ function AgentMoment({
       {decision ? (
         <>
           <p className="result-decision-kind">{DECISION_LABELS[decision.decision]}</p>
-          <p>{decision.action}</p>
-          {decision.dialogue && <blockquote>「{decision.dialogue}」</blockquote>}
-          {decision.publicReason && <p className="result-public-reason">当時の理由：{decision.publicReason}</p>}
+          <p>{displayText(decision.action, event.characterRoster)}</p>
+          {decision.dialogue && <blockquote>「{displayText(decision.dialogue, event.characterRoster)}」</blockquote>}
+          {decision.publicReason && <p className="result-public-reason">当時の理由：{displayText(decision.publicReason, event.characterRoster)}</p>}
         </>
       ) : (
         <p className="result-missing-copy">公開された選択の記録がありません。</p>
@@ -100,11 +101,11 @@ function AgentMoment({
       <div className="result-agent-comment">
         <strong>7日後の振り返り</strong>
         {comment ? (
-          <p>「{comment}」</p>
+          <p>「{displayText(comment, event.characterRoster)}」</p>
         ) : status === "generating" ? (
           <p aria-live="polite">感想を聞いています…</p>
         ) : decision?.publicReason ? (
-          <p>振り返りは取得できませんでした。当時の公開反応：「{decision.publicReason}」</p>
+          <p>振り返りは取得できませんでした。当時の公開反応：「{displayText(decision.publicReason, event.characterRoster)}」</p>
         ) : (
           <p>振り返りコメントは取得できませんでした。</p>
         )}
@@ -114,6 +115,7 @@ function AgentMoment({
 }
 
 function EventOutcome({ event }: { event: ResultEventLogEntry }) {
+  const displayText = useResultCharacterText();
   const addedConflicts = event.conflictUpdate?.added?.map((item) => item.summary ?? item.id)
     ?? event.conflictUpdate?.add
     ?? [];
@@ -124,14 +126,14 @@ function EventOutcome({ event }: { event: ResultEventLogEntry }) {
   return (
     <div className="result-highlight-outcome">
       <p className="result-highlight-proposal"><strong>デコピンへの指示</strong>{suggestionFor(event)}</p>
-      {event.navigatorMessage && <p><strong>デコピンの応答</strong>{event.navigatorMessage}</p>}
-      <p><strong>実際に起きたこと</strong>{selectedEventTitleFor(event)} — {event.narration}</p>
+      {event.navigatorMessage && <p><strong>デコピンの応答</strong>{displayText(event.navigatorMessage, event.characterRoster)}</p>}
+      <p><strong>実際に起きたこと</strong>{displayText(selectedEventTitleFor(event), event.characterRoster)} — {displayText(event.narration, event.characterRoster)}</p>
       {event.memory && (
-        <p><strong>残った記憶</strong>{event.memory.title}{event.memory.summary ? ` — ${event.memory.summary}` : ""}</p>
+        <p><strong>残った記憶</strong>{displayText(event.memory.title, event.characterRoster)}{event.memory.summary ? ` — ${displayText(event.memory.summary, event.characterRoster)}` : ""}</p>
       )}
       {!event.memory && event.memoryId && <p><strong>残った記憶</strong>記憶ID: {event.memoryId}</p>}
-      {addedConflicts.length > 0 && <p><strong>生まれた対立</strong>{addedConflicts.join("、")}</p>}
-      {resolvedConflicts.length > 0 && <p><strong>解消した対立</strong>{resolvedConflicts.join("、")}</p>}
+      {addedConflicts.length > 0 && <p><strong>生まれた対立</strong>{displayText(addedConflicts.join("、"), event.characterRoster)}</p>}
+      {resolvedConflicts.length > 0 && <p><strong>解消した対立</strong>{displayText(resolvedConflicts.join("、"), event.characterRoster)}</p>}
     </div>
   );
 }
@@ -148,6 +150,7 @@ export function Highlights({
   status: ResultStatus;
 }) {
   const highlights = normalizedHighlights(producer, events);
+  const displayText = useResultCharacterText();
 
   return (
     <section className="result-highlights" aria-labelledby="result-highlights-title">
@@ -175,11 +178,11 @@ export function Highlights({
                   <span className="result-highlight-number">0{index + 1}</span>
                   <div>
                     <p>{HIGHLIGHT_KIND_LABELS[highlight.kind] ?? "注目イベント"}</p>
-                    <h3>{highlight.headline}</h3>
-                    {primary && <span>{formatEventLocation(primary)}・{primary.eventTitle}</span>}
+                    <h3>{displayText(highlight.headline, primary?.characterRoster)}</h3>
+                    {primary && <span>{formatEventLocation(primary)}・{displayText(primary.eventTitle, primary.characterRoster)}</span>}
                   </div>
                 </header>
-                <p className="result-highlight-reason"><strong>選出理由</strong>{highlight.reason} <EvidenceLinks eventLogIds={highlight.eventLogIds} /></p>
+                <p className="result-highlight-reason"><strong>選出理由</strong>{displayText(highlight.reason, primary?.characterRoster)} <EvidenceLinks eventLogIds={highlight.eventLogIds} /></p>
 
                 {primary ? (
                   <>
@@ -190,7 +193,7 @@ export function Highlights({
                     </div>
                     {relatedEvents.length > 1 && (
                       <p className="result-related-events">
-                        この流れに含まれる記録：{relatedEvents.map((event) => `${formatEventLocation(event)}「${event.eventTitle}」`).join(" → ")}
+                        この流れに含まれる記録：{relatedEvents.map((event) => `${formatEventLocation(event)}「${displayText(event.eventTitle, event.characterRoster)}」`).join(" → ")}
                       </p>
                     )}
                   </>

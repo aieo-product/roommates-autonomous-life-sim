@@ -28,7 +28,11 @@ import type {
   ResultStatDelta,
   ResultTurnSnapshot,
 } from "./result/types.js";
-import type { CharacterSettings } from "@roommates/shared";
+import {
+  characterRosterSchema,
+  type CharacterRoster,
+  type CharacterSettings,
+} from "@roommates/shared";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -160,6 +164,14 @@ const normalizeRelationship = (
   ].includes(normalized)
     ? (normalized as RelationshipLabel)
     : fallback;
+};
+
+const normalizeCharacterRoster = (
+  value: unknown,
+  fallback: CharacterRoster | undefined,
+): CharacterRoster | undefined => {
+  const parsed = characterRosterSchema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
 };
 
 const normalizeCharacter = (
@@ -335,6 +347,10 @@ const normalizeEvent = (
   const relationshipAfter = normalizeRelationshipOptional(merged.relationshipAfter);
   return {
     id: text(merged.id, `event-${day}-${phase}-${index}-${eventTitle}`),
+    characterRoster: normalizeCharacterRoster(
+      first(merged.characterRoster, merged.character_roster),
+      undefined,
+    ),
     eventDefinitionId:
       text(
         first(
@@ -866,6 +882,7 @@ export const normalizeGameState = (
         ...lastLogged,
         ...currentDetail,
         id: lastLogged.id,
+        characterRoster: currentDetail.characterRoster ?? lastLogged.characterRoster,
         eventDefinitionId: currentDetail.eventDefinitionId ?? lastLogged.eventDefinitionId,
         suggestion: currentDetail.suggestion ?? lastLogged.suggestion,
         navigatorMessage:
@@ -963,6 +980,10 @@ export const normalizeGameState = (
   return {
     version: 2,
     seed: text(root.seed, previous.seed),
+    characterRoster: normalizeCharacterRoster(
+      first(root.characterRoster, root.character_roster),
+      previous.characterRoster,
+    ),
     revision: Number.isFinite(Number(root.revision))
       ? Math.max(0, Math.round(Number(root.revision)))
       : previous.revision,

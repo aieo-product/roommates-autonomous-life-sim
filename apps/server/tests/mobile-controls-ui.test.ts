@@ -64,7 +64,7 @@ describe("mobile-friendly game controls", () => {
   it("labels the compact event-card detail action as a dialog opener", () => {
     const card = sourceBetween("function EventCard", "function EventAnnouncementModal");
     expect(card).toContain('aria-haspopup="dialog"');
-    expect(card).toContain('aria-label={`${event.eventTitle}の全文を読む`}');
+    expect(card).toContain('aria-label={`${formatCharacterDisplayText(event.eventTitle, people, event.characterRoster ?? roster)}の全文を読む`}');
     expect(card.match(/className="event-icon" aria-hidden="true"/g)).toHaveLength(3);
   });
 });

@@ -14,7 +14,7 @@ import { ScoreDetails } from "./ScoreDetails";
 import { SeasonArticle } from "./SeasonArticle";
 import { Timeline } from "./Timeline";
 import type { ResultEnding, ResultScreenProps } from "./types";
-import { ResultCharacterNamesProvider } from "./character-names";
+import { ResultCharacterNamesProvider, useResultCharacterText } from "./character-names";
 import "./result.css";
 
 type ResultTab = "recap" | "data";
@@ -38,12 +38,13 @@ function ResultWaiting({
   titleRef,
 }: Pick<ResultScreenProps, "game"> & { titleRef: RefObject<HTMLHeadingElement | null> }) {
   const ending = endingFromLegacy(game.ending);
+  const displayText = useResultCharacterText();
   return (
     <main className="result-screen result-waiting-screen" aria-busy="true">
       <section aria-live="polite">
         <p className="result-section-label">ROOMMATES・7 DAYS</p>
-        <h1 ref={titleRef} tabIndex={-1}>{ending.title}</h1>
-        <p>{ending.narration}</p>
+        <h1 ref={titleRef} tabIndex={-1}>{displayText(ending.title)}</h1>
+        <p>{displayText(ending.narration)}</p>
         <div className="result-waiting-card">
           <strong>リザルトを準備しています</strong>
           <p>Endingとイベントログは保存済みです。デコピンのサポート評価と総集編の到着を待っています。</p>
@@ -65,6 +66,9 @@ export function ResultScreen({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const instanceId = useId().replace(/:/g, "");
+  const displayRosters = game.eventLog.flatMap((event) =>
+    event.characterRoster ? [event.characterRoster] : []
+  ).concat(game.characterRoster ? [game.characterRoster] : []);
 
   const hasResult = Boolean(result);
 
@@ -72,7 +76,11 @@ export function ResultScreen({
     titleRef.current?.focus();
   }, [hasResult]);
 
-  if (!result) return <ResultWaiting game={game} titleRef={titleRef} />;
+  if (!result) return (
+    <ResultCharacterNamesProvider names={characterNames} rosters={displayRosters}>
+      <ResultWaiting game={game} titleRef={titleRef} />
+    </ResultCharacterNamesProvider>
+  );
 
   const reflections = result.reflections ?? {};
 
@@ -120,7 +128,7 @@ export function ResultScreen({
   };
 
   return (
-    <ResultCharacterNamesProvider names={characterNames}>
+    <ResultCharacterNamesProvider names={characterNames} rosters={displayRosters}>
     <main className="result-screen" onClickCapture={onEvidenceClick}>
       <a className="result-skip-link" href={`#result-${instanceId}-tabs`}>総集編の本文へ移動</a>
       <ResultHero

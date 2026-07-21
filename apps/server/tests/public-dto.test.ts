@@ -122,6 +122,41 @@ describe("public DTO projection", () => {
     });
   });
 
+  it("keeps event-time names beside stable conversation and story actor IDs", () => {
+    const characterRoster = {
+      haru: { id: "haru" as const, displayName: "春", role: "male" as const },
+      aoi: { id: "aoi" as const, displayName: "葵子", role: "female" as const },
+    };
+    const event = toPublicStreamEvent({
+      type: "director.completed",
+      agent: "director",
+      message: "名前を反映したイベント",
+      data: {
+        characterRoster,
+        conversation: [
+          { speaker: "haru", text: "葵子、一緒にやろう。" },
+          { speaker: "aoi", text: "うん、春。" },
+        ],
+        storyBeats: [
+          { kind: "dialogue", actor: "haru", text: "葵子、一緒にやろう。" },
+          { kind: "dialogue", actor: "aoi", text: "うん、春。" },
+        ],
+      },
+    });
+
+    expect(event.data).toEqual({
+      characterRoster,
+      conversation: [
+        { speaker: "haru", text: "葵子、一緒にやろう。" },
+        { speaker: "aoi", text: "うん、春。" },
+      ],
+      storyBeats: [
+        { kind: "dialogue", actor: "haru", text: "葵子、一緒にやろう。" },
+        { kind: "dialogue", actor: "aoi", text: "うん、春。" },
+      ],
+    });
+  });
+
   it("replaces raw SSE errors with a fixed public message and drops their data", () => {
     const event = toPublicStreamEvent({
       type: "error",

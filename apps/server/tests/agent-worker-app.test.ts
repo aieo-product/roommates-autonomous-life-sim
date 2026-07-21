@@ -4,8 +4,9 @@ import type { Express } from "express";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import {
-  DEFAULT_CHARACTER_SETTINGS,
+  createCharacterRoster,
   createInitialGameState,
+  getDefaultCharacterSettings,
   type CharacterDecision,
   type CharacterDecisionInput,
   type DirectorInput,
@@ -50,9 +51,13 @@ function navigatorInput(): NavigatorInput {
 
 function characterInput(): CharacterDecisionInput {
   const state = createInitialGameState("agent-worker-test");
+  const settings = getDefaultCharacterSettings();
+  settings.characters.haru.profile.name = "春";
+  settings.characters.aoi.profile.name = "葵子";
   const snapshot = {
     seed: state.seed,
     revision: state.revision,
+    characterRoster: createCharacterRoster(settings),
     characters: {
       haru: state.characters.haru.state,
       aoi: state.characters.aoi.state,
@@ -62,7 +67,7 @@ function characterInput(): CharacterDecisionInput {
   return {
     turnId: "1-morning-1-test",
     characterId: "haru",
-    character: structuredClone(DEFAULT_CHARACTER_SETTINGS.characters.haru),
+    character: structuredClone(settings.characters.haru),
     snapshot,
     self: snapshot.characters.haru,
     otherKnownInfo: {
@@ -309,6 +314,16 @@ describe("AgentWorker HTTP gateway", () => {
     expect(adapter.decide).toHaveBeenCalledTimes(1);
     expect(adapter.resolve).toHaveBeenCalledTimes(1);
     expect(adapter.reflect).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(adapter.decide).mock.calls[0]?.[1].snapshot.characterRoster)
+      .toMatchObject({
+        haru: { displayName: "春" },
+        aoi: { displayName: "葵子" },
+      });
+    expect(vi.mocked(adapter.resolve).mock.calls[0]?.[0].snapshot.characterRoster)
+      .toMatchObject({
+        haru: { displayName: "春" },
+        aoi: { displayName: "葵子" },
+      });
   });
 
   it("isolates reset generations by scope, including idempotency entries", async () => {

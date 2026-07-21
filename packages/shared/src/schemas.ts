@@ -411,6 +411,7 @@ export const eventStoryBeatsSchema = z
 
 export const resolvedEventSchema = z
   .object({
+    characterRoster: characterRosterSchema.optional(),
     eventTitle: text,
     narration: text,
     navigatorMessage: cueText.optional(),
@@ -499,6 +500,7 @@ export const turnStateSnapshotSchema = z
 export const eventLogEntrySchema = z
   .object({
     id: text,
+    characterRoster: characterRosterSchema.optional(),
     turnId: text.optional(),
     day: z.number().int().min(1).max(7),
     phase: z.enum(phases),

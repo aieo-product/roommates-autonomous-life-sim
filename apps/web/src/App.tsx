@@ -54,6 +54,10 @@ import {
 import { getGameControlState, type ActionBusy } from "./game-controls";
 import { resolveSpeechBubblePlacement } from "./speech-bubble";
 import { createAssetInteractionAnchors } from "./asset-interactions";
+import {
+  formatCharacterDisplayText,
+  type CharacterDisplayRosterSource,
+} from "./character-display";
 import dekopinSpriteUrl from "../../../assets/characters/navigator/walk-cycle.png";
 import type {
   AgentDecision,
@@ -261,6 +265,8 @@ function PhaseRail({ game }: { game: GameState }) {
 
 function ResidentChip({
   person,
+  people,
+  roster,
   info,
   state,
   selected,
@@ -268,6 +274,8 @@ function ResidentChip({
   onSelect,
 }: {
   person: CharacterId;
+  people: People;
+  roster?: GameState["characterRoster"];
   info: PersonInfo;
   state: CharacterState;
   selected: boolean;
@@ -278,12 +286,12 @@ function ResidentChip({
     <button type="button" className={`resident-chip resident-${person} ${selected ? "is-selected" : ""}`} onClick={onSelect} aria-pressed={selected}>
       <PixelPortrait person={person} thinking={thinking} />
       <span className="resident-chip-copy">
-        <span><strong>{info.name}</strong><small>{state.mood}</small></span>
+        <span><strong>{info.name}</strong><small>{formatCharacterDisplayText(state.mood, people, roster)}</small></span>
         <span className="chip-bars">
           <i className="chip-energy" style={{ "--value": `${state.energy}%` } as CSSProperties} />
           <i className="chip-stress" style={{ "--value": `${state.stress}%` } as CSSProperties} />
         </span>
-        <b><span aria-hidden="true">⌂</span>{state.location}</b>
+        <b><span aria-hidden="true">⌂</span>{formatCharacterDisplayText(state.location, people, roster)}</b>
       </span>
       <span className="resident-cue" aria-hidden="true">›</span>
     </button>
@@ -537,8 +545,8 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} peerPoint={aoiPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={isMoving("haru")} travelling={isMoving("haru")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "haru"} acting={isActing("haru")} dialogue={dialogueFor("haru")} action={actionFor("haru")} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} peerPoint={haruPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={isMoving("aoi")} travelling={isMoving("aoi")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "aoi"} acting={isActing("aoi")} dialogue={dialogueFor("aoi")} action={actionFor("aoi")} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} peerPoint={aoiPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={isMoving("haru")} travelling={isMoving("haru")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "haru"} acting={isActing("haru")} dialogue={formatCharacterDisplayText(dialogueFor("haru"), people, currentEvent?.characterRoster ?? game.characterRoster)} action={formatCharacterDisplayText(actionFor("haru"), people, currentEvent?.characterRoster ?? game.characterRoster)} onSelect={() => onSelectPerson("haru")} />
+            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} peerPoint={haruPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={isMoving("aoi")} travelling={isMoving("aoi")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "aoi"} acting={isActing("aoi")} dialogue={formatCharacterDisplayText(dialogueFor("aoi"), people, currentEvent?.characterRoster ?? game.characterRoster)} action={formatCharacterDisplayText(actionFor("aoi"), people, currentEvent?.characterRoster ?? game.characterRoster)} onSelect={() => onSelectPerson("aoi")} />
           </g>
         </g>
       </svg>
@@ -553,11 +561,13 @@ function ResolutionProgress({
   active,
   message,
   people,
+  rosters,
 }: {
   stages: TurnStages;
   active: boolean;
   message: string;
   people: People;
+  rosters?: CharacterDisplayRosterSource;
 }) {
   if (!active) return null;
   const items = [
@@ -574,13 +584,15 @@ function ResolutionProgress({
           <span>{stages[item.key] === "complete" ? "✓" : index + 1}</span><b>{item.name}</b>
         </div>
       ))}
-      <p>{clipText(message || "ふたりがそれぞれの気持ちで考えています…", 40)}</p>
+      <p>{clipText(formatCharacterDisplayText(message, people, rosters) || "ふたりがそれぞれの気持ちで考えています…", 40)}</p>
     </div>
   );
 }
 
 function EventCard({
   event,
+  people,
+  roster,
   resolving,
   fresh,
   lastSuggestion,
@@ -588,6 +600,8 @@ function EventCard({
   onOpen,
 }: {
   event?: GameEvent;
+  people: People;
+  roster?: GameState["characterRoster"];
   resolving: boolean;
   fresh: boolean;
   lastSuggestion: string;
@@ -615,10 +629,10 @@ function EventCard({
       <span className="event-icon" aria-hidden="true">★</span>
       <div>
         <small>デコピンが反映したイベント · DAY {event?.day}</small>
-        <h2>{event?.eventTitle}</h2>
-        <p>{clipText(event?.narration ?? "", 74)}</p>
-        {navigatorMessage && <p className="event-dekopin-message"><b>{DEKOPIN_NAME}</b>「{clipText(navigatorMessage, 64)}」</p>}
-        {event && onOpen && <button type="button" className="event-card-open" onClick={onOpen} aria-haspopup="dialog" aria-label={`${event.eventTitle}の全文を読む`}>全文を読む <span aria-hidden="true">↗</span></button>}
+        <h2>{formatCharacterDisplayText(event?.eventTitle, people, event?.characterRoster ?? roster)}</h2>
+        <p>{clipText(formatCharacterDisplayText(event?.narration, people, event?.characterRoster ?? roster) ?? "", 74)}</p>
+        {navigatorMessage && <p className="event-dekopin-message"><b>{DEKOPIN_NAME}</b>「{clipText(formatCharacterDisplayText(navigatorMessage, people, event?.characterRoster ?? roster), 64)}」</p>}
+        {event && onOpen && <button type="button" className="event-card-open" onClick={onOpen} aria-haspopup="dialog" aria-label={`${formatCharacterDisplayText(event.eventTitle, people, event.characterRoster ?? roster)}の全文を読む`}>全文を読む <span aria-hidden="true">↗</span></button>}
       </div>
     </div>
   );
@@ -627,6 +641,7 @@ function EventCard({
 function EventAnnouncementModal({
   event,
   people,
+  roster,
   suggestion,
   navigatorMessage,
   notice,
@@ -639,6 +654,7 @@ function EventAnnouncementModal({
 }: {
   event: GameEvent;
   people: People;
+  roster?: GameState["characterRoster"];
   suggestion?: string;
   navigatorMessage?: string;
   notice?: string;
@@ -671,6 +687,8 @@ function EventAnnouncementModal({
   ];
   const safetyFlags = event.cueResolution?.cue?.safetyFlags ?? event.cueSafetyFlags ?? [];
   const displayedSuggestion = suggestion || event.suggestion;
+  const displayText = (value: string | undefined): string | undefined =>
+    formatCharacterDisplayText(value, people, event.characterRoster ?? roster);
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement
@@ -737,21 +755,21 @@ function EventAnnouncementModal({
           <span className="event-announcement-mark" aria-hidden="true">★</span>
           <div>
             <small>EVENT RESOLVED · DAY {event.day} · {phase.label} {phase.time}</small>
-            <h2 id="event-announcement-title">{event.eventTitle}</h2>
+            <h2 id="event-announcement-title">{displayText(event.eventTitle)}</h2>
             <p>デコピンが指示をイベントへ反映しました</p>
           </div>
           <button ref={closeRef} type="button" className="event-announcement-close" onClick={onClose} aria-label="イベント通知を閉じる">×</button>
         </header>
 
         <div className="event-announcement-scroll">
-          {notice && <aside className="event-announcement-notice" role="status"><span aria-hidden="true">!</span><p>{notice}</p></aside>}
+          {notice && <aside className="event-announcement-notice" role="status"><span aria-hidden="true">!</span><p>{displayText(notice)}</p></aside>}
 
           {navigatorMessage && (
             <section className="event-announcement-dekopin" aria-label="デコピンの応答">
               <div className="event-announcement-mini-avatar" aria-hidden="true">
                 <img src={managedNavigator?.portraitUrl ?? navigatorCharacterAssets.portraitUrl} alt="" />
               </div>
-              <div><small>{DEKOPIN_NAME} · EVENT NAVIGATOR</small><p>「{navigatorMessage}」</p></div>
+              <div><small>{DEKOPIN_NAME} · EVENT NAVIGATOR</small><p>「{displayText(navigatorMessage)}」</p></div>
             </section>
           )}
 
@@ -764,7 +782,7 @@ function EventAnnouncementModal({
 
           <section className="event-announcement-story">
             <small>起きたこと</small>
-            <p id="event-announcement-narration">{event.narration}</p>
+            <p id="event-announcement-narration">{displayText(event.narration)}</p>
           </section>
 
           <section className="event-announcement-actions" aria-label="ふたりの選択">
@@ -775,19 +793,19 @@ function EventAnnouncementModal({
                   <div><small>{people[resident.id].job.toUpperCase()}</small><h3>{people[resident.id].name}</h3></div>
                   {resident.decision && <span className={`decision-chip chip-${resident.decision.toLowerCase()}`}>{DECISION_LABELS[resident.decision]}</span>}
                 </header>
-                <strong>{resident.action || "自分のペースで過ごしました"}</strong>
-                {resident.dialogue && <blockquote>「{resident.dialogue}」</blockquote>}
-                {resident.reason && <p><small>そうした理由</small>{resident.reason}</p>}
+                <strong>{displayText(resident.action) || "自分のペースで過ごしました"}</strong>
+                {resident.dialogue && <blockquote>「{displayText(resident.dialogue)}」</blockquote>}
+                {resident.reason && <p><small>そうした理由</small>{displayText(resident.reason)}</p>}
               </article>
             ))}
           </section>
 
           {(event.cueResolution?.outcome || event.cueResolution?.lock?.reason || safetyFlags.length > 0 || event.memory?.title) && (
             <dl className="event-announcement-details">
-              {event.cueResolution?.outcome && <div><dt>指示の扱い</dt><dd>{event.cueResolution.outcome}</dd></div>}
-              {event.cueResolution?.lock?.reason && <div><dt>調整した理由</dt><dd>{event.cueResolution.lock.reason}</dd></div>}
+              {event.cueResolution?.outcome && <div><dt>指示の扱い</dt><dd>{displayText(event.cueResolution.outcome)}</dd></div>}
+              {event.cueResolution?.lock?.reason && <div><dt>調整した理由</dt><dd>{displayText(event.cueResolution.lock.reason)}</dd></div>}
               {safetyFlags.length > 0 && <div><dt>安全確認</dt><dd>{safetyFlags.join("・")}</dd></div>}
-              {event.memory?.title && <div><dt>残った思い出</dt><dd>{event.memory.title}</dd></div>}
+              {event.memory?.title && <div><dt>残った思い出</dt><dd>{displayText(event.memory.title)}</dd></div>}
             </dl>
           )}
         </div>
@@ -805,12 +823,16 @@ function EventAnnouncementModal({
 
 function CharacterInspector({
   person,
+  people,
+  roster,
   info,
   state,
   decision,
   thinking,
 }: {
   person: CharacterId;
+  people: People;
+  roster?: GameState["characterRoster"];
   info: PersonInfo;
   state: CharacterState;
   decision?: AgentDecision;
@@ -820,12 +842,12 @@ function CharacterInspector({
     <section className={`inspector-character character-${person}`}>
       <div className="inspector-profile">
         <PixelPortrait person={person} thinking={thinking} />
-        <div><small>{info.job.toUpperCase()} · {info.age}</small><h2>{info.name}</h2><span className="mood-pill">{state.mood}</span></div>
+        <div><small>{info.job.toUpperCase()} · {info.age}</small><h2>{info.name}</h2><span className="mood-pill">{formatCharacterDisplayText(state.mood, people, roster)}</span></div>
         <span className="level-badge"><small>LEVEL</small><b>{12 + (person === "aoi" ? 2 : 0)}</b></span>
       </div>
       <div className="inspector-now">
-        <div><small>現在地</small><b><span aria-hidden="true">⌂</span>{state.location}</b></div>
-        <div><small>いまの目標</small><p>{state.currentGoal}</p></div>
+        <div><small>現在地</small><b><span aria-hidden="true">⌂</span>{formatCharacterDisplayText(state.location, people, roster)}</b></div>
+        <div><small>いまの目標</small><p>{formatCharacterDisplayText(state.currentGoal, people, roster)}</p></div>
       </div>
       <div className="inspector-metrics">
         <MetricBar metric="energy" value={state.energy} />
@@ -836,8 +858,8 @@ function CharacterInspector({
       </div>
       <div className={`decision-card ${decision ? "has-decision" : ""}`}>
         <div><small>今回の選択</small>{decision && <span className={`decision-chip chip-${decision.decision.toLowerCase()}`}>{DECISION_LABELS[decision.decision]}</span>}</div>
-        <strong>{thinking ? "どうするか考えています…" : decision?.action ?? "まだ行動は決めていません"}</strong>
-        {decision?.publicReason && <p>{decision.publicReason}</p>}
+        <strong>{thinking ? "どうするか考えています…" : formatCharacterDisplayText(decision?.action, people, roster) ?? "まだ行動は決めていません"}</strong>
+        {decision?.publicReason && <p>{formatCharacterDisplayText(decision.publicReason, people, roster)}</p>}
       </div>
       <p className="private-note"><span aria-hidden="true">鍵</span> 公開できる気持ちの要約だけを表示しています。</p>
     </section>
@@ -872,9 +894,9 @@ function SchedulePanel({
               {(["haru", "aoi"] as CharacterId[]).map((person) => {
                 const plan = planFor(person, phase.id, game[person], game.shared.phase);
                 return (
-                  <button type="button" className={`schedule-item schedule-${person}`} key={person} onClick={() => onUseCue(`${people[person].name}の「${plan.title}」に、ふたりで取り組んでみたら？`)} disabled={!canUseCue} title={canUseCue ? "この予定からきっかけ文を作る" : "次の時間帯へ進むと、新しいきっかけを作れます"}>
+                  <button type="button" className={`schedule-item schedule-${person}`} key={person} onClick={() => onUseCue(`${people[person].name}の「${formatCharacterDisplayText(plan.title, people, game.characterRoster)}」に、ふたりで取り組んでみたら？`)} disabled={!canUseCue} title={canUseCue ? "この予定からきっかけ文を作る" : "次の時間帯へ進むと、新しいきっかけを作れます"}>
                     <span className="plan-icon" aria-hidden="true">{plan.icon}</span>
-                    <span><small>{people[person].name}</small><strong>{plan.title}</strong><em>{plan.location}</em></span>
+                    <span><small>{people[person].name}</small><strong>{formatCharacterDisplayText(plan.title, people, game.characterRoster)}</strong><em>{formatCharacterDisplayText(plan.location, people, game.characterRoster)}</em></span>
                     {index === activeIndex && <i>NOW</i>}
                   </button>
                 );
@@ -890,22 +912,27 @@ function SchedulePanel({
 
 function MemoryPanel({
   game,
+  people,
   onOpenMemory,
 }: {
   game: GameState;
+  people: People;
   onOpenMemory: (memory: Memory) => void;
 }) {
   const memories = [...game.shared.sharedMemories].reverse();
+  const displayRosters = game.eventLog.flatMap((event) =>
+    event.characterRoster ? [event.characterRoster] : []
+  ).concat(game.characterRoster ? [game.characterRoster] : []);
   return (
     <section className="memories-panel">
       <div className="memory-summary"><span><small>MEMORIES</small><b>{memories.length.toString().padStart(2, "0")}</b></span><div><small>RELATIONSHIP</small><strong>♡ {RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div></div>
-      {game.shared.unresolvedConflicts.length > 0 && <div className="conflict-box"><small>気になること</small><ul>{game.shared.unresolvedConflicts.map((conflict) => <li key={conflict}>{conflict}</li>)}</ul></div>}
+      {game.shared.unresolvedConflicts.length > 0 && <div className="conflict-box"><small>気になること</small><ul>{game.shared.unresolvedConflicts.map((conflict) => <li key={conflict}>{formatCharacterDisplayText(conflict, people, displayRosters)}</li>)}</ul></div>}
       {memories.length ? (
         <ol className="memory-list">
           {memories.map((memory) => (
             <li key={memory.id}>
               <span className={memory.emotionalImpact >= 0 ? "memory-good" : "memory-bad"}>{memory.emotionalImpact >= 0 ? "✦" : "!"}</span>
-              <div><small>DAY {memory.day} · IMPORTANCE {memory.importance}</small><h3>{memory.title}</h3><p>{memory.summary}</p><button type="button" onClick={() => onOpenMemory(memory)}>ふたりの記事を読む <span aria-hidden="true">›</span></button></div>
+              <div><small>DAY {memory.day} · IMPORTANCE {memory.importance}</small><h3>{formatCharacterDisplayText(memory.title, people, displayRosters)}</h3><p>{formatCharacterDisplayText(memory.summary, people, displayRosters)}</p><button type="button" onClick={() => onOpenMemory(memory)}>ふたりの記事を読む <span aria-hidden="true">›</span></button></div>
             </li>
           ))}
         </ol>
@@ -919,15 +946,23 @@ function MemoryPanel({
 function MemoryArticleModal({
   article,
   people,
+  rosters,
   onClose,
 }: {
   article: MemoryArticle;
   people: People;
+  rosters?: CharacterDisplayRosterSource;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const phase = PHASES.find((item) => item.id === article.phase) ?? PHASES[0];
+  const inheritedRosters = rosters
+    ? Array.isArray(rosters) ? rosters : [rosters]
+    : [];
+  const displayRosters = article.event?.characterRoster
+    ? [article.event.characterRoster, ...inheritedRosters]
+    : inheritedRosters;
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement
@@ -976,9 +1011,9 @@ function MemoryArticleModal({
       <section className={`memory-character-story is-${person}`}>
         <header><PixelPortrait person={person} /><div><small>{name.toUpperCase()} VIEW</small><h3>{name}が選んだこと</h3></div></header>
         {detail.decision && <span className="memory-decision-badge">{DECISION_LABELS[detail.decision]}</span>}
-        <p className="memory-action">{detail.action || "公開された行動の記録はありません。"}</p>
-        {detail.dialogue && <blockquote>「{detail.dialogue}」</blockquote>}
-        {detail.publicReason && <p className="memory-public-reason"><strong>その時の理由</strong>{detail.publicReason}</p>}
+        <p className="memory-action">{formatCharacterDisplayText(detail.action, people, displayRosters) || "公開された行動の記録はありません。"}</p>
+        {detail.dialogue && <blockquote>「{formatCharacterDisplayText(detail.dialogue, people, displayRosters)}」</blockquote>}
+        {detail.publicReason && <p className="memory-public-reason"><strong>その時の理由</strong>{formatCharacterDisplayText(detail.publicReason, people, displayRosters)}</p>}
       </section>
     );
   };
@@ -1000,22 +1035,22 @@ function MemoryArticleModal({
       >
         <header className="memory-article-header">
           <div className="memory-article-date"><span>DAY</span><strong>{article.memory.day}</strong><small>{phase.icon} {phase.label}</small></div>
-          <div><p>ROOMMATES LIFE ARCHIVE</p><h2 id="memory-article-title">{article.memory.title}</h2><span>記憶の重要度 {article.memory.importance} / 10</span></div>
+          <div><p>ROOMMATES LIFE ARCHIVE</p><h2 id="memory-article-title">{formatCharacterDisplayText(article.memory.title, people, displayRosters)}</h2><span>記憶の重要度 {article.memory.importance} / 10</span></div>
           <button ref={closeRef} type="button" onClick={onClose} aria-label="思い出の記事を閉じる">×</button>
         </header>
 
         <div className={`memory-article-scene phase-${article.phase}`}>
-          <div className="memory-scene-person is-haru"><PixelPortrait person="haru" /><strong>{people.haru.name}</strong><span>{article.scene.haru}</span></div>
+          <div className="memory-scene-person is-haru"><PixelPortrait person="haru" /><strong>{people.haru.name}</strong><span>{formatCharacterDisplayText(article.scene.haru, people, displayRosters)}</span></div>
           <div className="memory-scene-heart" aria-hidden="true">✦</div>
-          <div className="memory-scene-person is-aoi"><PixelPortrait person="aoi" /><strong>{people.aoi.name}</strong><span>{article.scene.aoi}</span></div>
+          <div className="memory-scene-person is-aoi"><PixelPortrait person="aoi" /><strong>{people.aoi.name}</strong><span>{formatCharacterDisplayText(article.scene.aoi, people, displayRosters)}</span></div>
           <small>{article.captureIsExact ? "保存された位置から再現" : "出来事から場所を再構成"}</small>
         </div>
 
         <div className="memory-article-body">
           <section className="memory-article-lead">
             <p className="memory-kicker">MEMORY STORY</p>
-            <h3>{article.event?.eventTitle ?? article.memory.title}</h3>
-            <p>{article.event?.narration || article.memory.summary}</p>
+            <h3>{formatCharacterDisplayText(article.event?.eventTitle ?? article.memory.title, people, displayRosters)}</h3>
+            <p>{formatCharacterDisplayText(article.event?.narration || article.memory.summary, people, displayRosters)}</p>
             {article.event?.suggestion && <p className="memory-producer-cue"><strong>デコピンへの指示</strong>{article.event.suggestion}</p>}
           </section>
           <div className="memory-character-columns">
@@ -1024,7 +1059,7 @@ function MemoryArticleModal({
           </div>
           <footer>
             <span aria-hidden="true">✦</span>
-            <p>{article.memory.summary}</p>
+            <p>{formatCharacterDisplayText(article.memory.summary, people, displayRosters)}</p>
             {!article.event && <small>この記憶に対応する公開イベントログがないため、保存された記憶だけを表示しています。</small>}
           </footer>
         </div>
@@ -1053,6 +1088,7 @@ function DebugDetails({ game, people }: { game: GameState; people: People }) {
 function LogDrawer({
   events,
   people,
+  roster,
   navigatorResponses,
   filter,
   onFilter,
@@ -1060,6 +1096,7 @@ function LogDrawer({
 }: {
   events: GameEvent[];
   people: People;
+  roster?: GameState["characterRoster"];
   navigatorResponses: Record<string, string>;
   filter: LogFilter;
   onFilter: (filter: LogFilter) => void;
@@ -1112,12 +1149,12 @@ function LogDrawer({
           <article className="log-entry" key={event.id}>
             <div className="log-time"><b>DAY {event.day}</b><span>{PHASES.find((phase) => phase.id === event.phase)?.label ?? event.phase}</span></div>
             <div className="log-copy">
-              <small>★ できごと</small><h3>{event.eventTitle}</h3>
+              <small>★ できごと</small><h3>{formatCharacterDisplayText(event.eventTitle, people, event.characterRoster ?? roster)}</h3>
               {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>デコピンへの指示</b>{event.suggestion}</p>}
-              {filter !== "haru" && filter !== "aoi" && <p>{event.narration}</p>}
-              {filter !== "haru" && filter !== "aoi" && navigatorMessage && <blockquote className="quote-dekopin"><b>{DEKOPIN_NAME}</b>「{navigatorMessage}」</blockquote>}
-              {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>{people.haru.name}</b>「{event.haruDialogue}」</blockquote>}
-              {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>{people.aoi.name}</b>「{event.aoiDialogue}」</blockquote>}
+              {filter !== "haru" && filter !== "aoi" && <p>{formatCharacterDisplayText(event.narration, people, event.characterRoster ?? roster)}</p>}
+              {filter !== "haru" && filter !== "aoi" && navigatorMessage && <blockquote className="quote-dekopin"><b>{DEKOPIN_NAME}</b>「{formatCharacterDisplayText(navigatorMessage, people, event.characterRoster ?? roster)}」</blockquote>}
+              {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>{people.haru.name}</b>「{formatCharacterDisplayText(event.haruDialogue, people, event.characterRoster ?? roster)}」</blockquote>}
+              {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>{people.aoi.name}</b>「{formatCharacterDisplayText(event.aoiDialogue, people, event.characterRoster ?? roster)}」</blockquote>}
             </div>
           </article>
           );
@@ -1546,6 +1583,9 @@ export default function App() {
     if (game.eventLog.length) return game.eventLog;
     return game.currentEvent ? [game.currentEvent] : [];
   }, [game.currentEvent, game.eventLog]);
+  const historicalDisplayRosters = useMemo(() => eventLog.flatMap((event) =>
+    event.characterRoster ? [event.characterRoster] : []
+  ).concat(game.characterRoster ? [game.characterRoster] : []), [eventLog, game.characterRoster]);
   const memoryArticle = useMemo(
     () => activeMemory ? buildMemoryArticle(activeMemory, eventLog, {
       haru: people.haru.name,
@@ -1565,21 +1605,23 @@ export default function App() {
       resolving,
       offline,
       draft: suggestion,
-      streamMessage: navigatorMessage || streamMessage,
+      streamMessage: formatCharacterDisplayText(navigatorMessage || streamMessage, people, latestEvent?.characterRoster ?? game.characterRoster),
       event: latestEvent
         ? {
-            eventTitle: latestEvent.eventTitle,
-            narration: latestEvent.narration,
-            navigatorMessage: latestNavigatorMessage || undefined,
+            eventTitle: formatCharacterDisplayText(latestEvent.eventTitle, people, latestEvent.characterRoster ?? game.characterRoster),
+            narration: formatCharacterDisplayText(latestEvent.narration, people, latestEvent.characterRoster ?? game.characterRoster),
+            navigatorMessage: formatCharacterDisplayText(latestNavigatorMessage || undefined, people, latestEvent.characterRoster ?? game.characterRoster),
           }
         : undefined,
-      sessionMessage: latestNavigatorMessage,
+      sessionMessage: formatCharacterDisplayText(latestNavigatorMessage || undefined, people, latestEvent?.characterRoster ?? game.characterRoster),
     }),
     [
       latestEvent,
       latestNavigatorMessage,
       navigatorMessage,
       offline,
+      game.characterRoster,
+      people,
       resolving,
       streamMessage,
       suggestion,
@@ -1697,7 +1739,7 @@ export default function App() {
     return (
       <div className="result-app-shell">
         <div aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
-          {notice && <div className="notice result-notice" role="alert"><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+          {notice && <div className="notice result-notice" role="alert"><span>!</span><p>{formatCharacterDisplayText(notice, people, historicalDisplayRosters)}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
           {!game.result && (
             <aside className="legacy-result-guide" role="status" aria-labelledby="legacy-result-title">
               <div>
@@ -1722,6 +1764,7 @@ export default function App() {
           <EventAnnouncementModal
             event={eventAnnouncement}
             people={people}
+            roster={game.characterRoster}
             suggestion={eventSuggestionFallbacks[eventAnnouncement.id] || eventAnnouncement.suggestion}
             navigatorMessage={eventAnnouncement.navigatorMessage ?? (latestNavigatorMessage || undefined)}
             notice={notice || undefined}
@@ -1753,11 +1796,11 @@ export default function App() {
         </div>
       </header>
 
-      {notice && <div className="notice" role="alert" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}><span>!</span><p>{notice}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+      {notice && <div className="notice" role="alert" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}><span>!</span><p>{formatCharacterDisplayText(notice, people, historicalDisplayRosters)}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
       {initialLoading && <div className="loading-banner"><span /><p>ふたりの生活を読み込んでいます…</p></div>}
 
       {personalityOpen && <PersonalityStudio controller={characterSettings} onClose={closePersonality} />}
-      {memoryArticle && <MemoryArticleModal article={memoryArticle} people={people} onClose={() => setActiveMemory(undefined)} />}
+      {memoryArticle && <MemoryArticleModal article={memoryArticle} people={people} rosters={historicalDisplayRosters} onClose={() => setActiveMemory(undefined)} />}
 
       <main id="game" className="game-layout" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
@@ -1776,11 +1819,11 @@ export default function App() {
             <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} resolving={resolving} onSelectPerson={selectCharacter} />
             <div id="map-overlay-layer" className="map-overlay-layer">
               <div className="resident-hud" aria-label="住人の状態">
-                <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
-                <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
+                <ResidentChip person="haru" people={people} roster={game.characterRoster} info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
+                <ResidentChip person="aoi" people={people} roster={game.characterRoster} info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
               </div>
-              <ResolutionProgress stages={stages} active={resolving} message={streamMessage} people={people} />
-              <EventCard event={latestEvent} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
+              <ResolutionProgress stages={stages} active={resolving} message={streamMessage} people={people} rosters={historicalDisplayRosters} />
+              <EventCard event={latestEvent} people={people} roster={game.characterRoster} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
                 setLogOpen(false);
                 setActiveMemory(undefined);
                 setPersonalityOpen(false);
@@ -1789,7 +1832,7 @@ export default function App() {
             </div>
             <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
               {freshEventId === latestEvent?.id && latestEvent
-                ? `イベントが反映されました：${latestEvent.eventTitle}。「全文を読む」で詳細を確認できます。`
+                ? `イベントが反映されました：${formatCharacterDisplayText(latestEvent.eventTitle, people, latestEvent.characterRoster ?? game.characterRoster)}。「全文を読む」で詳細を確認できます。`
                 : ""}
             </p>
           </div>
@@ -1797,7 +1840,7 @@ export default function App() {
           <section className="interaction-dock" aria-labelledby="dekopin-title">
             <button type="button" className="latest-log-strip" aria-controls="life-log-drawer" aria-expanded={logOpen} onClick={() => setLogOpen(true)}>
               <span className="log-clock">{activePhase.time}</span><span className="log-star">★</span>
-              <span className="latest-log-copy"><small>最新の生活ログ</small><b>{latestEvent?.eventTitle ?? "共同生活がはじまりました"}</b><em>{latestEvent?.haruDialogue ? `「${clipText(latestEvent.haruDialogue, 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
+              <span className="latest-log-copy"><small>最新の生活ログ</small><b>{formatCharacterDisplayText(latestEvent?.eventTitle, people, latestEvent?.characterRoster ?? game.characterRoster) ?? "共同生活がはじまりました"}</b><em>{latestEvent?.haruDialogue ? `「${clipText(formatCharacterDisplayText(latestEvent.haruDialogue, people, latestEvent.characterRoster ?? game.characterRoster), 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
               <span className="open-log-label">振り返る <b>⌃</b></span>
             </button>
             <div className="producer-row">
@@ -1831,7 +1874,7 @@ export default function App() {
             </div>
           </section>
 
-          {logOpen && <LogDrawer events={eventLog} people={people} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={closeLog} />}
+          {logOpen && <LogDrawer events={eventLog} people={people} roster={game.characterRoster} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={closeLog} />}
         </section>
 
         <aside className="inspector-panel" aria-label="住人と共同生活の詳細">
@@ -1843,9 +1886,9 @@ export default function App() {
             ))}
           </div>
           <div id="inspector-panel" className="inspector-body" role="tabpanel" aria-labelledby={`inspector-tab-${inspectorTab}`} tabIndex={0}>
-            {inspectorTab === "status" && <CharacterInspector person={selectedPerson} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
+            {inspectorTab === "status" && <CharacterInspector person={selectedPerson} people={people} roster={game.characterRoster} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
             {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} canUseCue={canSubmitCue} onUseCue={useScheduleCue} />}
-            {inspectorTab === "memories" && <MemoryPanel game={game} onOpenMemory={setActiveMemory} />}
+            {inspectorTab === "memories" && <MemoryPanel game={game} people={people} onOpenMemory={setActiveMemory} />}
           </div>
           <DebugDetails game={game} people={people} />
         </aside>
@@ -1854,6 +1897,7 @@ export default function App() {
         <EventAnnouncementModal
           event={eventAnnouncement}
           people={people}
+          roster={game.characterRoster}
           suggestion={eventSuggestionFallbacks[eventAnnouncement.id] || eventAnnouncement.suggestion}
           navigatorMessage={eventAnnouncement.navigatorMessage ?? (latestNavigatorMessage || undefined)}
           notice={notice || undefined}

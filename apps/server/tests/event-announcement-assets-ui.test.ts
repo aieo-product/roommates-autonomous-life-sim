@@ -104,10 +104,11 @@ describe("resolved event announcement", () => {
   });
 
   it("renders the full event, instruction, and Dekopin response without clipping", () => {
-    expect(modal).toContain("{event.eventTitle}");
-    expect(modal).toContain("{event.narration}");
+    expect(modal).toContain("{displayText(event.eventTitle)}");
+    expect(modal).toContain("{displayText(event.narration)}");
     expect(modal).toContain("{displayedSuggestion}");
-    expect(modal).toContain("{navigatorMessage}");
+    expect(modal).toContain("{displayText(navigatorMessage)}");
+    expect(modal).toContain("formatCharacterDisplayText(value, people, event.characterRoster ?? roster)");
     expect(modal).toMatch(/const displayedSuggestion\s*=\s*(?:suggestion\s*\|\|\s*event\.suggestion|event\.suggestion\s*\|\|\s*suggestion)/);
     expect(modal).not.toContain("clipText(");
   });
@@ -122,8 +123,8 @@ describe("resolved event announcement", () => {
     expect(app).toContain('fresh={freshEventId === latestEvent?.id}');
     expect(app).toContain('role="status" aria-live="polite" aria-atomic="true"');
     expect(card).toContain('event-result ${fresh ? "is-fresh" : ""}');
-    expect(card).toContain("{event?.eventTitle}");
-    expect(card).toContain("clipText(event?.narration");
+    expect(card).toContain("{formatCharacterDisplayText(event?.eventTitle, people, event?.characterRoster ?? roster)}");
+    expect(card).toContain("clipText(formatCharacterDisplayText(event?.narration, people, event?.characterRoster ?? roster)");
     expect(card).toContain("{navigatorMessage &&");
     expect(card).toContain("全文を読む");
     expect(app).toMatch(/onOpen=\{latestEvent \? \(\) => \{[\s\S]*?setEventAnnouncementId\(latestEvent\.id\)/);

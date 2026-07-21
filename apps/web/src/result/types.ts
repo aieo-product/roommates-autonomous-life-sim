@@ -1,3 +1,5 @@
+import type { CharacterRoster } from "@roommates/shared";
+
 export const RESULT_PHASES = ["morning", "afternoon", "evening", "night"] as const;
 
 export type ResultPhase = (typeof RESULT_PHASES)[number];
@@ -71,6 +73,8 @@ export type ResultConflictRecord = {
  */
 export type ResultEventLogEntry = {
   id: string;
+  /** Event-time display metadata; speaker/actor remain stable slot IDs. */
+  characterRoster?: CharacterRoster;
   day: number;
   phase: ResultPhase;
   eventTitle: string;
@@ -271,6 +275,7 @@ export type ResultScreenData = ResultGeneratingData | ResultReadyData | ResultPa
 
 export type ResultScreenGame = {
   status?: string;
+  characterRoster?: CharacterRoster;
   shared: {
     relationshipLabel: ResultRelationshipLabel;
   };

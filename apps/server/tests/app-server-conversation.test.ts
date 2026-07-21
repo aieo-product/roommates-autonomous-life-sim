@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createInitialGameState,
+  getDefaultCharacterSettings,
   type CharacterDecision,
   type CharacterDecisionInput,
   type CharacterId,
@@ -156,18 +157,24 @@ describe("App Server Director conversation contract", () => {
   });
 
   it("keeps App Server conversation in the committed and public event", async () => {
+    const adapter = appServerAdapter();
     const agents = new ResilientAgentCoordinator(
       "app-server",
       1_000,
-      appServerAdapter(),
+      adapter,
     );
     const engine = new GameEngine(new MemoryGameRepository(), agents);
     await engine.initialize();
+    const settings = getDefaultCharacterSettings();
+    settings.characters.haru.profile.name = "春";
+    settings.characters.aoi.profile.name = "葵子";
 
     const state = await engine.resolveTurn(
       "二人で少し話してみて",
       "app-server-conversation-key",
       0,
+      () => undefined,
+      settings,
     );
     const publicState = toPublicGameState(state);
 
@@ -193,6 +200,18 @@ describe("App Server Director conversation contract", () => {
     ]);
     expect(publicState.eventLog.at(-1)?.storyBeats).toEqual(
       publicState.lastEvent?.storyBeats,
+    );
+    expect(vi.mocked(adapter.resolve).mock.calls[0]?.[0].snapshot.characterRoster)
+      .toMatchObject({
+        haru: { displayName: "春" },
+        aoi: { displayName: "葵子" },
+      });
+    expect(publicState.lastEvent?.characterRoster).toMatchObject({
+      haru: { displayName: "春" },
+      aoi: { displayName: "葵子" },
+    });
+    expect(publicState.eventLog.at(-1)?.characterRoster).toEqual(
+      publicState.lastEvent?.characterRoster,
     );
     expect(JSON.stringify(publicState)).not.toContain("PRIVATE_SUMMARY_MUST_NOT_BE_PUBLIC");
   });

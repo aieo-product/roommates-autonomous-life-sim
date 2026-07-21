@@ -3,7 +3,7 @@ import type {
   ResultEventLogEntry,
   ResultScreenData,
 } from "./result/types.js";
-import type { EventStoryBeat } from "@roommates/shared";
+import type { CharacterRoster, EventStoryBeat } from "@roommates/shared";
 
 export type { EventStoryBeat } from "@roommates/shared";
 
@@ -118,6 +118,7 @@ export interface RuntimeHealth {
 export interface GameState {
   version: 2;
   seed: string;
+  characterRoster?: CharacterRoster;
   revision: number;
   status: "awaiting_suggestion" | "resolving" | "resolved" | "ended";
   haru: CharacterState;

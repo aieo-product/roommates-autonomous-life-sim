@@ -309,6 +309,12 @@ export type DirectorInput = {
 };
 
 export type ResolvedEvent = {
+  /**
+   * Event-time public identities for resolving `conversation.speaker` and
+   * `storyBeats.actor`. Optional only for saves created before replaceable
+   * character names were persisted with each event.
+   */
+  characterRoster?: import("./personality.js").CharacterRoster;
   eventTitle: string;
   narration: string;
   /** Public acknowledgement authored by デコピン for this event. */
@@ -366,6 +372,8 @@ export type ResolutionBranch =
 
 export type EventLogEntry = {
   id: string;
+  /** Event-time display metadata; actor IDs remain stable save-data slots. */
+  characterRoster?: import("./personality.js").CharacterRoster;
   turnId?: string;
   day: number;
   phase: Phase;

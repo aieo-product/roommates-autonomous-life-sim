@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CHARACTER_SETTINGS, runtimeAgentStateSchema } from "@roommates/shared";
 import {
   INITIAL_GAME_STATE,
+  fastForwardGame,
   getRuntimeHealth,
   normalizeGameState,
   runTurn,
@@ -33,6 +34,30 @@ afterEach(() => {
 });
 
 describe("runTurn SSE handling", () => {
+  it("sends the saved custom display names in characterSettings", async () => {
+    const settings = structuredClone(DEFAULT_CHARACTER_SETTINGS);
+    settings.characters.haru.profile.name = "レン";
+    settings.characters.aoi.profile.name = "ミオ";
+    let requestBody: Record<string, unknown> | undefined;
+    globalThis.fetch = vi.fn(async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return sseResponse(
+        "event: turn.completed\r\ndata: {\"type\":\"turn.completed\",\"data\":{\"status\":\"resolved\"}}\r\n\r\n",
+      );
+    });
+
+    await runTurn("一緒に朝食を作ってみたら？", 0, settings, () => undefined);
+
+    expect(requestBody).toMatchObject({
+      characterSettings: {
+        characters: {
+          haru: { profile: { name: "レン" } },
+          aoi: { profile: { name: "ミオ" } },
+        },
+      },
+    });
+  });
+
   it("rejects a public SSE error instead of silently clearing the submitted cue", async () => {
     globalThis.fetch = vi.fn(async () => sseResponse(
       "event: turn.started\r\ndata: {\"type\":\"turn.started\",\"message\":\"開始\"}\r\n\r\n" +
@@ -69,6 +94,33 @@ describe("runTurn SSE handling", () => {
   });
 });
 
+describe("character settings transport", () => {
+  it("also sends custom display names when fast-forwarding", async () => {
+    const settings = structuredClone(DEFAULT_CHARACTER_SETTINGS);
+    settings.characters.haru.profile.name = "レン";
+    settings.characters.aoi.profile.name = "ミオ";
+    let requestBody: Record<string, unknown> | undefined;
+    globalThis.fetch = vi.fn(async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response("{}", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    await fastForwardGame(settings);
+
+    expect(requestBody).toMatchObject({
+      characterSettings: {
+        characters: {
+          haru: { profile: { name: "レン" } },
+          aoi: { profile: { name: "ミオ" } },
+        },
+      },
+    });
+  });
+});
+
 describe("OpenAI API runtime observability", () => {
   it("maps the direct OpenAI source to its own UI mode", () => {
     const normalized = normalizeGameState({
@@ -102,6 +154,23 @@ describe("OpenAI API runtime observability", () => {
 });
 
 describe("App Server event normalization", () => {
+  it("keeps the server run roster across reload normalization", () => {
+    const normalized = normalizeGameState({
+      revision: 4,
+      characterRoster: {
+        haru: { id: "haru", role: "male", displayName: "レン" },
+        aoi: { id: "aoi", role: "female", displayName: "ミオ" },
+      },
+    }, INITIAL_GAME_STATE);
+
+    expect(normalized.characterRoster).toEqual({
+      haru: { id: "haru", role: "male", displayName: "レン" },
+      aoi: { id: "aoi", role: "female", displayName: "ミオ" },
+    });
+    expect(normalizeGameState({ revision: 5 }, normalized).characterRoster)
+      .toEqual(normalized.characterRoster);
+  });
+
   it("keeps a Director conversation from a nested event payload", () => {
     const normalized = normalizeGameState({
       data: {
@@ -113,6 +182,10 @@ describe("App Server event normalization", () => {
           directorResult: {
             id: "app-server-event",
             director: {
+              characterRoster: {
+                haru: { id: "haru", role: "male", displayName: "Ren" },
+                aoi: { id: "aoi", role: "female", displayName: "Mio" },
+              },
               eventTitle: "夕食の相談",
               narration: "ふたりはキッチンへ移動した。",
               conversation: [
@@ -131,6 +204,10 @@ describe("App Server event normalization", () => {
       { speaker: "aoi", text: "温かいものがいいな。" },
       { speaker: "haru", text: "じゃあ一緒にスープを作ろう。" },
     ]);
+    expect(normalized.currentEvent?.characterRoster).toEqual({
+      haru: { id: "haru", role: "male", displayName: "Ren" },
+      aoi: { id: "aoi", role: "female", displayName: "Mio" },
+    });
   });
 
   it("accepts snake-case conversation and legacy line aliases", () => {
@@ -162,6 +239,10 @@ describe("App Server event normalization", () => {
       status: "resolved",
       eventLog: [{
         id: "story-event",
+        characterRoster: {
+          haru: { id: "haru", role: "male", displayName: "Ren" },
+          aoi: { id: "aoi", role: "female", displayName: "Mio" },
+        },
         day: 2,
         phase: "afternoon",
         eventTitle: "午後の小さな物語",
@@ -189,5 +270,11 @@ describe("App Server event normalization", () => {
       { kind: "move", actor: "aoi", location: "ダイニングテーブル" },
     ]);
     expect(normalized.eventLog[0]?.storyBeats).toEqual(normalized.currentEvent?.storyBeats);
+    expect(normalized.currentEvent?.characterRoster).toEqual({
+      haru: { id: "haru", role: "male", displayName: "Ren" },
+      aoi: { id: "aoi", role: "female", displayName: "Mio" },
+    });
+    expect(normalized.eventLog[0]?.characterRoster)
+      .toEqual(normalized.currentEvent?.characterRoster);
   });
 });
