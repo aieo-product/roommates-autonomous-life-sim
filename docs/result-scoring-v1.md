@@ -4,7 +4,7 @@
 - Parent design: [7日間リザルト設計](./result-experience.md)
 - Data contract: [GameState v2](./game-state-v2.md)
 - Execution contract: [高速スキップ設計 v1](./fast-skip.md)
-- Issue: [#22](https://github.com/aieo-product/teamOtaniHackathon/issues/22)
+- Issue: [#22](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/22)
 
 ## 目的
 

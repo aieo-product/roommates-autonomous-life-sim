@@ -14,11 +14,11 @@
 | Recommended track | **Apps for Your Life** |
 | Live demo | [Try ROOMMATES](https://roommates-heart-game.donald-25.chatgpt.site) |
 | Visual field guide | [See the experience and architecture](https://roommates-build-week-guide.donald-25.chatgpt.site) |
-| Source | [GitHub repository](https://github.com/aieo-product/teamOtaniHackathon) |
+| Source | [GitHub repository](https://github.com/aieo-product/roommates-autonomous-life-sim) |
 | Demo video | `[OWNER: public YouTube URL; voiceover; less than 3 minutes]` |
 | Codex Session ID | `[OWNER: run /feedback in the primary build task]` |
-| Team | `[OWNER: names and roles]` |
-| License | `[OWNER: select and add an appropriate repository license]` |
+| Team | **syn-otani** — main programming and product; **HTNCode** — asset creation |
+| License | [MIT](../LICENSE) for software; bundled sample packs retain their declared `CC-BY-4.0` terms |
 | Submission deadline | **July 22, 2026 at 09:00 JST** (July 21 at 17:00 PDT) |
 
 Official references: [Build Week](https://openai.com/build-week/),
@@ -232,17 +232,17 @@ opened. The complete product in this repository was built during Build Week.
 
 | Date | Evidence | Outcome |
 | --- | --- | --- |
-| Jul 18 | [`13e16e6`](https://github.com/aieo-product/teamOtaniHackathon/commit/13e16e6) → [PR #27](https://github.com/aieo-product/teamOtaniHackathon/pull/27) | Repository initialization, visual specifications, sprites, Character Studio foundations, and map-first playable MVP |
-| Jul 18 | [PR #32](https://github.com/aieo-product/teamOtaniHackathon/pull/32) | Character profiles and ten personality controls integrated into agent decisions |
-| Jul 18 | [PR #36](https://github.com/aieo-product/teamOtaniHackathon/pull/36) | Seven-day recap, deterministic Dekopin Support Score, reflections, and Sites runtime |
-| Jul 18–19 | [PR #46](https://github.com/aieo-product/teamOtaniHackathon/pull/46), [#49](https://github.com/aieo-product/teamOtaniHackathon/pull/49) | Autonomous room scenes and multi-beat event composition |
-| Jul 18–19 | [PR #47](https://github.com/aieo-product/teamOtaniHackathon/pull/47), [#54](https://github.com/aieo-product/teamOtaniHackathon/pull/54) | Authenticated Codex App Server worker and OpenAI Responses API fallback |
-| Jul 19 | [PR #51](https://github.com/aieo-product/teamOtaniHackathon/pull/51), [#53](https://github.com/aieo-product/teamOtaniHackathon/pull/53) | Responsive mobile controls and map-overlay focus mode |
-| Jul 20 | [PR #55](https://github.com/aieo-product/teamOtaniHackathon/pull/55), [#56](https://github.com/aieo-product/teamOtaniHackathon/pull/56) | Safe provider diagnostics and Cloudflare/OpenAI runtime compatibility fix |
-| Jul 20–21 | [Submission PR #58](https://github.com/aieo-product/teamOtaniHackathon/pull/58) and final integration commits | Roommates Asset Format v1, grid Asset Manager, replaceable character slots and furniture placements, current-name dialogue, furniture-aware phase starts, animated time passage, and judge-facing documentation |
+| Jul 18 | [`13e16e6`](https://github.com/aieo-product/roommates-autonomous-life-sim/commit/13e16e6) → [PR #27](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/27) | Repository initialization, visual specifications, sprites, Character Studio foundations, and map-first playable MVP |
+| Jul 18 | [PR #32](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/32) | Character profiles and ten personality controls integrated into agent decisions |
+| Jul 18 | [PR #36](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/36) | Seven-day recap, deterministic Dekopin Support Score, reflections, and Sites runtime |
+| Jul 18–19 | [PR #46](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/46), [#49](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/49) | Autonomous room scenes and multi-beat event composition |
+| Jul 18–19 | [PR #47](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/47), [#54](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/54) | Authenticated Codex App Server worker and OpenAI Responses API fallback |
+| Jul 19 | [PR #51](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/51), [#53](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/53) | Responsive mobile controls and map-overlay focus mode |
+| Jul 20 | [PR #55](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/55), [#56](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/56) | Safe provider diagnostics and Cloudflare/OpenAI runtime compatibility fix |
+| Jul 20–21 | [Submission PR #58](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/58) and final integration commits | Roommates Asset Format v1, grid Asset Manager, replaceable character slots and furniture placements, current-name dialogue, furniture-aware phase starts, animated time passage, and judge-facing documentation |
 
 Final submitted source: [the `main` branch at submission
-time](https://github.com/aieo-product/teamOtaniHackathon/commits/main). Record the
+time](https://github.com/aieo-product/roommates-autonomous-life-sim/commits/main). Record the
 exact final commit SHA in the Devpost submission receipt.
 
 ## Judge-friendly test path
@@ -365,16 +365,17 @@ These checks should be repeated after the final submission changes are merged.
 - [ ] Join the hackathon on Devpost and create a draft submission.
 - [ ] Confirm entrant eligibility and add every team member before the deadline.
 - [ ] Select **Apps for Your Life**.
-- [ ] Choose and add the repository `LICENSE`; review third-party materials.
+- [x] Add the repository MIT `LICENSE`.
+- [ ] Review third-party materials and explicit asset-pack licenses.
 - [ ] Replace the remaining `[OWNER: ...]` fields and personally review this
   AI-assisted copy.
 - [ ] Run `npm run check` and `npm run check:sites` on the final commit.
 - [ ] Record and publish the public, voiced, under-three-minute YouTube demo.
 - [ ] Run `/feedback` in the primary Codex build task and add the Session ID.
-- [ ] Add the final commit SHA, team, video, Session ID, screenshots, and license.
+- [ ] Add the final commit SHA, video, Session ID, and screenshots.
 - [ ] Verify the repository, live demo, and video in a signed-out browser.
 - [ ] Submit before **July 22, 2026 at 09:00 JST** and save the receipt.
 - [ ] Keep the public demo free and unrestricted through judging, preferably through
   the announced results date.
 
-Submission tracking: [GitHub Issue #57](https://github.com/aieo-product/teamOtaniHackathon/issues/57).
+Submission tracking: [GitHub Issue #57](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/57).

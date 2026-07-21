@@ -1,9 +1,9 @@
 # ROOMMATES 高速スキップ設計 v1
 
 - Status: Accepted
-- Issue: [#33 決定論的ローカル進行による高速スキップをjob化する](https://github.com/aieo-product/teamOtaniHackathon/issues/33)
+- Issue: [#33 決定論的ローカル進行による高速スキップをjob化する](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/33)
 - Parent contracts: [GameState v2](./game-state-v2.md) / [Producer Score v1](./result-scoring-v1.md) / [7日間リザルト設計](./result-experience.md)
-- Related: [#3 App Server基盤](https://github.com/aieo-product/teamOtaniHackathon/issues/3) / [#10 イベント制約](https://github.com/aieo-product/teamOtaniHackathon/issues/10) / [#18 最終選択](https://github.com/aieo-product/teamOtaniHackathon/issues/18) / [#22 リザルト](https://github.com/aieo-product/teamOtaniHackathon/issues/22) / [#25 永続化パス](https://github.com/aieo-product/teamOtaniHackathon/issues/25) / [#26 MVP Epic](https://github.com/aieo-product/teamOtaniHackathon/issues/26)
+- Related: [#3 App Server基盤](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/3) / [#10 イベント制約](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/10) / [#18 最終選択](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/18) / [#22 リザルト](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/22) / [#25 永続化パス](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/25) / [#26 MVP Epic](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/26)
 
 ## 目的
 

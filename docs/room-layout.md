@@ -1,6 +1,6 @@
 # ROOMMATES 基本間取り仕様
 
-Issue: [#7 動的な部屋生成に使用する基本間取りを決定する](https://github.com/aieo-product/teamOtaniHackathon/issues/7)
+Issue: [#7 動的な部屋生成に使用する基本間取りを決定する](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/7)
 
 ## 採用案
 

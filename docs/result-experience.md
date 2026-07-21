@@ -1,8 +1,8 @@
 # ROOMMATES 7日間リザルト設計
 
 - Status: Accepted
-- Issue: [#22 全ログとAgent選択から7日間の総集編・プロデュース評価を表示する](https://github.com/aieo-product/teamOtaniHackathon/issues/22)
-- Related: [#10 ガードレールと基本イベント](https://github.com/aieo-product/teamOtaniHackathon/issues/10) / [#18 最終選択](https://github.com/aieo-product/teamOtaniHackathon/issues/18) / [#20 イベントEpic](https://github.com/aieo-product/teamOtaniHackathon/issues/20)
+- Issue: [#22 全ログとAgent選択から7日間の総集編・プロデュース評価を表示する](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/22)
+- Related: [#10 ガードレールと基本イベント](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/10) / [#18 最終選択](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/18) / [#20 イベントEpic](https://github.com/aieo-product/roommates-autonomous-life-sim/issues/20)
 - Normative contracts: [Producer Score v1](./result-scoring-v1.md) / [GameState v2](./game-state-v2.md) / [高速スキップ設計 v1](./fast-skip.md)
 
 ## 採用案

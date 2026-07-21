@@ -26,6 +26,15 @@ the next platform step.
 | Review the submission narrative | [English Build Week submission pack](./docs/openai-build-week-submission.md) |
 | Inspect the implementation | [Architecture and technical documentation](#technical-reference) |
 
+## Team and licensing
+
+- **syn-otani** — main programming, product, and integration
+- **HTNCode** — character, furniture, and visual asset creation
+
+The software is released under the [MIT License](./LICENSE). Bundled sample
+asset packs retain the explicit `CC-BY-4.0` terms and attribution declared in
+their manifests.
+
 ## Judge it in 90 seconds
 
 1. Open the [live game](https://roommates-heart-game.donald-25.chatgpt.site) and
@@ -131,15 +140,15 @@ the direct Responses API path.
 Codex collaborated across the build loop with reviewable GitHub evidence:
 
 - translated the premise into state, role, event, and safety contracts, then
-  helped build the map-first MVP in [PR #27](https://github.com/aieo-product/teamOtaniHackathon/pull/27);
+  helped build the map-first MVP in [PR #27](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/27);
 - implemented and tested the seven-day recap and explainable in-game score in
-  [PR #36](https://github.com/aieo-product/teamOtaniHackathon/pull/36);
+  [PR #36](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/36);
 - helped turn autonomous decisions into coherent multi-beat scenes in
-  [PR #49](https://github.com/aieo-product/teamOtaniHackathon/pull/49);
+  [PR #49](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/49);
 - hardened the hosted Agent Worker, direct Responses API path, privacy boundaries,
-  and Cloudflare runtime in [PR #47](https://github.com/aieo-product/teamOtaniHackathon/pull/47),
-  [PR #54](https://github.com/aieo-product/teamOtaniHackathon/pull/54), and
-  [PR #56](https://github.com/aieo-product/teamOtaniHackathon/pull/56);
+  and Cloudflare runtime in [PR #47](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/47),
+  [PR #54](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/54), and
+  [PR #56](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/56);
 - expanded unit, contract, API, D1, provider, asset, and UI verification to 617 tests.
 
 The human team retained the defining product decisions:
@@ -477,14 +486,14 @@ period opened. The repository history documents the Build Week work:
 
 | Date | Evidence | Outcome |
 | --- | --- | --- |
-| Jul 18 | [Initial commit](https://github.com/aieo-product/teamOtaniHackathon/commit/13e16e6), [PR #27](https://github.com/aieo-product/teamOtaniHackathon/pull/27) | Repository, visual specifications, sprites, and playable map-first MVP |
-| Jul 18 | [PR #32](https://github.com/aieo-product/teamOtaniHackathon/pull/32) | Character Studio and personality-aware decisions |
-| Jul 18 | [PR #36](https://github.com/aieo-product/teamOtaniHackathon/pull/36) | Seven-day recap, reflections, Dekopin Support Score, and Sites runtime |
-| Jul 18–19 | [PR #46](https://github.com/aieo-product/teamOtaniHackathon/pull/46), [#49](https://github.com/aieo-product/teamOtaniHackathon/pull/49) | Autonomous room scenes and multi-beat event composition |
-| Jul 18–19 | [PR #47](https://github.com/aieo-product/teamOtaniHackathon/pull/47), [#54](https://github.com/aieo-product/teamOtaniHackathon/pull/54) | Authenticated Agent Worker and Responses API fallback |
-| Jul 19 | [PR #51](https://github.com/aieo-product/teamOtaniHackathon/pull/51), [#53](https://github.com/aieo-product/teamOtaniHackathon/pull/53) | Smartphone controls and map focus mode |
-| Jul 20 | [PR #55](https://github.com/aieo-product/teamOtaniHackathon/pull/55), [#56](https://github.com/aieo-product/teamOtaniHackathon/pull/56) | Safe runtime diagnostics and Cloudflare fetch fix |
-| Jul 20–21 | [Submission PR #58](https://github.com/aieo-product/teamOtaniHackathon/pull/58) and final integration commits | Replaceable character/room assets, grid Asset Manager, current-name dialogue, furniture-aware phase starts, animated time passage, and judge-facing documentation |
+| Jul 18 | [Initial commit](https://github.com/aieo-product/roommates-autonomous-life-sim/commit/13e16e6), [PR #27](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/27) | Repository, visual specifications, sprites, and playable map-first MVP |
+| Jul 18 | [PR #32](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/32) | Character Studio and personality-aware decisions |
+| Jul 18 | [PR #36](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/36) | Seven-day recap, reflections, Dekopin Support Score, and Sites runtime |
+| Jul 18–19 | [PR #46](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/46), [#49](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/49) | Autonomous room scenes and multi-beat event composition |
+| Jul 18–19 | [PR #47](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/47), [#54](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/54) | Authenticated Agent Worker and Responses API fallback |
+| Jul 19 | [PR #51](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/51), [#53](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/53) | Smartphone controls and map focus mode |
+| Jul 20 | [PR #55](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/55), [#56](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/56) | Safe runtime diagnostics and Cloudflare fetch fix |
+| Jul 20–21 | [Submission PR #58](https://github.com/aieo-product/roommates-autonomous-life-sim/pull/58) and final integration commits | Replaceable character/room assets, grid Asset Manager, current-name dialogue, furniture-aware phase starts, animated time passage, and judge-facing documentation |
 
 ## Technical reference
 

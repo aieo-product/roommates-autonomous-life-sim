@@ -7,8 +7,8 @@
   "packVersion": "1.0.0",
   "license": {
     "spdx": "CC-BY-4.0",
-    "attribution": "ROOMMATES contributors",
-    "source": "https://github.com/aieo-product/teamOtaniHackathon"
+    "attribution": "HTNCode and ROOMMATES contributors",
+    "source": "https://github.com/aieo-product/roommates-autonomous-life-sim"
   },
   "assets": [
     {
