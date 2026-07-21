@@ -685,7 +685,7 @@ describe("GameEngine", () => {
     }
   });
 
-  it("locks an unavailable morning movie, selects its fallback, and streams the lock", async () => {
+  it("soft-adapts an unavailable morning movie and streams the playable event", async () => {
     const { engine } = await engineWith();
     const streamed: StreamEvent[] = [];
 
@@ -696,17 +696,19 @@ describe("GameEngine", () => {
       (event) => streamed.push(event),
     );
 
-    expect(result.eventLog.at(-1)?.eventDefinitionId).toBe("observe-rest");
+    expect(result.eventLog.at(-1)).toMatchObject({
+      eventDefinitionId: "open-low-pressure-activity",
+      inputMethod: "free_text",
+      cue: { transformed: false, safetyFlags: [] },
+    });
     expect(streamed.find((event) => event.type === "turn.started")).toMatchObject({
       data: {
-        eventDefinitionId: "observe-rest",
-        cue: { transformed: true },
-        lock: {
-          requestedEventId: "movie-night",
-          fallbackEventId: "observe-rest",
-          reason: expect.stringContaining("利用できます"),
-        },
+        eventDefinitionId: "open-low-pressure-activity",
+        cue: { transformed: false, safetyFlags: [] },
       },
+    });
+    expect(streamed.find((event) => event.type === "turn.started")).not.toMatchObject({
+      data: { lock: expect.anything() },
     });
   });
 
@@ -723,7 +725,11 @@ describe("GameEngine", () => {
 
     const state = await engine.resolveTurn("タイムマシンで月へ行こう", "turn-key-unknown", 0);
 
-    expect(state.eventLog.at(-1)?.eventDefinitionId).toBe("observe-rest");
+    expect(state.eventLog.at(-1)).toMatchObject({
+      eventDefinitionId: "observe-rest",
+      inputMethod: "free_text",
+      cue: { transformed: true },
+    });
     for (const character of ["haru", "aoi"] as const) {
       expect(state.characters[character].state.affection).toBe(
         before.characters[character].state.affection,

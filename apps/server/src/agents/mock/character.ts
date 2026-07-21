@@ -30,6 +30,18 @@ const actions: Record<ProposalTag, string> = {
   other: "提案を自分たちなりに試してみる",
 };
 
+const OPEN_LOW_PRESSURE_EVENT_ID = "open-low-pressure-activity";
+
+function actionForSuggestion(
+  input: CharacterDecisionInput,
+  tag: ProposalTag,
+): string {
+  if (input.suggestion.eventDefinitionId === OPEN_LOW_PRESSURE_EVENT_ID) {
+    return `「${input.suggestion.text}」を20分以内の安全な形で試す`;
+  }
+  return actions[tag];
+}
+
 function primaryTag(input: CharacterDecisionInput): ProposalTag {
   return input.suggestion.tags.find((tag) => tag !== "pressure") ?? input.suggestion.tags[0] ?? "other";
 }
@@ -239,7 +251,7 @@ export class MockCharacterAgent implements CharacterAgent {
     const action =
       decision === "DECLINE" || decision === "IGNORE"
         ? `${profile.dislikes[0]}を避け、自分の時間を過ごす`
-        : actions[tag];
+        : actionForSuggestion(input, tag);
     return {
       decision,
       action,

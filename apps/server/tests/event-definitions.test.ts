@@ -47,6 +47,37 @@ describe("event definition catalog", () => {
     }
   });
 
+  it("bounds accepted free text inside an always-available low-pressure event", () => {
+    const definition = EVENT_DEFINITIONS_BY_ID.get("open-low-pressure-activity");
+
+    expect(definition).toMatchObject({
+      category: "talk",
+      intimacyTier: 0,
+      allowedPhases: ["morning", "afternoon", "evening", "night"],
+      minDay: 1,
+      maxDay: 7,
+      participantRange: { min: 1, max: 2 },
+      durationMinutes: 20,
+      preconditions: {},
+      cooldownPhases: 0,
+      maxUsesPerDay: 4,
+      maxUsesPerRun: 28,
+      consent: {
+        allowPass: true,
+        allowModify: true,
+        physicalContact: "none",
+        secrets: "forbidden",
+      },
+    });
+    expect(definition?.effectBudget).toMatchObject({
+      energy: 4,
+      stress: 5,
+      affection: 3,
+      trust: 3,
+      romanticAwareness: 1,
+    });
+  });
+
   it("offers varied everyday actions that remain safe when initiated, modified, or done solo", () => {
     const categories = new Set<string>();
 

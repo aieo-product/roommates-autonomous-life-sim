@@ -72,7 +72,10 @@ import {
   PRODUCER_SCORING_VERSION,
   RESULT_NARRATIVE_VERSION,
 } from "./result/index.js";
-import { resolveSuggestion } from "./suggestion.js";
+import {
+  isExplicitObserveInput,
+  resolveSuggestion,
+} from "./suggestion.js";
 
 type Emit = (event: StreamEvent) => void;
 const phaseOrder: Phase[] = ["morning", "afternoon", "evening", "night"];
@@ -611,7 +614,7 @@ export class GameEngine {
             cue: suggestion.cue,
             inputMethod:
               inputMethod ??
-              (suggestion.kind === "observe" ? "observe" : "free_text"),
+              (isExplicitObserveInput(rawSuggestion) ? "observe" : "free_text"),
             requestedEventId: suggestion.lock?.requestedEventId,
             alternativesShown: suggestion.alternatives,
             lock: suggestion.lock,
