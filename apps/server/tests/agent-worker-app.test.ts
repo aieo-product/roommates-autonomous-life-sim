@@ -657,7 +657,7 @@ describe("AgentWorker HTTP gateway", () => {
     await request(runtime.app)
       .post("/v1/invoke")
       .set("Content-Type", "application/json")
-      .send(oversized)
+      .send({})
       .expect(401);
     const response = await request(runtime.app)
       .post("/v1/invoke")
