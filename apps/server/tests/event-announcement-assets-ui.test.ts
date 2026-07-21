@@ -162,6 +162,18 @@ describe("resolved event announcement", () => {
   });
 });
 
+describe("resident speech bubbles", () => {
+  it("connects a visible tail to the character-facing edge", () => {
+    expect(app).toContain("resolveSpeechBubblePlacement");
+    expect(app).toContain("speech-object-${speechBubble.side}");
+    expect(css).toMatch(/\.speech-object,\s*\n\.scene-speech\s*\{[\s\S]*?overflow:\s*visible;/);
+    expect(css).toMatch(/\.speech-object-left \.scene-speech::after\s*\{[\s\S]*?right:\s*-8px;/);
+    expect(css).toMatch(/\.speech-object-right \.scene-speech::after\s*\{[\s\S]*?left:\s*-8px;/);
+    expect(app).toContain('hasCharacterSpeech ? "has-character-speech" : ""');
+    expect(css).toMatch(/@media \(max-width:\s*700px\)[\s\S]*?\.apartment-stage\.has-character-speech svg\s*\{[\s\S]*?transform:\s*scale\(1\.04\);/);
+  });
+});
+
 describe("generated furniture integration", () => {
   const manifestUrl = new URL("../../../assets/furniture/manifest.json", import.meta.url);
   const rendererUrl = new URL("../../web/src/furniture-assets.tsx", import.meta.url);

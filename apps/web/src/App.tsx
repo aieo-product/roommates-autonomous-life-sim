@@ -52,6 +52,7 @@ import {
   type DekopinPresentation,
 } from "./dekopin";
 import { getGameControlState, type ActionBusy } from "./game-controls";
+import { resolveSpeechBubblePlacement } from "./speech-bubble";
 import dekopinSpriteUrl from "../../../assets/characters/navigator/walk-cycle.png";
 import type {
   AgentDecision,
@@ -314,6 +315,7 @@ function SceneCharacter({
   person,
   name,
   point,
+  peerPoint,
   selected,
   thinking,
   direction,
@@ -328,6 +330,7 @@ function SceneCharacter({
   person: CharacterId;
   name: string;
   point: Point;
+  peerPoint?: Point;
   selected: boolean;
   thinking: boolean;
   direction: SpriteDirection;
@@ -339,7 +342,11 @@ function SceneCharacter({
   action?: string;
   onSelect: () => void;
 }) {
-  const bubbleX = point.x > 950 || person === "haru" ? -216 : 38;
+  const speechBubble = resolveSpeechBubblePlacement(
+    point,
+    peerPoint,
+    person === "haru" ? "left" : "right",
+  );
   const activate = () => onSelect();
   return (
     <g
@@ -377,7 +384,13 @@ function SceneCharacter({
         </foreignObject>
       )}
       {!thinking && (dialogue || action) && (
-        <foreignObject x={bubbleX} y="-142" width="208" height="94" className="speech-object">
+        <foreignObject
+          x={speechBubble.x}
+          y={speechBubble.y}
+          width={speechBubble.width}
+          height={speechBubble.height}
+          className={`speech-object speech-object-${speechBubble.side}`}
+        >
           <div className={`scene-speech speech-${person} ${action ? "is-action" : ""}`} aria-live={conversing || acting ? "polite" : undefined}>
             <small>{action ? "ACTION" : name}</small>
             <p>{clipText(action || dialogue || "", 46)}</p>
@@ -466,9 +479,17 @@ function ApartmentStage({
     activeBeat?.kind === "action" && actorIncludes(person);
   const actionFor = (person: CharacterId): string | undefined =>
     isActing(person) && activeBeat?.kind === "action" ? activeBeat.action : undefined;
+  const haruPoint = pointFor("haru");
+  const aoiPoint = pointFor("aoi");
+  const hasCharacterSpeech = Boolean(
+    dialogueFor("haru")
+    || dialogueFor("aoi")
+    || actionFor("haru")
+    || actionFor("aoi"),
+  );
 
   return (
-    <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""}`}>
+    <div className={`apartment-stage phase-${game.shared.phase} ${eventRoom ? "has-event-focus" : ""} ${hasCharacterSpeech ? "has-character-speech" : ""}`}>
       <svg viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${people.haru.name}と${people.aoi.name}が暮らす2LDKを南西側の斜め上から見た全景`}>
         <defs>
           <pattern id="floor-grid" width="50" height="25" patternUnits="userSpaceOnUse">
@@ -520,8 +541,8 @@ function ApartmentStage({
           </g>
           <FurnitureLayer />
           <g className="character-layer">
-            <SceneCharacter person="haru" name={people.haru.name} point={pointFor("haru")} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={isMoving("haru")} travelling={isMoving("haru")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "haru"} acting={isActing("haru")} dialogue={dialogueFor("haru")} action={actionFor("haru")} onSelect={() => onSelectPerson("haru")} />
-            <SceneCharacter person="aoi" name={people.aoi.name} point={pointFor("aoi")} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={isMoving("aoi")} travelling={isMoving("aoi")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "aoi"} acting={isActing("aoi")} dialogue={dialogueFor("aoi")} action={actionFor("aoi")} onSelect={() => onSelectPerson("aoi")} />
+            <SceneCharacter person="haru" name={people.haru.name} point={haruPoint} peerPoint={aoiPoint} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} direction={directionFor("haru")} moving={isMoving("haru")} travelling={isMoving("haru")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "haru"} acting={isActing("haru")} dialogue={dialogueFor("haru")} action={actionFor("haru")} onSelect={() => onSelectPerson("haru")} />
+            <SceneCharacter person="aoi" name={people.aoi.name} point={aoiPoint} peerPoint={haruPoint} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} direction={directionFor("aoi")} moving={isMoving("aoi")} travelling={isMoving("aoi")} conversing={activeBeat?.kind === "dialogue" && activeBeat.actor === "aoi"} acting={isActing("aoi")} dialogue={dialogueFor("aoi")} action={actionFor("aoi")} onSelect={() => onSelectPerson("aoi")} />
           </g>
         </g>
       </svg>

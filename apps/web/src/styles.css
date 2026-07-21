@@ -765,6 +765,11 @@ a:focus-visible,
 .running-dots i:nth-child(2) { animation-delay: .14s; }
 .running-dots i:nth-child(3) { animation-delay: .28s; }
 
+.speech-object,
+.scene-speech {
+  overflow: visible;
+}
+
 .scene-speech {
   position: relative;
   min-height: 72px;
@@ -774,13 +779,11 @@ a:focus-visible,
   border: 3px solid var(--ink);
   border-radius: 8px;
   box-shadow: 4px 4px 0 rgba(31,45,64,.24);
-  overflow: hidden;
 }
 
 .scene-speech::after {
   content: "";
   position: absolute;
-  left: 50%;
   bottom: -9px;
   width: 14px;
   height: 14px;
@@ -788,6 +791,14 @@ a:focus-visible,
   border-right: 3px solid var(--ink);
   border-bottom: 3px solid var(--ink);
   transform: rotate(45deg);
+}
+
+.speech-object-left .scene-speech::after {
+  right: -8px;
+}
+
+.speech-object-right .scene-speech::after {
+  left: -8px;
 }
 
 .scene-speech small {
@@ -2760,6 +2771,10 @@ a:focus-visible,
   .apartment-stage svg {
     transform: scale(1.28);
     transform-origin: center;
+  }
+
+  .apartment-stage.has-character-speech svg {
+    transform: scale(1.04);
   }
 
   .stage-caption,
