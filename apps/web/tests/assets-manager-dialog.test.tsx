@@ -19,6 +19,8 @@ describe("AssetManagerDialog", () => {
     expect(markup).toContain("家具ライブラリ");
     expect(markup).toContain("浴室");
     expect(markup).toContain("JSON 読込");
+    expect(markup).toContain("アクションタグ（カンマ区切り）");
+    expect(markup).toContain("イベントの移動先検索にも使う安定ID");
   });
 
   it("does not mount the modal when open is false", () => {
@@ -31,4 +33,3 @@ describe("AssetManagerDialog", () => {
     expect(markup).toBe("");
   });
 });
-

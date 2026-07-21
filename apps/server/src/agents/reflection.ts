@@ -1,10 +1,14 @@
 import { z } from "zod";
 import {
   decisions,
+  characterDisplayName,
+  characterIdentitySchema,
+  otherCharacterId,
   phases,
   relationshipLabels,
   type AgentResultReflection,
   type CharacterId,
+  type CharacterRoster,
   type GameState,
 } from "@roommates/shared";
 
@@ -61,6 +65,8 @@ const publicReflectionMemorySchema = z
 export const agentReflectionInputSchema = z
   .object({
     characterId: z.enum(["haru", "aoi"]),
+    characterIdentity: characterIdentitySchema.optional(),
+    otherCharacterIdentity: characterIdentitySchema.optional(),
     finalRelationship: z.enum(relationshipLabels),
     ending: z
       .object({
@@ -203,6 +209,7 @@ export function buildAgentReflectionInput(
   state: GameState,
   characterId: CharacterId,
   highlightEventLogIds: readonly string[],
+  characterRoster: CharacterRoster | undefined = state.characterRoster,
 ): AgentReflectionInput {
   const selfPrefix = characterId === "haru" ? "haru" : "aoi";
   const sharedEvents = state.eventLog.map((event) => {
@@ -245,6 +252,12 @@ export function buildAgentReflectionInput(
 
   return agentReflectionInputSchema.parse({
     characterId,
+    ...(characterRoster
+      ? {
+          characterIdentity: characterRoster[characterId],
+          otherCharacterIdentity: characterRoster[otherCharacterId(characterId)],
+        }
+      : {}),
     finalRelationship: state.shared.relationshipLabel,
     ending: state.ending
       ? {
@@ -279,8 +292,7 @@ export function buildAgentReflectionInput(
 }
 
 function unavailableSeasonImpression(characterId: CharacterId): string {
-  const name = characterId === "haru" ? "Haru" : "Aoi";
-  return `${name}のアフターインタビューを取得できませんでした。ログにない感情や出来事は補わず、7日間の各場面で保存された本人の公開発言と選択だけを振り返りとして表示します。`;
+  return `${characterDisplayName(undefined, characterId)}のアフターインタビューを取得できませんでした。ログにない感情や出来事は補わず、7日間の各場面で保存された本人の公開発言と選択だけを振り返りとして表示し、推測による補完は行いません。`;
 }
 
 /** A non-generative failure path: it repeats only saved public material. */
@@ -303,7 +315,9 @@ export function fallbackAgentReflection(input: AgentReflectionInput): AgentResul
 
   return agentResultReflectionSchemaFor(input).parse({
     characterId: input.characterId,
-    seasonImpression: unavailableSeasonImpression(input.characterId),
+    seasonImpression: input.characterIdentity
+      ? `${input.characterIdentity.displayName}のアフターインタビューを取得できませんでした。ログにない感情や出来事は補わず、7日間の各場面で保存された本人の公開発言と選択だけを振り返りとして表示し、推測による補完は行いません。`
+      : unavailableSeasonImpression(input.characterId),
     notableEventComments: comments,
     bestMomentEventLogId,
     turningPointEventLogId: null,

@@ -18,7 +18,7 @@
       "file": "images/island-kitchen.png",
       "footprintTiles": { "width": 1, "depth": 2 },
       "orientation": "south-west-to-north-east",
-      "anchorIds": ["kitchen_island"],
+      "anchorIds": ["kitchen_island", "cook", "prepare_meal"],
       "render": {
         "canvas": { "width": 256, "height": 256 },
         "contentBounds": { "x": 80, "y": 91, "width": 148, "height": 145 },
@@ -35,7 +35,7 @@
       "file": "images/refrigerator.png",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
-      "anchorIds": ["refrigerator"],
+      "anchorIds": ["refrigerator", "get_food"],
       "render": {
         "canvas": { "width": 256, "height": 256 },
         "contentBounds": { "x": 82, "y": 70, "width": 92, "height": 166 },

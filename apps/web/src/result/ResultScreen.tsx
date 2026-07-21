@@ -14,6 +14,7 @@ import { ScoreDetails } from "./ScoreDetails";
 import { SeasonArticle } from "./SeasonArticle";
 import { Timeline } from "./Timeline";
 import type { ResultEnding, ResultScreenProps } from "./types";
+import { ResultCharacterNamesProvider } from "./character-names";
 import "./result.css";
 
 type ResultTab = "recap" | "data";
@@ -55,6 +56,7 @@ function ResultWaiting({
 
 export function ResultScreen({
   game,
+  characterNames,
   onRestartSameSeed,
   onRestartNewSeed,
 }: ResultScreenProps) {
@@ -118,6 +120,7 @@ export function ResultScreen({
   };
 
   return (
+    <ResultCharacterNamesProvider names={characterNames}>
     <main className="result-screen" onClickCapture={onEvidenceClick}>
       <a className="result-skip-link" href={`#result-${instanceId}-tabs`}>総集編の本文へ移動</a>
       <ResultHero
@@ -201,5 +204,6 @@ export function ResultScreen({
         </div>
       </footer>
     </main>
+    </ResultCharacterNamesProvider>
   );
 }

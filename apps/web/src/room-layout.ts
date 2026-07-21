@@ -2,17 +2,38 @@ import type { CharacterState, GameEvent } from "./types.js";
 
 export type CharacterId = "haru" | "aoi";
 
-export type RoomId =
-  | "haru_room"
-  | "aoi_room"
-  | "entry"
-  | "washroom"
-  | "hallway"
-  | "bathroom"
-  | "kitchen"
-  | "dining"
-  | "living"
-  | "balcony";
+export const CANONICAL_ROOM_IDS = [
+  "male_room",
+  "female_room",
+  "entry",
+  "washroom",
+  "hallway",
+  "bathroom",
+  "kitchen",
+  "dining",
+  "living",
+  "balcony",
+] as const;
+
+export type RoomId = (typeof CANONICAL_ROOM_IDS)[number];
+
+/** Deprecated persisted IDs accepted at input boundaries only. */
+export const LEGACY_ROOM_ID_ALIASES = {
+  haru_room: "male_room",
+  aoi_room: "female_room",
+  famale_room: "female_room",
+} as const satisfies Record<string, RoomId>;
+
+export type LegacyRoomId = keyof typeof LEGACY_ROOM_ID_ALIASES;
+export type RoomIdInput = RoomId | LegacyRoomId;
+
+const canonicalRoomIdSet = new Set<string>(CANONICAL_ROOM_IDS);
+
+export const normalizeRoomId = (value: string): RoomId | undefined => {
+  const normalized = value.trim().toLowerCase();
+  if (canonicalRoomIdSet.has(normalized)) return normalized as RoomId;
+  return LEGACY_ROOM_ID_ALIASES[normalized as LegacyRoomId];
+};
 
 export type Point = { x: number; y: number };
 
@@ -57,8 +78,8 @@ const polygon = (...points: Array<[number, number]>): string =>
   }).join(" ");
 
 export const ROOM_ZONES: RoomZone[] = [
-  { id: "haru_room", label: "HARU ROOM", labelPoint: iso(3.2, 1.4), points: polygon([0, 0], [8, 0], [8, 6], [0, 6]) },
-  { id: "aoi_room", label: "AOI ROOM", labelPoint: iso(11.2, 1.4), points: polygon([8, 0], [16, 0], [16, 6], [8, 6]) },
+  { id: "male_room", label: "MALE ROOM", labelPoint: iso(3.2, 1.4), points: polygon([0, 0], [8, 0], [8, 6], [0, 6]) },
+  { id: "female_room", label: "FEMALE ROOM", labelPoint: iso(11.2, 1.4), points: polygon([8, 0], [16, 0], [16, 6], [8, 6]) },
   { id: "entry", label: "ENTRY", labelPoint: iso(16.8, 0.8), points: polygon([16, 0], [19, 0], [19, 3], [16, 3]) },
   { id: "washroom", label: "WASH", labelPoint: iso(20.2, 0.8), points: polygon([19, 0], [24, 0], [24, 3], [19, 3]) },
   {
@@ -77,8 +98,8 @@ export const ROOM_ZONES: RoomZone[] = [
 ];
 
 const ROOM_FOCUS_POINTS: Record<RoomId, Point> = {
-  haru_room: iso(4.5, 3),
-  aoi_room: iso(12.5, 3),
+  male_room: iso(4.5, 3),
+  female_room: iso(12.5, 3),
   entry: iso(17.3, 1.3),
   washroom: iso(21.5, 1.3),
   hallway: iso(10, 6.8),
@@ -94,8 +115,8 @@ const ROOM_FOCUS_POINTS: Record<RoomId, Point> = {
  * the furniture manifest. These are floor-contact points, not sprite origins.
  */
 export const ROOM_STAND_SPOTS: Record<RoomId, CharacterSpots> = {
-  haru_room: { haru: { x: 7.4, y: 3.5 }, aoi: { x: 4.3, y: 4.8 } },
-  aoi_room: { haru: { x: 12.2, y: 4.8 }, aoi: { x: 15.2, y: 3.5 } },
+  male_room: { haru: { x: 7.4, y: 3.5 }, aoi: { x: 4.3, y: 4.8 } },
+  female_room: { haru: { x: 12.2, y: 4.8 }, aoi: { x: 15.2, y: 3.5 } },
   entry: { haru: { x: 16.4, y: 2.6 }, aoi: { x: 18.7, y: 2.6 } },
   washroom: { haru: { x: 22.2, y: 2.2 }, aoi: { x: 23.2, y: 1.8 } },
   hallway: { haru: { x: 9.1, y: 6.9 }, aoi: { x: 11, y: 6.8 } },
@@ -111,8 +132,8 @@ export const ROOM_STAND_SPOTS: Record<RoomId, CharacterSpots> = {
 // Safe alternates let repeated/synonymous story destinations include a turn
 // without inventing a screen-space nudge that can land inside furniture.
 export const ROOM_TURN_SPOTS: Record<RoomId, CharacterSpots> = {
-  haru_room: { haru: { x: 4.3, y: 4.8 }, aoi: { x: 7.4, y: 3.5 } },
-  aoi_room: { haru: { x: 15.2, y: 3.5 }, aoi: { x: 12.2, y: 4.8 } },
+  male_room: { haru: { x: 4.3, y: 4.8 }, aoi: { x: 7.4, y: 3.5 } },
+  female_room: { haru: { x: 15.2, y: 3.5 }, aoi: { x: 12.2, y: 4.8 } },
   entry: { haru: { x: 18.7, y: 2.6 }, aoi: { x: 16.4, y: 2.6 } },
   washroom: { haru: { x: 23.2, y: 1.8 }, aoi: { x: 22.2, y: 2.2 } },
   hallway: { haru: { x: 10.7, y: 7.2 }, aoi: { x: 9.4, y: 6.7 } },
@@ -136,8 +157,8 @@ export const DESTINATION_STAND_SPOTS = {
 } satisfies Record<string, CharacterSpots>;
 
 const ROOM_WORLD_BOUNDS: Record<RoomId, Array<{ x: number; y: number; width: number; height: number }>> = {
-  haru_room: [{ x: 0, y: 0, width: 8, height: 6 }],
-  aoi_room: [{ x: 8, y: 0, width: 8, height: 6 }],
+  male_room: [{ x: 0, y: 0, width: 8, height: 6 }],
+  female_room: [{ x: 8, y: 0, width: 8, height: 6 }],
   entry: [{ x: 16, y: 0, width: 3, height: 3 }],
   washroom: [{ x: 19, y: 0, width: 5, height: 3 }],
   hallway: [
@@ -172,13 +193,12 @@ const rectanglesOverlap = (
   && left.y < right.y + right.height
   && left.y + left.height > right.y;
 
-const safeDestination = (
+export const safeWorldDestination = (
   person: CharacterId,
   room: RoomId,
   preferred: Point,
   obstacles: readonly GridObstacle[],
 ): Point => {
-  if (obstacles.length === 0) return preferred;
   const roomObstacles = obstacles.filter((obstacle) => obstacle.roomId === room);
   const candidates = [
     preferred,
@@ -207,6 +227,18 @@ const safeDestination = (
   }) ?? preferred;
 };
 
+// Built-in destinations are curated against the static layout. Preserve their
+// exact choreography unless an edited asset supplies dynamic obstacles, while
+// exposing `safeWorldDestination` for arbitrary editor/asset-derived points.
+const safeKnownWorldDestination = (
+  person: CharacterId,
+  room: RoomId,
+  preferred: Point,
+  obstacles: readonly GridObstacle[],
+): Point => obstacles.length === 0
+  ? preferred
+  : safeWorldDestination(person, room, preferred, obstacles);
+
 const EVENT_ROOMS: Partial<Record<string, RoomId>> = {
   "shared-cooking": "kitchen",
   "movie-night": "living",
@@ -222,6 +254,8 @@ const containsAny = (value: string, needles: string[]): boolean =>
 
 export const roomForLocation = (location: string, person: CharacterId): RoomId => {
   const value = location.toLowerCase();
+  const persistedRoomId = normalizeRoomId(value);
+  if (persistedRoomId) return persistedRoomId;
   if (containsAny(value, ["キッチン", "台所", "kitchen"])) return "kitchen";
   if (containsAny(value, ["ダイニング", "食卓", "dining"])) return "dining";
   if (containsAny(value, ["ベランダ", "バルコニー", "balcony"])) return "balcony";
@@ -231,15 +265,15 @@ export const roomForLocation = (location: string, person: CharacterId): RoomId =
   if (containsAny(value, ["廊下", "hallway"])) return "hallway";
   if (containsAny(value, ["リビング", "living"])) return "living";
   if (containsAny(value, ["作業机", "デスク", "desk"])) {
-    if (containsAny(value, ["haru", "ハル"])) return "haru_room";
-    if (containsAny(value, ["aoi", "アオイ"])) return "aoi_room";
-    return person === "haru" ? "haru_room" : "aoi_room";
+    if (containsAny(value, ["haru", "ハル"])) return "male_room";
+    if (containsAny(value, ["aoi", "アオイ"])) return "female_room";
+    return person === "haru" ? "male_room" : "female_room";
   }
   if (containsAny(value, ["洗濯", "ランドリー", "laundry"])) return "balcony";
-  if (containsAny(value, ["haru", "ハル"])) return "haru_room";
-  if (containsAny(value, ["aoi", "アオイ"])) return "aoi_room";
+  if (containsAny(value, ["haru", "ハル"])) return "male_room";
+  if (containsAny(value, ["aoi", "アオイ"])) return "female_room";
   if (containsAny(value, ["自室", "寝室", "部屋", "room"])) {
-    return person === "haru" ? "haru_room" : "aoi_room";
+    return person === "haru" ? "male_room" : "female_room";
   }
   return "living";
 };
@@ -285,7 +319,7 @@ const rawWorldDestinationForLocation = (
   if (containsAny(value, ["ソファ", "sofa"])) return DESTINATION_STAND_SPOTS.sofa[person];
   if (containsAny(value, ["ローテーブル", "coffee table"])) return DESTINATION_STAND_SPOTS.lowTable[person];
   if (containsAny(value, ["作業机", "デスク", "desk"])) {
-    return room === "aoi_room"
+    return room === "female_room"
       ? DESTINATION_STAND_SPOTS.workDesk.aoi
       : DESTINATION_STAND_SPOTS.workDesk.haru;
   }
@@ -312,7 +346,7 @@ export const worldDestinationForLocation = (
   obstacles: readonly GridObstacle[] = [],
 ): Point => {
   const room = roomForLocation(location, person);
-  return safeDestination(
+  return safeKnownWorldDestination(
     person,
     room,
     rawWorldDestinationForLocation(person, location),
@@ -333,13 +367,13 @@ export const characterDetourCandidates = (
 ): Point[] => {
   const room = roomForLocation(location, person);
   return [
-    projectCharacterFloorPoint(safeDestination(
+    projectCharacterFloorPoint(safeKnownWorldDestination(
       person,
       room,
       ROOM_TURN_SPOTS[room][person],
       obstacles,
     )),
-    projectCharacterFloorPoint(safeDestination(
+    projectCharacterFloorPoint(safeKnownWorldDestination(
       person,
       room,
       ROOM_STAND_SPOTS[room][person],
@@ -348,4 +382,5 @@ export const characterDetourCandidates = (
   ];
 };
 
-export const focusPointForRoom = (room: RoomId): Point => ROOM_FOCUS_POINTS[room];
+export const focusPointForRoom = (room: RoomIdInput): Point =>
+  ROOM_FOCUS_POINTS[normalizeRoomId(room) ?? "living"];

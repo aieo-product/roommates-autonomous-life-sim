@@ -1,5 +1,6 @@
 import type {
   CharacterId,
+  CharacterRoster,
   Ending,
   Phase,
   ProducerResult,
@@ -9,6 +10,7 @@ import type {
   ProducerStyle,
   TurnStateSnapshot,
 } from "@roommates/shared";
+import { characterDisplayName } from "@roommates/shared";
 import { selectHighlights } from "./highlights.js";
 import {
   CHARACTER_IDS,
@@ -580,6 +582,7 @@ function scoreStory(
   collector: EvidenceCollector,
   followUps: RefusalFollowUp[],
   producerCausedConflicts: ReadonlySet<string>,
+  characterRoster?: CharacterRoster,
 ): void {
   const categories = new Set<string>();
   const importantMemoryDays = new Set<number>();
@@ -655,7 +658,7 @@ function scoreStory(
       collector.add({
         ruleId: "ST-04",
         entry,
-        message: `${characterId === "haru" ? "Haru" : "Aoi"}のMODIFYまたはINITIATEが成立した。`,
+        message: `${characterDisplayName(characterRoster, characterId)}のMODIFYまたはINITIATEが成立した。`,
       });
     }
   }
@@ -892,6 +895,7 @@ function statJourney(eventLog: StructuredEventLogEntry[]):
 export function buildProducerResult(
   input: readonly StructuredEventLogEntry[],
   _ending?: Ending,
+  characterRoster?: CharacterRoster,
 ): ProducerResult {
   const eventLog = sortEventLog(input);
   const collector = new EvidenceCollector();
@@ -911,12 +915,18 @@ export function buildProducerResult(
     repeatedAfterNoIds,
     repeatedLockIds,
   );
-  scoreStory(eventLog, collector, followUps, producerCausedConflicts);
+  scoreStory(
+    eventLog,
+    collector,
+    followUps,
+    producerCausedConflicts,
+    characterRoster,
+  );
 
   const evidence = collector.all();
   const axes = buildAxes(evidence);
   const overallScore = axes.reduce((sum, axis) => sum + axis.score, 0);
-  const highlights = selectHighlights(eventLog);
+  const highlights = selectHighlights(eventLog, 4, characterRoster);
   const coverage = calculateCoverage(eventLog);
   const warnings: string[] = [];
   if (coverage.ratio < 0.95) {

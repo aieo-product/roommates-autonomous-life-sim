@@ -5,6 +5,7 @@ import {
   createAfterScenePlan,
   directionForTravel,
 } from "../src/after-scene.js";
+import { projectCharacterFloorPoint } from "../src/room-layout.js";
 import type { GameEvent, GameState } from "../src/types.js";
 
 const event = (overrides: Partial<GameEvent> = {}): GameEvent => ({
@@ -183,6 +184,69 @@ describe("post-event room scene", () => {
     expect(moves[1]?.routes.haru.hasTravel).toBe(true);
     expect(moves[0]?.routes.haru.direction).not.toBe(moves[1]?.routes.haru.direction);
     expect(moves[0]?.points.haru).not.toEqual(moves[1]?.points.haru);
+  });
+
+  it("walks to the current asset placement before performing a tagged action", () => {
+    const game: GameState = {
+      ...INITIAL_GAME_STATE,
+      haru: { ...INITIAL_GAME_STATE.haru, location: "キッチン" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "キッチン" },
+    };
+    const sceneEvent = event({
+      storyBeats: [
+        { kind: "action", actor: "both", action: "アイランドで野菜を切る" },
+      ],
+    });
+    const anchors = [{
+      id: "kitchen-island",
+      assetId: "island-kitchen",
+      label: "Island Kitchen",
+      roomId: "kitchen" as const,
+      tags: ["island kitchen", "island", "アイランド"],
+      floorContact: { x: 4, y: 12 },
+      footprintTiles: { width: 1, depth: 2 },
+    }];
+
+    const plan = createAfterScenePlan(sceneEvent, game, undefined, [], anchors);
+
+    expect(plan.beats.map((beat) => beat.kind)).toEqual(["move", "action"]);
+    expect(plan.beats[0]).toMatchObject({
+      kind: "move",
+      actor: "both",
+      focusLocation: "Island Kitchen",
+    });
+    expect(plan.finalPoints.haru).toEqual(projectCharacterFloorPoint({ x: 2.45, y: 11 }));
+    expect(plan.finalPoints.aoi).toEqual(projectCharacterFloorPoint({ x: 4.55, y: 11 }));
+  });
+
+  it("uses the edited asset placement for an explicit furniture move beat", () => {
+    const game: GameState = {
+      ...INITIAL_GAME_STATE,
+      haru: { ...INITIAL_GAME_STATE.haru, location: "リビング" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "リビング" },
+    };
+    const sceneEvent = event({
+      storyBeats: [
+        { kind: "move", actor: "both", location: "アイランドキッチン" },
+        { kind: "action", actor: "both", action: "野菜を切る" },
+      ],
+    });
+    const anchors = [{
+      id: "edited-island",
+      assetId: "island-kitchen",
+      label: "Island Kitchen",
+      roomId: "kitchen" as const,
+      tags: ["island kitchen", "island", "アイランド"],
+      floorContact: { x: 5.4, y: 15 },
+      footprintTiles: { width: 1, depth: 2 },
+    }];
+
+    const plan = createAfterScenePlan(sceneEvent, game, undefined, [], anchors);
+
+    expect(plan.beats.map((beat) => beat.kind)).toEqual(["move", "action"]);
+    expect(plan.beats[0]?.focusLocation).toBe("Island Kitchen");
+    expect(plan.finalPoints.haru).toEqual(projectCharacterFloorPoint({ x: 3.85, y: 14 }));
+    expect(plan.finalPoints.aoi).toEqual(projectCharacterFloorPoint({ x: 5.95, y: 14 }));
   });
 
   it("adds a physical turn when consecutive story legs would face one direction", () => {

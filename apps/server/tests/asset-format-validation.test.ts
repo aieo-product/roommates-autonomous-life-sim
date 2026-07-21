@@ -17,6 +17,7 @@ type RenderMetadata = {
 type FurnitureManifest = {
   version: number;
   format: string;
+  roomIdAliases: Record<string, string>;
   grid: {
     columns: number;
     rows: number;
@@ -48,17 +49,23 @@ type CharacterManifest = {
   };
 };
 type PortableRoomPack = {
+  rooms: Array<{ id: string }>;
   placements: {
     assets: Array<{
       instanceId: string;
       assetId: string;
+      roomId: string;
       floorContact: { x: number; y: number };
     }>;
     characters: Array<{
       instanceId: string;
+      roomId: string;
       floorContact: { x: number; y: number };
       facing: string;
     }>;
+  };
+  extensions?: {
+    "roommates.room-id-aliases"?: Record<string, string>;
   };
 };
 
@@ -151,6 +158,27 @@ describe("shipped square-grid asset contract", () => {
     });
   });
 
+  it("emits canonical private-room IDs while retaining read-only aliases", () => {
+    expect(furnitureManifest.roomIdAliases).toEqual({
+      haru_room: "male_room",
+      aoi_room: "female_room",
+      famale_room: "female_room",
+    });
+    const privateRoomIds = furnitureManifest.defaultScene.instances
+      .filter(({ assetId }) => assetId === "haru-bed" || assetId === "aoi-bed")
+      .map(({ roomId }) => roomId);
+    expect(privateRoomIds).toEqual(["male_room", "female_room"]);
+    expect(privateRoomIds).not.toContain("haru_room");
+    expect(privateRoomIds).not.toContain("aoi_room");
+
+    const sampleRoomIds = sampleRoomPack.rooms.map(({ id }) => id);
+    expect(sampleRoomIds).toEqual(expect.arrayContaining(["male_room", "female_room"]));
+    expect(sampleRoomIds).not.toEqual(expect.arrayContaining(["haru_room", "aoi_room", "famale_room"]));
+    expect(sampleRoomPack.extensions?.["roommates.room-id-aliases"]).toEqual(
+      furnitureManifest.roomIdAliases,
+    );
+  });
+
   it("locks the key one-cell and two-cell furniture footprints", () => {
     expect(assetById("island-kitchen").footprintTiles).toEqual({ width: 1, depth: 2 });
     expect(assetById("bathtub").footprintTiles).toEqual({ width: 1, depth: 2 });
@@ -172,14 +200,14 @@ describe("shipped square-grid asset contract", () => {
 
   it("keeps the sample residents on opposite sides of the island and facing each other", () => {
     const island = sampleRoomPack.placements.assets.find(({ assetId }) => assetId === "sample.island-kitchen");
-    const haru = sampleRoomPack.placements.characters.find(({ instanceId }) => instanceId === "haru");
-    const aoi = sampleRoomPack.placements.characters.find(({ instanceId }) => instanceId === "aoi");
+    const male = sampleRoomPack.placements.characters.find(({ instanceId }) => instanceId === "male-character");
+    const female = sampleRoomPack.placements.characters.find(({ instanceId }) => instanceId === "female-character");
 
     expect(island?.floorContact).toEqual({ x: 6, y: 3 });
-    expect(haru).toMatchObject({ floorContact: { x: 5, y: 2 }, facing: "east" });
-    expect(aoi).toMatchObject({ floorContact: { x: 7, y: 2 }, facing: "west" });
-    expect(haru!.floorContact.x).toBeLessThan(island!.floorContact.x);
-    expect(aoi!.floorContact.x).toBeGreaterThan(island!.floorContact.x);
+    expect(male).toMatchObject({ floorContact: { x: 5, y: 2 }, facing: "east" });
+    expect(female).toMatchObject({ floorContact: { x: 7, y: 2 }, facing: "west" });
+    expect(male!.floorContact.x).toBeLessThan(island!.floorContact.x);
+    expect(female!.floorContact.x).toBeGreaterThan(island!.floorContact.x);
   });
 
   it("stores fit, bounds, pivot, orientation, and flip separately from placement", () => {

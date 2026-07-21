@@ -35,8 +35,8 @@
       { "instanceId": "bath-a", "assetId": "sample.bathtub", "roomId": "test-room", "floorContact": { "x": 4, "y": 5 } }
     ],
     "characters": [
-      { "instanceId": "resident-a", "assetId": "sample.haru", "roomId": "test-room", "floorContact": { "x": 2, "y": 2 }, "facing": "east" },
-      { "instanceId": "resident-b", "assetId": "sample.aoi", "roomId": "test-room", "floorContact": { "x": 4, "y": 4 }, "facing": "west" }
+      { "instanceId": "resident-a", "assetId": "sample.male", "roomId": "test-room", "floorContact": { "x": 2, "y": 2 }, "facing": "east" },
+      { "instanceId": "resident-b", "assetId": "sample.female", "roomId": "test-room", "floorContact": { "x": 4, "y": 4 }, "facing": "west" }
     ]
   }
 }

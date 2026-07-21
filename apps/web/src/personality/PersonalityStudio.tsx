@@ -143,7 +143,7 @@ function CharacterEditor({
     <section className={`personality-character personality-character-${character.id}`} aria-label={`${character.profile.name}の個性設定`}>
       <header className="personality-character-header">
         <ResidentPortrait person={character.id} className="personality-avatar" />
-        <div><small>{character.id === "haru" ? "HARU PROFILE" : "AOI PROFILE"}</small><h3>{character.profile.name}</h3><p>{character.profile.introduction}</p></div>
+        <div><small>{character.id === "haru" ? "MALE CHARACTER" : "FEMALE CHARACTER"}</small><h3>{character.profile.name}</h3><p>{character.profile.introduction}</p></div>
         <button type="button" onClick={onReset}>この人を初期設定へ</button>
       </header>
 
@@ -230,7 +230,7 @@ export function PersonalityStudio({ controller, onClose }: PersonalityStudioProp
     <div className="personality-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section ref={dialogRef} className="personality-modal" role="dialog" aria-modal="true" aria-labelledby="personality-title" aria-describedby="personality-description">
         <header className="personality-modal-header">
-          <div><small>CHARACTER STUDIO</small><h2 id="personality-title">ふたりの個性設定</h2><p id="personality-description">保存した設定は次のターンからHaruとAoiの判断へ反映されます。</p></div>
+          <div><small>CHARACTER STUDIO</small><h2 id="personality-title">ふたりの個性設定</h2><p id="personality-description">保存した名前と個性は、次のターンから男性・女性キャラクターの判断とイベントへ反映されます。</p></div>
           <button ref={closeRef} type="button" className="personality-close" onClick={onClose} aria-label="個性設定を閉じる">×</button>
         </header>
 

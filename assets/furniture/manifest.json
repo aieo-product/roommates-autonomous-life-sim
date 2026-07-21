@@ -1,6 +1,11 @@
 {
   "version": 5,
   "format": "roommates-grid-assets",
+  "roomIdAliases": {
+    "haru_room": "male_room",
+    "aoi_room": "female_room",
+    "famale_room": "female_room"
+  },
   "projection": {
     "type": "isometric-cutaway",
     "tileRatio": "2:1",
@@ -29,47 +34,47 @@
       {
         "instanceId": "haru-bed",
         "assetId": "haru-bed",
-        "roomId": "haru_room",
+        "roomId": "male_room",
         "anchorId": "haru_bed",
         "floorContact": { "x": 3.5, "y": 5.5 }
       },
       {
         "instanceId": "haru-storage-shelf",
         "assetId": "storage-shelf",
-        "roomId": "haru_room",
+        "roomId": "male_room",
         "floorContact": { "x": 5.5, "y": 4 }
       },
       {
         "instanceId": "haru-work-desk",
         "assetId": "work-desk",
-        "roomId": "haru_room",
+        "roomId": "male_room",
         "anchorId": "haru_desk",
         "floorContact": { "x": 7.5, "y": 2.5 }
       },
       {
         "instanceId": "haru-desk-chair",
         "assetId": "desk-chair",
-        "roomId": "haru_room",
+        "roomId": "male_room",
         "floorContact": { "x": 6.5, "y": 3.5 }
       },
       {
         "instanceId": "aoi-bed",
         "assetId": "aoi-bed",
-        "roomId": "aoi_room",
+        "roomId": "female_room",
         "anchorId": "aoi_bed",
         "floorContact": { "x": 11.5, "y": 5.5 }
       },
       {
         "instanceId": "aoi-work-desk",
         "assetId": "work-desk",
-        "roomId": "aoi_room",
+        "roomId": "female_room",
         "anchorId": "aoi_desk",
         "floorContact": { "x": 15.5, "y": 2.5 }
       },
       {
         "instanceId": "aoi-desk-chair",
         "assetId": "desk-chair",
-        "roomId": "aoi_room",
+        "roomId": "female_room",
         "floorContact": { "x": 14.5, "y": 3.5 }
       },
       {

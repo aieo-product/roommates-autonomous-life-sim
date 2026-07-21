@@ -100,6 +100,8 @@ export type GridAssetInstance<AssetId extends string = string> = {
 export type GridAssetManifest<AssetId extends string = string> = {
   version: number;
   format?: typeof ASSET_MANIFEST_FORMAT;
+  /** Deprecated persisted room IDs mapped to canonical IDs at load time. */
+  roomIdAliases?: Readonly<Record<string, string>>;
   grid?: ManifestGridSpec;
   projection?: {
     type?: string;
@@ -327,6 +329,19 @@ export const collectAssetManifestIssues = (
   const isV5 = isFiniteNumber(value.version) && value.version >= ASSET_MANIFEST_VERSION;
   if (isV5 && value.format !== ASSET_MANIFEST_FORMAT) {
     issues.push(`format must be "${ASSET_MANIFEST_FORMAT}" for v5`);
+  }
+
+  if (value.roomIdAliases !== undefined) {
+    if (!isRecord(value.roomIdAliases)) {
+      issues.push("roomIdAliases must map legacy room IDs to canonical room IDs");
+    } else {
+      for (const [legacyId, canonicalId] of Object.entries(value.roomIdAliases)) {
+        if (legacyId.trim() === "" || typeof canonicalId !== "string" || canonicalId.trim() === "") {
+          issues.push("roomIdAliases must map non-empty room IDs to non-empty room IDs");
+          break;
+        }
+      }
+    }
   }
 
   let manifestGrid: ManifestGridSpec | undefined;

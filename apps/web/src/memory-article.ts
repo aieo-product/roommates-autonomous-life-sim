@@ -3,9 +3,7 @@ import type { DecisionType, GameEvent, Memory, Phase } from "./types.js";
 
 const PHASES: Phase[] = ["morning", "afternoon", "evening", "night"];
 
-const ROOM_LOCATIONS: Record<RoomId, string> = {
-  haru_room: "Haruの自室",
-  aoi_room: "Aoiの自室",
+const SHARED_ROOM_LOCATIONS: Omit<Record<RoomId, string>, "male_room" | "female_room"> = {
   entry: "玄関",
   washroom: "洗面室",
   hallway: "廊下",
@@ -78,10 +76,20 @@ export function findEventForMemory(
   );
 }
 
-export function buildMemoryArticle(memory: Memory, events: GameEvent[]): MemoryArticle {
+export function buildMemoryArticle(
+  memory: Memory,
+  events: GameEvent[],
+  characterNames: Record<"haru" | "aoi", string> = { haru: "住人1", aoi: "住人2" },
+): MemoryArticle {
   const event = findEventForMemory(memory, events);
   const inferredRoom = event ? roomForEvent(event) : undefined;
-  const inferredLocation = inferredRoom ? ROOM_LOCATIONS[inferredRoom] : "リビング";
+  const inferredLocation = inferredRoom === "male_room"
+    ? `${characterNames.haru}の自室`
+    : inferredRoom === "female_room"
+      ? `${characterNames.aoi}の自室`
+      : inferredRoom
+        ? SHARED_ROOM_LOCATIONS[inferredRoom]
+        : "リビング";
   const haruLocation = event?.scene?.haru ?? inferredLocation;
   const aoiLocation = event?.scene?.aoi ?? inferredLocation;
 

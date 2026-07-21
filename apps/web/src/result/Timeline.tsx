@@ -5,8 +5,8 @@ import type {
   ResultMetricKey,
 } from "./types";
 import { RESULT_PHASES } from "./types";
+import { useResultCharacterNames } from "./character-names";
 import {
-  CHARACTER_NAMES,
   DECISION_LABELS,
   METRIC_LABELS,
   PHASE_LABELS,
@@ -21,11 +21,12 @@ import {
 const METRIC_KEYS: ResultMetricKey[] = ["energy", "stress", "affection", "trust", "romanticAwareness"];
 
 function EventDecision({ person, event }: { person: ResultCharacterId; event: ResultEventLogEntry }) {
+  const characterNames = useResultCharacterNames();
   const decision = decisionFor(event, person);
-  if (!decision) return <p className="result-character-heading"><strong><ResidentPortrait person={person} className="result-character-avatar is-compact" />{CHARACTER_NAMES[person]}</strong> 選択データなし</p>;
+  if (!decision) return <p className="result-character-heading"><strong><ResidentPortrait person={person} className="result-character-avatar is-compact" />{characterNames[person]}</strong> 選択データなし</p>;
   return (
     <div className={`result-timeline-decision is-${person}`}>
-      <p><strong><ResidentPortrait person={person} className="result-character-avatar is-compact" />{CHARACTER_NAMES[person]}</strong><span>{DECISION_LABELS[decision.decision]}</span></p>
+      <p><strong><ResidentPortrait person={person} className="result-character-avatar is-compact" />{characterNames[person]}</strong><span>{DECISION_LABELS[decision.decision]}</span></p>
       <p>{decision.action}</p>
       {decision.dialogue && <blockquote>「{decision.dialogue}」</blockquote>}
       {decision.publicReason && <small>公開理由：{decision.publicReason}</small>}
@@ -34,6 +35,7 @@ function EventDecision({ person, event }: { person: ResultCharacterId; event: Re
 }
 
 function EventDeltas({ event }: { event: ResultEventLogEntry }) {
+  const characterNames = useResultCharacterNames();
   if (!event.appliedEffects) return null;
   return (
     <div className="result-timeline-deltas">
@@ -42,7 +44,7 @@ function EventDeltas({ event }: { event: ResultEventLogEntry }) {
           .map((metric) => [metric, event.appliedEffects?.[person]?.[metric]] as const)
           .filter((entry): entry is readonly [ResultMetricKey, number] => typeof entry[1] === "number" && entry[1] !== 0);
         return entries.length > 0 ? (
-          <p key={person}><strong>{CHARACTER_NAMES[person]}の実変化</strong>{entries.map(([metric, value]) => `${METRIC_LABELS[metric]} ${metricDeltaLabel(value)}`).join("、")}</p>
+          <p key={person}><strong>{characterNames[person]}の実変化</strong>{entries.map(([metric, value]) => `${METRIC_LABELS[metric]} ${metricDeltaLabel(value)}`).join("、")}</p>
         ) : null;
       })}
     </div>
@@ -50,6 +52,7 @@ function EventDeltas({ event }: { event: ResultEventLogEntry }) {
 }
 
 function TimelineEvent({ event }: { event: ResultEventLogEntry }) {
+  const characterNames = useResultCharacterNames();
   const flags = safetyFlagsFor(event);
   const relationshipChanged = event.relationshipBefore && event.relationshipAfter && event.relationshipBefore !== event.relationshipAfter;
   const conflictsAdded = event.conflictUpdate?.added?.map((item) => item.summary ?? item.id) ?? event.conflictUpdate?.add ?? [];
@@ -63,7 +66,7 @@ function TimelineEvent({ event }: { event: ResultEventLogEntry }) {
         <span className="result-timeline-choice-summary">
           {(["haru", "aoi"] as ResultCharacterId[]).map((person) => {
             const decision = decisionFor(event, person);
-            return <small key={person}>{CHARACTER_NAMES[person]}：{decision ? DECISION_LABELS[decision.decision] : "記録なし"}</small>;
+            return <small key={person}>{characterNames[person]}：{decision ? DECISION_LABELS[decision.decision] : "記録なし"}</small>;
           })}
         </span>
       </summary>

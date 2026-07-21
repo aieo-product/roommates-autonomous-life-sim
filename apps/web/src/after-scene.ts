@@ -2,11 +2,18 @@ import {
   characterAnchor,
   characterDestinationForLocation,
   characterDetourCandidates,
+  projectCharacterFloorPoint,
   roomForLocation,
+  safeWorldDestination,
   type CharacterId,
   type GridObstacle,
   type Point,
 } from "./room-layout.js";
+import {
+  findAssetInteractionAnchor,
+  interactionStandPoint,
+  type AssetInteractionAnchor,
+} from "./asset-interactions.js";
 import type {
   CharacterState,
   EventConversationTurn,
@@ -220,6 +227,7 @@ export const createAfterScenePlan = (
   game: GameState,
   turnStart?: Partial<Record<CharacterId, CharacterState>>,
   obstacles: readonly GridObstacle[] = [],
+  interactionAnchors: readonly AssetInteractionAnchor[] = [],
 ): AfterScenePlan => {
   const startingLocations: Record<CharacterId, string> = {
     haru: locationFor(event, "haru", "before", turnStart?.haru ?? game.haru),
@@ -246,9 +254,23 @@ export const createAfterScenePlan = (
     if (beat.kind === "move") {
       const movingPeople = new Set(actorsFor(beat.actor));
       const targets = copyPoints(points);
+      const targetAnchors: Partial<Record<CharacterId, AssetInteractionAnchor>> = {};
       for (const person of PEOPLE) {
         if (movingPeople.has(person)) {
-          targets[person] = pointForLocation(person, beat.location, obstacles);
+          const currentRoom = roomForLocation(locations[person], person);
+          const anchor = findAssetInteractionAnchor(beat.location, interactionAnchors, currentRoom)
+            ?? findAssetInteractionAnchor(beat.location, interactionAnchors);
+          if (anchor) {
+            targetAnchors[person] = anchor;
+            targets[person] = projectCharacterFloorPoint(safeWorldDestination(
+              person,
+              anchor.roomId,
+              interactionStandPoint(anchor, person),
+              obstacles,
+            ));
+          } else {
+            targets[person] = pointForLocation(person, beat.location, obstacles);
+          }
         }
       }
       const detouringPeople = new Set(PEOPLE.filter((person) => {
@@ -274,7 +296,14 @@ export const createAfterScenePlan = (
           const start = { ...points[person] };
           const previous = lastTravelDirections[person] ?? directions[person];
           const end = detouringPeople.has(person)
-            ? detourPointFor(person, beat.location, start, targets[person], previous, obstacles)
+            ? detourPointFor(
+                person,
+                targetAnchors[person]?.roomId ?? beat.location,
+                start,
+                targets[person],
+                previous,
+                obstacles,
+              )
             : start;
           const hasTravel = Math.hypot(end.x - start.x, end.y - start.y) >= 1;
           const direction = hasTravel ? directionForTravel(start, end) : directions[person];
@@ -305,7 +334,7 @@ export const createAfterScenePlan = (
         routes[person] = { start, end, direction, hasTravel };
         if (movingPeople.has(person)) {
           points[person] = end;
-          locations[person] = beat.location;
+          locations[person] = targetAnchors[person]?.roomId ?? beat.location;
           directions[person] = direction;
           if (hasTravel) lastTravelDirections[person] = direction;
         }
@@ -315,9 +344,60 @@ export const createAfterScenePlan = (
         routes,
         points: copyPoints(points),
         directions: copyDirections(directions),
-        focusLocation: beat.location,
+        focusLocation: targetAnchors.haru?.label
+          ?? targetAnchors.aoi?.label
+          ?? beat.location,
       });
       return;
+    }
+
+    if (beat.kind === "action" && interactionAnchors.length > 0) {
+      const actionPeople = new Set(actorsFor(beat.actor));
+      const routes = {} as Record<CharacterId, ResidentRoute>;
+      let hasInteractionTravel = false;
+      let focusLocation: string | undefined;
+
+      for (const person of PEOPLE) {
+        const start = { ...points[person] };
+        const currentRoom = roomForLocation(locations[person], person);
+        const anchor = actionPeople.has(person)
+          ? findAssetInteractionAnchor(beat.action, interactionAnchors, currentRoom)
+            ?? findAssetInteractionAnchor(beat.action, interactionAnchors)
+          : undefined;
+        const end = anchor
+          ? projectCharacterFloorPoint(safeWorldDestination(
+              person,
+              anchor.roomId,
+              interactionStandPoint(anchor, person),
+              obstacles,
+            ))
+          : start;
+        const hasTravel = Math.hypot(end.x - start.x, end.y - start.y) >= 1;
+        const direction = hasTravel ? directionForTravel(start, end) : directions[person];
+        routes[person] = { start, end, direction, hasTravel };
+        if (anchor) {
+          points[person] = end;
+          locations[person] = anchor.roomId;
+          directions[person] = direction;
+          focusLocation ??= anchor.label || anchor.id;
+          if (hasTravel) {
+            hasInteractionTravel = true;
+            lastTravelDirections[person] = direction;
+          }
+        }
+      }
+
+      if (hasInteractionTravel) {
+        beats.push({
+          kind: "move",
+          actor: beat.actor,
+          location: focusLocation ?? beat.action,
+          routes,
+          points: copyPoints(points),
+          directions: copyDirections(directions),
+          focusLocation: focusLocation ?? beat.action,
+        });
+      }
     }
 
     const focusPerson = beat.actor === "both" ? "haru" : beat.actor;

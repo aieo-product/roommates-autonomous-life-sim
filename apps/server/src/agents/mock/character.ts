@@ -9,6 +9,7 @@ import type {
   DecisionKind,
   ProposalTag,
 } from "@roommates/shared";
+import { characterDisplayName, otherCharacterId } from "@roommates/shared";
 import { jitter } from "./seed.js";
 
 const affinity: Record<CharacterId, Partial<Record<ProposalTag, number>>> = {
@@ -33,7 +34,12 @@ function primaryTag(input: CharacterDecisionInput): ProposalTag {
   return input.suggestion.tags.find((tag) => tag !== "pressure") ?? input.suggestion.tags[0] ?? "other";
 }
 
-function dialogue(id: CharacterId, decision: DecisionKind, tag: ProposalTag): string {
+function dialogue(
+  id: CharacterId,
+  decision: DecisionKind,
+  tag: ProposalTag,
+  otherName: string,
+): string {
   if (decision === "DECLINE") return id === "haru" ? "ごめん、今日は少し一人でいたい。" : "今は無理しないほうがよさそう。別のときにしよ？";
   if (decision === "IGNORE") return id === "haru" ? "……今日は自分のことを片付けよう。" : "今はちょっと、別のことがしたいかな。";
   if (decision === "MODIFY") {
@@ -43,7 +49,11 @@ function dialogue(id: CharacterId, decision: DecisionKind, tag: ProposalTag): st
   }
   if (decision === "INITIATE") return id === "haru" ? "よかったら、少し一緒に過ごさない？" : "ねえ、せっかくだし二人で何かしようよ。";
   if (tag === "cook") return id === "haru" ? "簡単なものなら、一緒に作る？" : "味見係だけじゃなくて、私も手伝う！";
-  if (tag === "movie") return id === "haru" ? "Aoiが見たいもの、選んでいいよ。" : "飲み物を用意して、映画会にしよう。";
+  if (tag === "movie") {
+    return id === "haru"
+      ? `${otherName}が見たいもの、選んでいいよ。`
+      : "飲み物を用意して、映画会にしよう。";
+  }
   if (tag === "confession") return id === "haru" ? "急がず、自分の言葉で考えたい。" : "本当の気持ちなら、ちゃんと向き合いたい。";
   return id === "haru" ? "うん、やってみようか。" : "いいね。楽しそう！";
 }
@@ -53,8 +63,9 @@ function personalizedDialogue(
   decision: DecisionKind,
   tag: ProposalTag,
   character: CharacterDefinition,
+  otherName: string,
 ): string {
-  const base = dialogue(id, decision, tag);
+  const base = dialogue(id, decision, tag, otherName);
   if (character.personality.expressiveness >= 70) {
     return base.replace(/。$/, "！");
   }
@@ -145,6 +156,10 @@ export class MockCharacterAgent implements CharacterAgent {
     const tag = primaryTag(input);
     const self = input.self;
     const { personality, profile } = input.character;
+    const otherName = characterDisplayName(
+      input.snapshot.characterRoster,
+      otherCharacterId(this.id),
+    );
     const pressure = input.suggestion.tags.includes("pressure");
     const key = `${input.snapshot.seed}:${input.snapshot.shared.day}:${input.snapshot.shared.phase}:${this.id}:${input.suggestion.text}`;
 
@@ -170,7 +185,13 @@ export class MockCharacterAgent implements CharacterAgent {
         dialogue:
           decision === "INITIATE" && candidate && invitation
             ? autonomousDialogue(this.id, candidate, invitation)
-            : personalizedDialogue(this.id, decision, "rest", input.character),
+            : personalizedDialogue(
+                this.id,
+                decision,
+                "rest",
+                input.character,
+                otherName,
+              ),
         publicReason:
           decision === "INITIATE" && candidate
             ? `${profile.likes[0]}など、自分の好きな過ごし方に近いから`
@@ -222,7 +243,7 @@ export class MockCharacterAgent implements CharacterAgent {
     return {
       decision,
       action,
-      dialogue: personalizedDialogue(this.id, decision, tag, input.character),
+      dialogue: personalizedDialogue(this.id, decision, tag, input.character, otherName),
       publicReason:
         decision === "ACCEPT"
           ? `${profile.likes[0]}のように、二人で楽しめそうだから`
@@ -232,8 +253,8 @@ export class MockCharacterAgent implements CharacterAgent {
       internalSummary:
         decision === "ACCEPT" || decision === "MODIFY"
           ? this.id === "haru"
-            ? "Aoiと近づきたいが、自然なペースを守りたい"
-            : "Haruがどう応えてくれるか楽しみにしている"
+            ? "相手と近づきたいが、自然なペースを守りたい"
+            : "相手がどう応えてくれるか楽しみにしている"
           : this.id === "haru"
             ? "断ることで嫌われないか、少し気になっている"
             : "強制されるより、自分で選べる関係を大切にしたい",

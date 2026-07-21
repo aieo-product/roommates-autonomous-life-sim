@@ -1,5 +1,6 @@
 import type {
   CharacterId,
+  CharacterRoster,
   Ending,
   MutableStatKey,
   Phase,
@@ -7,6 +8,7 @@ import type {
   ResultHighlight,
   ResultNarrative,
 } from "@roommates/shared";
+import { characterDisplayName } from "@roommates/shared";
 import { selectHighlights } from "./highlights.js";
 import {
   CHARACTER_IDS,
@@ -53,24 +55,24 @@ function sentence(value: string): string {
   return /[。！？!?]$/.test(trimmed) ? trimmed : `${trimmed}。`;
 }
 
-function characterName(characterId: CharacterId): string {
-  return characterId === "haru" ? "Haru" : "Aoi";
-}
-
 function decisionSentence(
   entry: StructuredEventLogEntry,
   characterId: CharacterId,
+  characterRoster?: CharacterRoster,
 ): string | undefined {
   const decision = decisionFor(entry, characterId);
   if (!decision) return undefined;
   const action = decision.action.trim();
   const reason = decision.publicReason.trim();
-  return `${characterName(characterId)}は${decision.decision}を選び${
+  return `${characterDisplayName(characterRoster, characterId)}は${decision.decision}を選び${
     action ? `、${action}` : ""
   }${reason ? `。理由は${reason}` : ""}`;
 }
 
-function effectSentence(entry: StructuredEventLogEntry): string | undefined {
+function effectSentence(
+  entry: StructuredEventLogEntry,
+  characterRoster?: CharacterRoster,
+): string | undefined {
   if (!entry.appliedEffects) return undefined;
   const characterParts = CHARACTER_IDS.flatMap((characterId) => {
     const effects = entry.appliedEffects?.[characterId];
@@ -78,12 +80,17 @@ function effectSentence(entry: StructuredEventLogEntry): string | undefined {
     const changes = (Object.entries(effects) as Array<[MutableStatKey, number | undefined]>)
       .filter(([, value]) => value !== undefined && value !== 0)
       .map(([key, value]) => `${STAT_LABELS[key]} ${value! > 0 ? "+" : ""}${value}`);
-    return changes.length > 0 ? [`${characterName(characterId)}は${changes.join("、")}`] : [];
+    return changes.length > 0
+      ? [`${characterDisplayName(characterRoster, characterId)}は${changes.join("、")}`]
+      : [];
   });
   return characterParts.length > 0 ? `実際の変化は、${characterParts.join("。")}` : undefined;
 }
 
-function stateAndMemorySentences(entry: StructuredEventLogEntry): string[] {
+function stateAndMemorySentences(
+  entry: StructuredEventLogEntry,
+  characterRoster?: CharacterRoster,
+): string[] {
   const parts: string[] = [];
   if (relationshipChanged(entry)) {
     parts.push(
@@ -92,7 +99,7 @@ function stateAndMemorySentences(entry: StructuredEventLogEntry): string[] {
       }」へ変わった`,
     );
   }
-  const effect = effectSentence(entry);
+  const effect = effectSentence(entry, characterRoster);
   if (effect) parts.push(effect);
   if (entry.memory) {
     parts.push(`「${entry.memory.title}」が共有記憶として残った。${entry.memory.summary}`);
@@ -106,11 +113,16 @@ function stateAndMemorySentences(entry: StructuredEventLogEntry): string[] {
   return parts;
 }
 
-function describeEntry(entry: StructuredEventLogEntry): string {
-  const decisions = CHARACTER_IDS.map((id) => decisionSentence(entry, id)).filter(
+function describeEntry(
+  entry: StructuredEventLogEntry,
+  characterRoster?: CharacterRoster,
+): string {
+  const decisions = CHARACTER_IDS.map((id) =>
+    decisionSentence(entry, id, characterRoster)
+  ).filter(
     (value): value is string => Boolean(value),
   );
-  const facts = stateAndMemorySentences(entry);
+  const facts = stateAndMemorySentences(entry, characterRoster);
   return [
     `${PHASE_LABELS[entry.phase]}の「${entry.eventTitle}」。`,
     sentence(entry.narration),
@@ -159,6 +171,7 @@ function buildDaySection(
   day: number,
   entries: StructuredEventLogEntry[],
   highlights: readonly ResultHighlight[],
+  characterRoster?: CharacterRoster,
 ): ResultNarrative["daySections"][number] {
   const featured = chooseFeatured(entries, highlights);
   if (!featured) {
@@ -177,13 +190,15 @@ function buildDaySection(
   const remaining = entries.filter((entry) => entry.id !== featured.id);
   const paragraphs: ResultNarrative["daySections"][number]["paragraphs"] = [
     {
-      text: describeEntry(featured),
+      text: describeEntry(featured, characterRoster),
       sourceEventLogIds: [featured.id],
     },
   ];
   if (remaining.length > 0) {
     paragraphs.push({
-      text: `この日のほかの場面。${remaining.map(describeEntry).join("")}`,
+      text: `この日のほかの場面。${remaining
+        .map((entry) => describeEntry(entry, characterRoster))
+        .join("")}`,
       sourceEventLogIds: remaining.map((entry) => entry.id),
     });
   }
@@ -204,9 +219,10 @@ export function buildResultNarrative(
   input: readonly StructuredEventLogEntry[],
   ending: Ending,
   providedHighlights?: readonly ResultHighlight[],
+  characterRoster?: CharacterRoster,
 ): ResultNarrative {
   const eventLog = sortEventLog(input);
-  const highlights = providedHighlights ?? selectHighlights(eventLog);
+  const highlights = providedHighlights ?? selectHighlights(eventLog, 4, characterRoster);
   const first = eventLog[0];
   const last = eventLog[eventLog.length - 1];
   const leadSources = [first?.id, ...highlights.flatMap((item) => item.eventLogIds)]
@@ -221,7 +237,7 @@ export function buildResultNarrative(
     const dayHighlights = highlights.filter((highlight) =>
       highlight.eventLogIds.some((id) => dayIds.has(id)),
     );
-    return buildDaySection(day, entries, dayHighlights);
+    return buildDaySection(day, entries, dayHighlights, characterRoster);
   });
 
   const firstRelationship = first ? RELATIONSHIP_LABELS[relationshipBefore(first)] : undefined;

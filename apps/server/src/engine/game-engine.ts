@@ -23,6 +23,8 @@ import type {
 } from "@roommates/shared";
 import {
   DEFAULT_CHARACTER_SETTINGS,
+  characterDisplayName,
+  createCharacterRoster,
   createInitialGameState,
   mutableStatKeys,
 } from "@roommates/shared";
@@ -268,6 +270,7 @@ export class GameEngine {
     if (revision !== this.state.revision) throw new GameConflictError("ゲーム状態が更新されています。再読み込みしてください");
 
     const before = this.getState();
+    const characterRoster = createCharacterRoster(characterSettings);
     const suggestion = deepFreeze(resolveSuggestion(rawSuggestion, before));
     const eventDefinition = EVENT_DEFINITIONS_BY_ID.get(suggestion.eventDefinitionId);
     if (!eventDefinition) {
@@ -278,6 +281,7 @@ export class GameEngine {
     const snapshot = deepFreeze<GameSnapshot>({
       seed: before.seed,
       revision: before.revision,
+      characterRoster: structuredClone(characterRoster),
       characters: {
         haru: structuredClone(before.characters.haru.state),
         aoi: structuredClone(before.characters.aoi.state),
@@ -338,8 +342,16 @@ export class GameEngine {
         };
       };
 
-      emit({ type: "agent.thinking", agent: "haru", message: "Haru is thinking…" });
-      emit({ type: "agent.thinking", agent: "aoi", message: "Aoi is thinking…" });
+      emit({
+        type: "agent.thinking",
+        agent: "haru",
+        message: `${characterDisplayName(characterRoster, "haru")} is thinking…`,
+      });
+      emit({
+        type: "agent.thinking",
+        agent: "aoi",
+        message: `${characterDisplayName(characterRoster, "aoi")} is thinking…`,
+      });
       const navigatorTask = async (): Promise<AgentResult<NavigatorAgentOutput>> => {
         if (inputMethod === "fast_forward") {
           return {
@@ -417,13 +429,13 @@ export class GameEngine {
       emit({
         type: "agent.completed",
         agent: "haru",
-        message: `Haru: ${haruDecision.decision}`,
+        message: `${characterDisplayName(characterRoster, "haru")}: ${haruDecision.decision}`,
         data: toPublicDecision(haruDecision),
       });
       emit({
         type: "agent.completed",
         agent: "aoi",
-        message: `Aoi: ${aoiDecision.decision}`,
+        message: `${characterDisplayName(characterRoster, "aoi")}: ${aoiDecision.decision}`,
         data: toPublicDecision(aoiDecision),
       });
       if (haru.runtime.source === "fallback" || aoi.runtime.source === "fallback") {
@@ -454,6 +466,7 @@ export class GameEngine {
               haru: snapshot.characters.haru.location,
               aoi: snapshot.characters.aoi.location,
             },
+            characterRoster,
           },
         );
       let resolved = {
@@ -489,8 +502,18 @@ export class GameEngine {
       }
 
       const positive = resolved.memory.emotionalImpact > 0;
-      nextCharacters.haru = decorateCharacterState(nextCharacters.haru, "haru", positive);
-      nextCharacters.aoi = decorateCharacterState(nextCharacters.aoi, "aoi", positive);
+      nextCharacters.haru = decorateCharacterState(
+        nextCharacters.haru,
+        "haru",
+        positive,
+        characterRoster,
+      );
+      nextCharacters.aoi = decorateCharacterState(
+        nextCharacters.aoi,
+        "aoi",
+        positive,
+        characterRoster,
+      );
       nextCharacters.haru.currentGoal = haruDecision.action;
       nextCharacters.aoi.currentGoal = aoiDecision.action;
       const isLastTurn = before.shared.day === 7 && before.shared.phase === "night";
@@ -514,6 +537,7 @@ export class GameEngine {
       const cueOutcome: CueResolutionOutcome = navigatorResponse.outcome;
       const nextState: GameState = {
         ...before,
+        characterRoster,
         revision: before.revision + 1,
         status: isLastTurn ? "ended" : "resolved",
         turnId,
@@ -631,7 +655,11 @@ export class GameEngine {
 
     let producer: ReturnType<typeof buildProducerResult>;
     try {
-      producer = buildProducerResult(terminalState.eventLog, terminalState.ending);
+      producer = buildProducerResult(
+        terminalState.eventLog,
+        terminalState.ending,
+        terminalState.characterRoster,
+      );
     } catch {
       safeEmit(emit, {
         type: "warning",
@@ -680,6 +708,7 @@ export class GameEngine {
         terminalState.eventLog,
         terminalState.ending,
         producer.highlights,
+        terminalState.characterRoster,
       );
     } catch {
       failures.push({
@@ -706,12 +735,17 @@ export class GameEngine {
       safeEmit(emit, {
         type: "agent.reflecting",
         agent: id,
-        message: `${id === "haru" ? "Haru" : "Aoi"}が7日間を振り返っています`,
+        message: `${characterDisplayName(terminalState.characterRoster, id)}が7日間を振り返っています`,
       });
 
       let input: ReturnType<typeof buildAgentReflectionInput>;
       try {
-        input = buildAgentReflectionInput(terminalState, id, highlightIds);
+        input = buildAgentReflectionInput(
+          terminalState,
+          id,
+          highlightIds,
+          terminalState.characterRoster,
+        );
       } catch {
         return {
           failure: {
@@ -748,7 +782,7 @@ export class GameEngine {
         safeEmit(emit, {
           type: "agent.reflected",
           agent: id,
-          message: `${id === "haru" ? "Haru" : "Aoi"}の振り返りが届きました`,
+          message: `${characterDisplayName(terminalState.characterRoster, id)}の振り返りが届きました`,
           data: value,
         });
         return reflected.runtime.source === "fallback" && reflected.runtime.error
@@ -843,6 +877,7 @@ export class GameEngine {
         terminalState.eventLog,
         terminalState.ending,
         generating.producer.highlights,
+        terminalState.characterRoster,
       );
     } catch {
       failures.push({
@@ -859,7 +894,12 @@ export class GameEngine {
     for (const id of ["haru", "aoi"] as const) {
       const component = `${id}_reflection` as const;
       try {
-        const input = buildAgentReflectionInput(terminalState, id, highlightIds);
+        const input = buildAgentReflectionInput(
+          terminalState,
+          id,
+          highlightIds,
+          terminalState.characterRoster,
+        );
         reflections[id] = {
           ...fallbackAgentReflection(input),
           runtime: {

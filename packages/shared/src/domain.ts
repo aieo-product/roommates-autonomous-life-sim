@@ -278,6 +278,8 @@ export type CharacterDecision = {
 export type GameSnapshot = {
   seed: string;
   revision: number;
+  /** Public display metadata; actor keys remain the stable `haru` / `aoi` slots. */
+  characterRoster?: import("./personality.js").CharacterRoster;
   characters: Record<CharacterId, CharacterState>;
   shared: SharedState;
 };
@@ -560,6 +562,11 @@ export type CharacterRecord = {
 export type GameState = {
   version: 2;
   seed: string;
+  /**
+   * Last validated public character presentation used for this run.
+   * Optional so saves created before the replaceable-character contract load.
+   */
+  characterRoster?: import("./personality.js").CharacterRoster;
   /** Rotates on reset so a new game never reuses private agent conversation history. */
   agentEpoch?: number;
   revision: number;

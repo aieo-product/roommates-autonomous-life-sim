@@ -5,9 +5,11 @@ import {
   ROOM_STAND_SPOTS,
   ROOM_TURN_SPOTS,
   characterAnchor,
+  normalizeRoomId,
   projectCharacterFloorPoint,
   roomForEvent,
   roomForLocation,
+  safeWorldDestination,
   worldDestinationForLocation,
 } from "../../web/src/room-layout.js";
 import type { CharacterState, GameEvent } from "../../web/src/types.js";
@@ -109,8 +111,8 @@ const state = (location: string): CharacterState => ({
 describe("whole-apartment UI layout contract", () => {
   it("contains every canonical room and the L-shaped hallway leg", () => {
     expect(ROOM_ZONES.map((zone) => zone.id)).toEqual([
-      "haru_room",
-      "aoi_room",
+      "male_room",
+      "female_room",
       "entry",
       "washroom",
       "hallway",
@@ -127,11 +129,20 @@ describe("whole-apartment UI layout contract", () => {
   });
 
   it("maps each person's generic private room independently", () => {
-    expect(roomForLocation("自室", "haru")).toBe("haru_room");
-    expect(roomForLocation("自室", "aoi")).toBe("aoi_room");
-    expect(roomForLocation("作業机", "haru")).toBe("haru_room");
-    expect(roomForLocation("デスク", "aoi")).toBe("aoi_room");
-    expect(roomForLocation("Aoiのデスク", "haru")).toBe("aoi_room");
+    expect(roomForLocation("自室", "haru")).toBe("male_room");
+    expect(roomForLocation("自室", "aoi")).toBe("female_room");
+    expect(roomForLocation("作業机", "haru")).toBe("male_room");
+    expect(roomForLocation("デスク", "aoi")).toBe("female_room");
+    expect(roomForLocation("Aoiのデスク", "haru")).toBe("female_room");
+  });
+
+  it("normalizes legacy and misspelled private-room IDs at the input boundary", () => {
+    expect(normalizeRoomId("haru_room")).toBe("male_room");
+    expect(normalizeRoomId("aoi_room")).toBe("female_room");
+    expect(normalizeRoomId("famale_room")).toBe("female_room");
+    expect(normalizeRoomId("female_room")).toBe("female_room");
+    expect(roomForLocation("haru_room", "aoi")).toBe("male_room");
+    expect(roomForLocation("famale_room", "haru")).toBe("female_room");
   });
 
   it("maps shared laundry destinations to the balcony", () => {
@@ -163,7 +174,7 @@ describe("whole-apartment UI layout contract", () => {
     const aoi = characterAnchor("aoi", state("リビング"));
 
     expect(haru).not.toEqual(aoi);
-    expect(roomForLocation("自室", "haru")).toBe("haru_room");
+    expect(roomForLocation("自室", "haru")).toBe("male_room");
     expect(roomForLocation("リビング", "aoi")).toBe("living");
   });
 
@@ -209,6 +220,24 @@ describe("whole-apartment UI layout contract", () => {
     expect(adjusted.x).toBeLessThanOrEqual(6.5);
     expect(adjusted.y).toBeGreaterThanOrEqual(8.5);
     expect(adjusted.y).toBeLessThanOrEqual(15.5);
+  });
+
+  it("safely resolves an arbitrary asset-derived world point through the public helper", () => {
+    const preferred = { x: 2, y: 11 };
+    const adjusted = safeWorldDestination("haru", "kitchen", preferred, [{
+      roomId: "kitchen",
+      x: 1.5,
+      y: 10.5,
+      width: 1,
+      depth: 1,
+    }]);
+
+    expect(adjusted).not.toEqual(preferred);
+    expectWalkable("kitchen", adjusted, "safeWorldDestination");
+
+    const outsideRoom = safeWorldDestination("aoi", "kitchen", { x: 99, y: 99 }, []);
+    expect(outsideRoom).toEqual(ROOM_STAND_SPOTS.kitchen.aoi);
+    expectWalkable("kitchen", outsideRoom, "safeWorldDestination.outsideRoom");
   });
 
   it("keeps every resident stand, turn, and named destination off furniture and blocked paths", () => {

@@ -17,7 +17,7 @@ import {
   relationshipLabels,
   storyBeatActors,
 } from "./domain.js";
-import { characterSettingsSchema } from "./personality.js";
+import { characterRosterSchema, characterSettingsSchema } from "./personality.js";
 
 const text = z.string().trim().min(1).max(2_000);
 const cueText = z.string().trim().min(1).max(240);
@@ -772,6 +772,7 @@ const gameStateV2Schema = z
   .object({
     version: z.literal(2),
     seed: text,
+    characterRoster: characterRosterSchema.optional(),
     agentEpoch: z.number().int().nonnegative().optional(),
     revision: z.number().int().nonnegative(),
     status: z.enum(["awaiting_suggestion", "resolving", "resolved", "ended"]),

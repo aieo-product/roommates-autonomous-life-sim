@@ -131,14 +131,14 @@ describe("resident character asset manifest", () => {
 
     expect(manifest.characters.find(({ id }) => id === "otani-haru")).toMatchObject({
       name: "オータニ ハル",
-      role: "resident",
+      role: "male",
       animationPreset: "walk",
       portrait: "otani-haru/portraits/ui-bust-v2.png",
       sheet: "otani-haru/walk-cycle.png",
     });
     expect(manifest.characters.find(({ id }) => id === "mizuhara-aoi")).toMatchObject({
       name: "ミズハラ アオイ",
-      role: "resident",
+      role: "female",
       animationPreset: "walk",
       portrait: "mizuhara-aoi/portraits/ui-bust-v2.png",
       sheet: "mizuhara-aoi/walk-cycle.png",

@@ -104,9 +104,10 @@ export function useCharacterSettings(): CharacterSettingsController {
   };
 
   const resetCharacter = (id: CharacterId): void => {
+    const displayName = settings.characters[id].profile.name;
     setSettings((current) => resetCharacterSetting(current, id));
     setError(undefined);
-    setMessage(`${id === "haru" ? "Haru" : "Aoi"}を初期値へ戻しました。保存すると反映されます。`);
+    setMessage(`${displayName}を初期値へ戻しました。保存すると反映されます。`);
   };
 
   const resetAll = (): void => {

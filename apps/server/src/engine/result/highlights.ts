@@ -1,4 +1,9 @@
-import type { ResultHighlight, ResultHighlightKind } from "@roommates/shared";
+import type {
+  CharacterRoster,
+  ResultHighlight,
+  ResultHighlightKind,
+} from "@roommates/shared";
+import { characterDisplayName } from "@roommates/shared";
 import {
   decisionFor,
   eventTier,
@@ -90,7 +95,10 @@ function isRespectedFollowUp(
   );
 }
 
-function buildCandidates(eventLog: StructuredEventLogEntry[]): HighlightCandidate[] {
+function buildCandidates(
+  eventLog: StructuredEventLogEntry[],
+  characterRoster?: CharacterRoster,
+): HighlightCandidate[] {
   const candidates: HighlightCandidate[] = [];
   const conflictCreators = new Map<string, StructuredEventLogEntry>();
 
@@ -148,9 +156,7 @@ function buildCandidates(eventLog: StructuredEventLogEntry[]): HighlightCandidat
       const initiativeSubject =
         initiators.length === 2
           ? "二人"
-          : initiators[0] === "haru"
-            ? "Haru"
-            : "Aoi";
+          : characterDisplayName(characterRoster, initiators[0] ?? "haru");
       candidates.push(
         candidate(
           entry,
@@ -225,10 +231,11 @@ function stripCandidate(candidateValue: HighlightCandidate): ResultHighlight {
 export function selectHighlights(
   input: readonly StructuredEventLogEntry[],
   limit = 4,
+  characterRoster?: CharacterRoster,
 ): ResultHighlight[] {
   if (limit <= 0) return [];
   const eventLog = sortEventLog(input);
-  const remaining = buildCandidates(eventLog).sort(compareCandidates);
+  const remaining = buildCandidates(eventLog, characterRoster).sort(compareCandidates);
   const selected: HighlightCandidate[] = [];
   const selectedKinds = new Set<ResultHighlightKind>();
   const selectedPrimaryEvents = new Set<string>();

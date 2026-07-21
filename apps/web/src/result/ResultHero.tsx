@@ -10,7 +10,8 @@ import type {
   ResultRelationshipLabel,
   ResultStatus,
 } from "./types";
-import { CHARACTER_NAMES, RELATIONSHIP_LABELS, STYLE_LABELS } from "./utils";
+import { useResultCharacterNames } from "./character-names";
+import { RELATIONSHIP_LABELS, STYLE_LABELS } from "./utils";
 
 type ResultHeroProps = {
   ending: ResultEnding;
@@ -31,6 +32,7 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
     const managedHaru = useManagedCharacterAsset("haru");
     const managedAoi = useManagedCharacterAsset("aoi");
     const managedNavigator = useManagedCharacterAsset("navigator");
+    const characterNames = useResultCharacterNames();
 
     return (
       <header className={`result-hero result-rank-${producer.rank.toLowerCase()}`}>
@@ -46,14 +48,14 @@ export const ResultHero = forwardRef<HTMLHeadingElement, ResultHeroProps>(
             <p className="result-relationship">
               最後の関係 <strong>{RELATIONSHIP_LABELS[relationshipLabel]}</strong>
             </p>
-            <div className="result-resident-pair" role="img" aria-label={`${CHARACTER_NAMES.haru}と${CHARACTER_NAMES.aoi}`}>
+            <div className="result-resident-pair" role="img" aria-label={`${characterNames.haru}と${characterNames.aoi}`}>
               <span className="is-haru">
                 <img src={managedHaru?.portraitUrl ?? residentCharacterAssets.haru.resultUrl} alt="" />
-                <small>{CHARACTER_NAMES.haru}</small>
+                <small>{characterNames.haru}</small>
               </span>
               <span className="is-aoi">
                 <img src={managedAoi?.portraitUrl ?? residentCharacterAssets.aoi.resultUrl} alt="" />
-                <small>{CHARACTER_NAMES.aoi}</small>
+                <small>{characterNames.aoi}</small>
               </span>
             </div>
           </div>

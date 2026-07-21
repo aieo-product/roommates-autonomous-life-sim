@@ -68,7 +68,7 @@ const MAX_AGENT_WORKER_PROBE_TIMEOUT_MS = 10_000;
 const AGENT_WORKER_COORDINATOR_TIMEOUT_GRACE_MS = 5_000;
 const OPENAI_API_MODEL_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 const MAX_AGENT_WORKER_ATTEMPTS_PER_OPERATION = 2;
-// Navigator, Haru, Aoi, and director are the four remote operations that may
+// Navigator, both resident actor slots, and director are the four remote operations that may
 // run between persisted checkpoints. Count them conservatively as sequential
 // even though character decisions currently run in parallel.
 const MAX_AGENT_WORKER_OPERATIONS_PER_CHECKPOINT = 4;

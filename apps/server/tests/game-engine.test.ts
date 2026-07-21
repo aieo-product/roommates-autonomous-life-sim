@@ -191,18 +191,32 @@ describe("GameEngine", () => {
     const { engine } = await engineWith(agents);
     const settings = getDefaultCharacterSettings();
     settings.characters.haru.profile.name = "春";
+    settings.characters.aoi.profile.name = "葵子";
     settings.characters.aoi.personality.initiative = 3;
+    const streamed: StreamEvent[] = [];
 
     const result = await engine.resolveTurn(
       "一緒に夕食を作ってみたら？",
       "turn-key-personality",
       0,
-      undefined,
+      (event) => streamed.push(event),
       settings,
     );
 
     expect(agents.inputs.haru?.character.profile.name).toBe("春");
     expect(agents.inputs.aoi?.character.personality.initiative).toBe(3);
+    expect(agents.inputs.haru?.snapshot.characterRoster).toEqual({
+      haru: { id: "haru", displayName: "春", role: "male" },
+      aoi: { id: "aoi", displayName: "葵子", role: "female" },
+    });
+    expect(agents.directorInput?.snapshot.characterRoster).toEqual(
+      agents.inputs.haru?.snapshot.characterRoster,
+    );
+    expect(result.characterRoster).toEqual(agents.inputs.haru?.snapshot.characterRoster);
+    expect(streamed.filter((event) => event.type === "agent.thinking").map((event) => event.message))
+      .toEqual(["春 is thinking…", "葵子 is thinking…"]);
+    expect(streamed.filter((event) => event.type === "agent.completed").map((event) => event.message))
+      .toEqual(["春: ACCEPT", "葵子: ACCEPT"]);
     expect(agents.inputs.haru?.character).not.toBe(settings.characters.haru);
     expect(result.characters.haru.state.currentGoal).toBe(acceptedDecision.action);
     expect(result.characters.aoi.state.currentGoal).toBe(acceptedDecision.action);

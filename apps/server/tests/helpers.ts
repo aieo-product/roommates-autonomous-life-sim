@@ -47,6 +47,7 @@ export function mockResult<T>(value: T): AgentResult<T> {
 export class StaticAgentCoordinator implements AgentCoordinator {
   readonly inputs: Partial<Record<CharacterId, CharacterDecisionInput>> = {};
   navigatorInput?: NavigatorInput;
+  directorInput?: DirectorInput;
 
   constructor(
     private readonly decisions: Partial<Record<CharacterId, CharacterDecision>> = {},
@@ -69,7 +70,8 @@ export class StaticAgentCoordinator implements AgentCoordinator {
     return mockResult(this.decisions[id] ?? acceptedDecision);
   }
 
-  async resolve(_input: DirectorInput): Promise<AgentResult<ResolvedEvent>> {
+  async resolve(input: DirectorInput): Promise<AgentResult<ResolvedEvent>> {
+    this.directorInput = input;
     return mockResult(structuredClone(this.event));
   }
 }

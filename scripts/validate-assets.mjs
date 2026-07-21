@@ -35,6 +35,7 @@ const ORIENTATIONS = new Set([
   "north-west-to-south-east",
 ]);
 const CARDINAL_DIRECTIONS = ["south", "east", "north", "west"];
+const CHARACTER_ROLES = new Set(["male", "female", "navigator"]);
 const ID_PATTERN = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
 const SEMVER_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -382,11 +383,17 @@ const validateCharacterDefinition = (value, errors, source, path, options, { edi
   validateId(value.id, errors, source, jsonPath(path, "id"));
   const label = value.label ?? (editor ? value.name : undefined);
   if (!expectString(label, errors, source, jsonPath(path, "label"))) return;
-  expectString(value.role, errors, source, jsonPath(path, "role"));
+  if (expectString(value.role, errors, source, jsonPath(path, "role")) && !CHARACTER_ROLES.has(value.role)) {
+    pushError(errors, source, jsonPath(path, "role"), "must be male, female or navigator");
+  }
   if (editor) {
     expectString(value.animationPreset, errors, source, jsonPath(path, "animationPreset"));
     if (value.runtimeId !== undefined && !["haru", "aoi", "navigator"].includes(value.runtimeId)) {
       pushError(errors, source, jsonPath(path, "runtimeId"), "must be haru, aoi or navigator");
+    }
+    const expectedRole = { haru: "male", aoi: "female", navigator: "navigator" }[value.runtimeId];
+    if (expectedRole && value.role !== expectedRole) {
+      pushError(errors, source, jsonPath(path, "role"), `must be '${expectedRole}' for runtimeId '${value.runtimeId}'`);
     }
   }
   validateFootprint(value.footprintTiles, errors, source, jsonPath(path, "footprintTiles"), { character: true });
@@ -410,7 +417,7 @@ const validateCharacterDefinition = (value, errors, source, path, options, { edi
     validateImageSource(value.portraitUrl, errors, source, jsonPath(path, "portraitUrl"));
   }
 
-  if (!editor || value.spriteSheet !== undefined) {
+  if (value.spriteSheet !== undefined) {
     const sheetPath = jsonPath(path, "spriteSheet");
     if (expectRecord(value.spriteSheet, errors, source, sheetPath)) {
       rejectUnknown(value.spriteSheet, new Set([
@@ -437,6 +444,9 @@ const validateCharacterDefinition = (value, errors, source, path, options, { edi
       }
     }
   } else {
+    pushError(errors, source, jsonPath(path, "spriteSheet"), "is required");
+  }
+  if (editor) {
     validateFile(value.file, errors, source, jsonPath(path, "file"), options, undefined);
     validateImageSource(value.imageUrl ?? value.sheetUrl, errors, source, jsonPath(path, "imageUrl"));
   }
@@ -803,7 +813,9 @@ const validateLegacyCharacters = (document, errors, source, options) => {
       if (!expectRecord(character, errors, source, path)) return;
       validateId(character.id, errors, source, `${path}.id`);
       expectString(character.name, errors, source, `${path}.name`);
-      expectString(character.role, errors, source, `${path}.role`);
+      if (expectString(character.role, errors, source, `${path}.role`) && !CHARACTER_ROLES.has(character.role)) {
+        pushError(errors, source, `${path}.role`, "must be male, female or navigator");
+      }
       expectString(character.animationPreset, errors, source, `${path}.animationPreset`);
       if (!isRecord(document.animationPresets?.[character.animationPreset])) {
         pushError(errors, source, `${path}.animationPreset`, `references unknown preset '${character.animationPreset}'`);

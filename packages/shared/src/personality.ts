@@ -4,6 +4,21 @@ import type { CharacterId } from "./domain.js";
 export const characterIds = ["haru", "aoi"] as const satisfies readonly CharacterId[];
 export const characterIdSchema = z.enum(characterIds);
 
+/**
+ * Public presentation role for replaceable ROOMMATES character packs.
+ *
+ * `haru` / `aoi` remain stable save-data actor slots. A role is presentation
+ * metadata and must never be used as an actor ID or persistence key.
+ */
+export const characterRoles = ["male", "female"] as const;
+export const characterRoleSchema = z.enum(characterRoles);
+export type CharacterRole = z.infer<typeof characterRoleSchema>;
+
+const legacyDefaultRoles: Record<CharacterId, CharacterRole> = {
+  haru: "male",
+  aoi: "female",
+};
+
 export const personalityKeys = [
   "sociability",
   "compassion",
@@ -60,12 +75,48 @@ export type CharacterProfile = z.infer<typeof characterProfileSchema>;
 export const characterDefinitionSchema = z
   .object({
     id: characterIdSchema,
+    // Optional on input so v1 settings saved before roles existed still load.
+    role: characterRoleSchema.optional(),
     profile: characterProfileSchema,
     personality: personalitySchema,
   })
-  .strict();
+  .strict()
+  .transform((character) => ({
+    ...character,
+    role: character.role ?? legacyDefaultRoles[character.id],
+  }));
 
 export type CharacterDefinition = z.infer<typeof characterDefinitionSchema>;
+
+export const characterIdentitySchema = z
+  .object({
+    id: characterIdSchema,
+    displayName: z.string().trim().min(1).max(20),
+    role: characterRoleSchema,
+  })
+  .strict();
+
+export type CharacterIdentity = z.infer<typeof characterIdentitySchema>;
+
+export const characterRosterSchema = z
+  .object({
+    haru: characterIdentitySchema,
+    aoi: characterIdentitySchema,
+  })
+  .strict()
+  .superRefine((roster, context) => {
+    for (const characterId of characterIds) {
+      if (roster[characterId].id !== characterId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "キャラクターIDと表示設定の対応が一致しません。",
+          path: [characterId, "id"],
+        });
+      }
+    }
+  });
+
+export type CharacterRoster = z.infer<typeof characterRosterSchema>;
 
 export const characterSettingsSchema = z
   .object({
@@ -167,6 +218,7 @@ const defaultCharacterSettings = {
   characters: {
     haru: {
       id: "haru",
+      role: "male",
       profile: {
         name: "Haru",
         age: 27,
@@ -193,6 +245,7 @@ const defaultCharacterSettings = {
     },
     aoi: {
       id: "aoi",
+      role: "female",
       profile: {
         name: "Aoi",
         age: 26,
@@ -229,6 +282,42 @@ export function cloneCharacterSettings(settings: CharacterSettings): CharacterSe
 
 export function getDefaultCharacterSettings(): CharacterSettings {
   return cloneCharacterSettings(DEFAULT_CHARACTER_SETTINGS);
+}
+
+export function createCharacterRoster(settings: CharacterSettings): CharacterRoster {
+  return characterRosterSchema.parse({
+    haru: {
+      id: "haru",
+      displayName: settings.characters.haru.profile.name,
+      role: settings.characters.haru.role,
+    },
+    aoi: {
+      id: "aoi",
+      displayName: settings.characters.aoi.profile.name,
+      role: settings.characters.aoi.role,
+    },
+  });
+}
+
+export function getDefaultCharacterRoster(): CharacterRoster {
+  return createCharacterRoster(DEFAULT_CHARACTER_SETTINGS);
+}
+
+const genericCharacterNames: Record<CharacterId, string> = {
+  haru: "住人1",
+  aoi: "住人2",
+};
+
+/** Resolve presentation text without leaking legacy slot names as fallbacks. */
+export function characterDisplayName(
+  roster: CharacterRoster | undefined,
+  characterId: CharacterId,
+): string {
+  return roster?.[characterId].displayName ?? genericCharacterNames[characterId];
+}
+
+export function otherCharacterId(characterId: CharacterId): CharacterId {
+  return characterId === "haru" ? "aoi" : "haru";
 }
 
 export function resetCharacterToPreset(

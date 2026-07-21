@@ -18,6 +18,8 @@ import {
   validateAssetManagerDocument,
   type AssetKind,
   type AssetManagerDocument,
+  type CharacterRole,
+  type CharacterRuntimeId,
   type ManagedCharacterAsset,
   type ManagedFurnitureAsset,
   type ManagedPlacement,
@@ -102,7 +104,7 @@ const createStarterFurniture = (id: string): ManagedFurnitureAsset => ({
 const createStarterCharacter = (id: string): ManagedCharacterAsset => ({
   id,
   label: "新しいキャラクター",
-  role: "resident",
+  role: "male",
   animationPreset: "walk",
   file: `${id}/walk-cycle.png`,
   imageUrl: placeholderImage,
@@ -116,6 +118,18 @@ const createStarterCharacter = (id: string): ManagedCharacterAsset => ({
     flipX: false,
     flipY: false,
     fitScale: 1,
+  },
+  spriteSheet: {
+    file: `${id}/walk-cycle.png`,
+    canvas: { width: 384, height: 512 },
+    frameSize: { width: 128, height: 128 },
+    columns: 3,
+    rows: 4,
+    directionRows: { south: 0, east: 1, north: 2, west: 3 },
+    animations: {
+      idle: { frames: [1], frameDurationMs: 170, loop: true },
+      walk: { frames: [0, 1, 2, 1], frameDurationMs: 170, loop: true },
+    },
   },
 });
 
@@ -227,7 +241,7 @@ export function AssetManagerProvider({
       next.placements[kind].push({
         instanceId,
         assetId: id,
-        roomId: kind === "furniture" ? "living" : "haru_room",
+        roomId: kind === "furniture" ? "living" : "male_room",
         floorContact: kind === "furniture" ? { x: 18, y: 12 } : { x: 4, y: 4 },
       });
       return next;
@@ -373,16 +387,25 @@ export const useManagedCharacterScene = (): ResolvedCharacterPlacement[] => {
 };
 
 export const useManagedCharacterAsset = (
-  runtimeOrAssetId: "haru" | "aoi" | "navigator" | string,
+  runtimeOrAssetIdOrRole: CharacterRuntimeId | CharacterRole | string,
 ): ManagedCharacterAsset | undefined => {
   const { document } = useAssetManager();
   return useMemo(
-    () => document.assets.characters.find(
-      (asset) => asset.runtimeId === runtimeOrAssetId || asset.id === runtimeOrAssetId,
-    ),
-    [document, runtimeOrAssetId],
+    () => findManagedCharacterAsset(document, runtimeOrAssetIdOrRole),
+    [document, runtimeOrAssetIdOrRole],
   );
 };
+
+export const findManagedCharacterAsset = (
+  document: AssetManagerDocument,
+  runtimeOrAssetIdOrRole: CharacterRuntimeId | CharacterRole | string,
+): ManagedCharacterAsset | undefined => document.assets.characters.find(
+  (asset) => asset.runtimeId === runtimeOrAssetIdOrRole || asset.id === runtimeOrAssetIdOrRole,
+) ?? document.assets.characters.find((asset) => asset.role === runtimeOrAssetIdOrRole);
+
+export const useManagedCharacterSlot = (
+  role: CharacterRole,
+): ManagedCharacterAsset | undefined => useManagedCharacterAsset(role);
 
 export const formatImportError = (error: unknown): string => {
   if (error instanceof AssetManagerValidationError) {

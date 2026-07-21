@@ -267,7 +267,7 @@ describe("constrainResolvedEvent", () => {
 
     expect(constrained.scene).toEqual({
       haru: "リビングのソファ",
-      aoi: "自室",
+      aoi: "住人2の自室",
     });
   });
 

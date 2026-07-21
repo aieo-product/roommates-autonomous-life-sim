@@ -22,6 +22,7 @@ function snapshot(): GameSnapshot {
   return {
     seed: state.seed,
     revision: state.revision,
+    characterRoster: state.characterRoster,
     characters: {
       haru: state.characters.haru.state,
       aoi: state.characters.aoi.state,
@@ -225,5 +226,24 @@ describe("MockDirectorAgent", () => {
     expect(event.storyBeats).toEqual(
       expect.arrayContaining([expect.objectContaining({ kind: "action", actor: "both" })]),
     );
+  });
+
+  it("uses the public character roster in mock event narration", async () => {
+    const current = snapshot();
+    current.characterRoster = {
+      haru: { id: "haru", displayName: "蓮", role: "male" },
+      aoi: { id: "aoi", displayName: "凛", role: "female" },
+    };
+    const event = await new MockDirectorAgent().resolve({
+      turnId: "turn-custom-names",
+      snapshot: current,
+      suggestion: sanitizeSuggestion("一緒に料理をしよう"),
+      haruDecision: decision("ACCEPT"),
+      aoiDecision: decision("MODIFY"),
+    });
+
+    expect(event.narration).toContain("蓮は一緒に料理をする");
+    expect(event.narration).toContain("凛は一緒に料理をする");
+    expect(event.narration).not.toMatch(/Haru|Aoi/u);
   });
 });

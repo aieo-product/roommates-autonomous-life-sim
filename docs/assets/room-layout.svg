@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
   <title id="title">ROOMMATES 基本2LDK間取り図</title>
-  <desc id="desc">北側にHaruとAoiの個室、玄関、洗面所、浴室、中央に廊下、南側にキッチン、ダイニング、リビング、最南部にバルコニーを配置した間取り。</desc>
+  <desc id="desc">北側に男性キャラクターと女性キャラクターの個室、玄関、洗面所、浴室、中央に廊下、南側にキッチン、ダイニング、リビング、最南部にバルコニーを配置した間取り。</desc>
   <defs>
     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
       <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#665B52" stroke-opacity="0.12" stroke-width="1"/>
@@ -41,9 +41,9 @@
     <rect x="560" y="320" width="400" height="320" fill="#E5D6BF" fill-opacity="0.55" class="zone"/>
 
     <!-- Labels -->
-    <text x="160" y="93" class="label" font-size="24">Haruの個室</text>
+    <text x="160" y="93" class="label" font-size="24">男性キャラの個室</text>
     <text x="160" y="120" class="sub">PRIVATE / 8 × 6</text>
-    <text x="480" y="93" class="label" font-size="24">Aoiの個室</text>
+    <text x="480" y="93" class="label" font-size="24">女性キャラの個室</text>
     <text x="480" y="120" class="sub">PRIVATE / 8 × 6</text>
     <text x="700" y="49" class="label" font-size="22">玄関</text>
     <text x="700" y="75" class="sub">3 × 3</text>

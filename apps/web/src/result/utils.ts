@@ -8,11 +8,6 @@ import type {
   ResultRelationshipLabel,
 } from "./types";
 
-export const CHARACTER_NAMES: Record<ResultCharacterId, string> = {
-  haru: "Haru",
-  aoi: "Aoi",
-};
-
 export const PHASE_LABELS: Record<ResultPhase, string> = {
   morning: "朝",
   afternoon: "昼",

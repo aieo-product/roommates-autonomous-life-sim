@@ -152,6 +152,23 @@ describe("asset manifest validation", () => {
     expect(() => validateAssetManifest(v5Manifest)).not.toThrow();
   });
 
+  it("accepts a legacy-to-canonical room ID map and rejects malformed aliases", () => {
+    const withAliases = {
+      ...v5Manifest,
+      roomIdAliases: {
+        haru_room: "male_room",
+        aoi_room: "female_room",
+        famale_room: "female_room",
+      },
+    };
+    expect(collectAssetManifestIssues(withAliases)).toEqual([]);
+
+    const invalidAliases = { ...v5Manifest, roomIdAliases: { haru_room: "" } };
+    expect(collectAssetManifestIssues(invalidAliases)).toContain(
+      "roomIdAliases must map non-empty room IDs to non-empty room IDs",
+    );
+  });
+
   it("validates and resolves every asset in the shipped v5 manifest", () => {
     expect(collectAssetManifestIssues(furnitureManifestJson)).toEqual([]);
     const manifest = furnitureManifestJson as unknown as GridAssetManifest;

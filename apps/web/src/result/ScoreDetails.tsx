@@ -5,9 +5,9 @@ import type {
   ResultMetricKey,
   ResultProducer,
 } from "./types";
+import { useResultCharacterNames } from "./character-names";
 import {
   AXIS_LABELS,
-  CHARACTER_NAMES,
   METRIC_LABELS,
   STYLE_LABELS,
   clampPercent,
@@ -33,6 +33,7 @@ function EvidenceList({ items, empty }: { items: ResultProducer["topStrengths"];
 }
 
 function StatJourney({ producer }: { producer: ResultProducer }) {
+  const characterNames = useResultCharacterNames();
   const journey = producer.statJourney;
   if (!journey) {
     return <p className="result-missing-copy">開始時と終了時の構造化スナップショットは取得できませんでした。</p>;
@@ -45,7 +46,7 @@ function StatJourney({ producer }: { producer: ResultProducer }) {
         const end = journey.end.characters[person];
         return (
           <section key={person}>
-            <h4 className="result-character-heading"><ResidentPortrait person={person} className="result-character-avatar" />{CHARACTER_NAMES[person]}</h4>
+            <h4 className="result-character-heading"><ResidentPortrait person={person} className="result-character-avatar" />{characterNames[person]}</h4>
             {start && end ? (
               <dl>
                 {METRIC_KEYS.map((metric) => {

@@ -1,4 +1,5 @@
 import type { DirectorAgent, DirectorInput, ProposalTag, ResolvedEvent, StatDelta } from "@roommates/shared";
+import { characterDisplayName } from "@roommates/shared";
 
 const cooperative = new Set(["ACCEPT", "MODIFY", "INITIATE"]);
 
@@ -52,6 +53,8 @@ export class MockDirectorAgent implements DirectorAgent {
     const aoiJoins = cooperative.has(input.aoiDecision.decision);
     const together = haruJoins && aoiJoins;
     const pressure = input.suggestion.tags.includes("pressure");
+    const haruName = characterDisplayName(input.snapshot.characterRoster, "haru");
+    const aoiName = characterDisplayName(input.snapshot.characterRoster, "aoi");
 
     if (!together) {
       const oneJoins = haruJoins || aoiJoins;
@@ -122,7 +125,7 @@ export class MockDirectorAgent implements DirectorAgent {
     const aoiFollowUp = "うん。二人のペースで進めよう。";
     return {
       eventTitle: titles[tag],
-      narration: `二人は提案をそのまま命令としてではなく、自分たちなりのきっかけとして選び取った。${input.haruDecision.action}Haruと、${input.aoiDecision.action}Aoiの間に、少しだけ自然な空気が流れた。`,
+      narration: `二人は提案をそのまま命令としてではなく、自分たちなりのきっかけとして選び取った。${haruName}は${input.haruDecision.action}。${aoiName}は${input.aoiDecision.action}。二人の間に、少しだけ自然な空気が流れた。`,
       haruDialogue: input.haruDecision.dialogue,
       aoiDialogue: input.aoiDecision.dialogue,
       conversation: [

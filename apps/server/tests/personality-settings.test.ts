@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_CHARACTER_SETTINGS,
+  characterRoleSchema,
   characterSettingsSchema,
   cloneCharacterSettings,
+  createCharacterRoster,
   getDefaultCharacterSettings,
   personalityKeys,
   personalityMetadata,
@@ -25,11 +27,35 @@ describe("character personality settings", () => {
       age: 26,
       occupation: "グラフィックデザイナー",
     });
+    expect(settings.characters.haru.role).toBe("male");
+    expect(settings.characters.aoi.role).toBe("female");
+    expect(characterRoleSchema.options).toEqual(["male", "female"]);
     expect(personalityKeys).toHaveLength(10);
     expect(Object.keys(personalityMetadata)).toEqual([...personalityKeys]);
     expect(settings.characters.aoi.personality.initiative).toBeGreaterThan(
       settings.characters.haru.personality.initiative,
     );
+  });
+
+  it("keeps legacy role-less settings valid and exposes replaceable display identities", () => {
+    const legacy = structuredClone(getDefaultCharacterSettings()) as unknown as {
+      characters: {
+        haru: { role?: unknown; profile: { name: string } };
+        aoi: { role?: unknown; profile: { name: string } };
+      };
+    };
+    delete legacy.characters.haru.role;
+    delete legacy.characters.aoi.role;
+    legacy.characters.haru.profile.name = "蓮";
+    legacy.characters.aoi.profile.name = "凛";
+
+    const parsed = characterSettingsSchema.parse(legacy);
+    expect(parsed.characters.haru.role).toBe("male");
+    expect(parsed.characters.aoi.role).toBe("female");
+    expect(createCharacterRoster(parsed)).toEqual({
+      haru: { id: "haru", displayName: "蓮", role: "male" },
+      aoi: { id: "aoi", displayName: "凛", role: "female" },
+    });
   });
 
   it("strictly rejects unknown, fractional, and out-of-range personality values", () => {

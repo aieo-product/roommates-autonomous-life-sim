@@ -530,8 +530,8 @@ a:focus-visible,
   stroke-width: 7;
 }
 
-.room-haru_room polygon:first-child { fill: #cde3b8; }
-.room-aoi_room polygon:first-child { fill: #d9caeb; }
+.room-male_room polygon:first-child { fill: #cde3b8; }
+.room-female_room polygon:first-child { fill: #d9caeb; }
 .room-entry polygon:first-child { fill: #eadcc8; }
 .room-washroom polygon:first-child { fill: #c4e9e2; }
 .room-hallway polygon:first-child { fill: #e5dcc9; }
@@ -2266,7 +2266,7 @@ a:focus-visible,
 
   .resident-scene-sprite.is-moving > img {
     animation: none !important;
-    transform: translateX(-64px) !important;
+    transform: translateX(var(--resident-idle-offset, -64px)) !important;
   }
 
   .scene-character.is-conversing .character-sprite,

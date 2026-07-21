@@ -3,6 +3,7 @@ import type {
   AutonomousInvitation,
   CharacterDecision,
   CharacterId,
+  CharacterRoster,
   EventConversationLine,
   EventDefinition,
   EventStoryBeat,
@@ -11,7 +12,7 @@ import type {
   SafeSuggestion,
   StatDelta,
 } from "@roommates/shared";
-import { mutableStatKeys } from "@roommates/shared";
+import { characterDisplayName, mutableStatKeys } from "@roommates/shared";
 
 const CHARACTER_IDS = ["haru", "aoi"] as const satisfies readonly CharacterId[];
 const CHARACTER_CHOICES = ["ACCEPT", "MODIFY", "DECLINE", "IGNORE", "INITIATE"] as const;
@@ -31,6 +32,7 @@ export type AutonomousEventPlan = {
   definition: EventDefinition;
   suggestion: SafeSuggestion;
   scene: Partial<Record<CharacterId, string>>;
+  characterRoster?: CharacterRoster;
 };
 
 export type ComposeAutonomousEventInput = {
@@ -156,6 +158,7 @@ function planIdentity(
 function planTitle(
   mode: AutonomousEventMode,
   selections: readonly ValidatedAutonomousSelection[],
+  characterRoster?: CharacterRoster,
 ): string {
   if (mode === "single") return selections[0]!.candidate.title;
   if (mode === "shared") {
@@ -164,7 +167,11 @@ function planTitle(
   const byId = Object.fromEntries(
     selections.map((selection) => [selection.characterId, selection.candidate.title]),
   ) as Partial<Record<CharacterId, string>>;
-  return `Haruの「${byId.haru ?? "自由時間"}」／Aoiの「${byId.aoi ?? "自由時間"}」`.slice(
+  return `${characterDisplayName(characterRoster, "haru")}の「${
+    byId.haru ?? "自由時間"
+  }」／${characterDisplayName(characterRoster, "aoi")}の「${
+    byId.aoi ?? "自由時間"
+  }」`.slice(
     0,
     2_000,
   );
@@ -173,6 +180,7 @@ function planTitle(
 function planText(
   mode: AutonomousEventMode,
   selections: readonly ValidatedAutonomousSelection[],
+  characterRoster?: CharacterRoster,
 ): string {
   if (mode === "single") return selections[0]!.candidate.publicIntent;
   if (mode === "shared") {
@@ -184,7 +192,11 @@ function planText(
   const byId = Object.fromEntries(
     selections.map((selection) => [selection.characterId, selection.candidate.title]),
   ) as Partial<Record<CharacterId, string>>;
-  return `Haruは「${byId.haru ?? "自由時間"}」、Aoiは「${byId.aoi ?? "自由時間"}」をそれぞれ選ぶ。`.slice(
+  return `${characterDisplayName(characterRoster, "haru")}は「${
+    byId.haru ?? "自由時間"
+  }」、${characterDisplayName(characterRoster, "aoi")}は「${
+    byId.aoi ?? "自由時間"
+  }」をそれぞれ選ぶ。`.slice(
     0,
     240,
   );
@@ -221,7 +233,7 @@ function buildDefinition(
   snapshot: GameSnapshot,
 ): EventDefinition {
   const first = selections[0]!.candidate;
-  const title = planTitle(mode, selections);
+  const title = planTitle(mode, selections, snapshot.characterRoster);
   const invitation = selections[0]!.invitation;
   const participantRange =
     mode === "single"
@@ -295,7 +307,7 @@ export function composeAutonomousEvent(
 
   const mode = planMode(selections);
   const definition = buildDefinition(mode, selections, input.snapshot);
-  const text = planText(mode, selections);
+  const text = planText(mode, selections, input.snapshot.characterRoster);
   const suggestion: SafeSuggestion = {
     kind: "proposal",
     allowsAutonomy: false,
@@ -318,7 +330,14 @@ export function composeAutonomousEvent(
     selections.map(({ characterId, candidate }) => [characterId, candidate.location]),
   ) as Partial<Record<CharacterId, string>>;
 
-  return { mode, selections, definition, suggestion, scene };
+  return {
+    mode,
+    selections,
+    definition,
+    suggestion,
+    scene,
+    characterRoster: input.snapshot.characterRoster,
+  };
 }
 
 function constrainSelectionDelta(
@@ -511,11 +530,14 @@ function buildParallelPresentation(
     );
   }
   const narration = boundedEventText(
-    "Haruは「" +
+    characterDisplayName(plan.characterRoster, "haru") +
+      "は「" +
       haru.candidate.title +
       "」を選び、" +
       haru.candidate.publicIntent +
-      " 一方、Aoiは「" +
+      " 一方、" +
+      characterDisplayName(plan.characterRoster, "aoi") +
+      "は「" +
       aoi.candidate.title +
       "」を選び、" +
       aoi.candidate.publicIntent +

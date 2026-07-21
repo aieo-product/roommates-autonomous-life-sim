@@ -14,9 +14,14 @@ import {
 } from "./AssetManagerContext.js";
 import {
   ASSET_ORIENTATIONS,
+  CARDINAL_DIRECTIONS,
+  CHARACTER_ROLES,
   ROOM_IDS,
   type AssetKind,
   type AssetOrientation,
+  type CharacterAnimation,
+  type CharacterRole,
+  type CharacterRuntimeId,
   type ManagedCharacterAsset,
   type ManagedFurnitureAsset,
   type ManagedPlacement,
@@ -26,8 +31,8 @@ import { readImageFileAsDataUrl } from "./storage.js";
 import "./assets-manager.css";
 
 const ROOM_LABELS: Record<(typeof ROOM_IDS)[number], string> = {
-  haru_room: "ハルの部屋",
-  aoi_room: "アオイの部屋",
+  male_room: "男性の個室",
+  female_room: "女性の個室",
   entry: "玄関",
   washroom: "洗面所",
   hallway: "廊下",
@@ -44,6 +49,34 @@ const ORIENTATION_LABELS: Record<AssetOrientation, string> = {
   "north-east-to-south-west": "北東 → 南西",
   "north-west-to-south-east": "北西 → 南東",
 };
+
+const CHARACTER_ROLE_LABELS: Record<CharacterRole, string> = {
+  male: "男性キャラクター",
+  female: "女性キャラクター",
+  navigator: "ナビゲーター",
+};
+
+const RUNTIME_ROLE: Record<CharacterRuntimeId, CharacterRole> = {
+  haru: "male",
+  aoi: "female",
+  navigator: "navigator",
+};
+
+const DIRECTION_LABELS = {
+  south: "南",
+  east: "東",
+  north: "北",
+  west: "西",
+} as const;
+
+const parseCommaSeparatedIds = (value: string): string[] => [
+  ...new Set(value.split(/[,、]/).map((item) => item.trim()).filter(Boolean)),
+];
+
+const parseFrameList = (value: string): number[] => value
+  .split(/[,、\s]+/)
+  .map((item) => Number(item))
+  .filter((frame) => Number.isInteger(frame));
 
 const focusableSelector = [
   "button:not([disabled])",
@@ -267,9 +300,57 @@ export function AssetManagerDialog({
       && bounds.height === previousCanvas.height
       ? { ...bounds, [axis]: value }
       : bounds;
-    updateRender({
+    const render = {
+      ...asset.render,
       canvas: { ...previousCanvas, [axis]: value },
       ...(contentBounds ? { contentBounds } : {}),
+    };
+    if (kind === "characters") {
+      const character = asset as ManagedCharacterAsset;
+      const frameSize = { ...character.spriteSheet.frameSize, [axis]: value };
+      updateAsset({
+        render,
+        spriteSheet: {
+          ...character.spriteSheet,
+          frameSize,
+          canvas: {
+            width: frameSize.width * character.spriteSheet.columns,
+            height: frameSize.height * character.spriteSheet.rows,
+          },
+        },
+      });
+      return;
+    }
+    updateAsset({ render });
+  };
+
+  const updateSpriteSheet = (patch: Partial<ManagedCharacterAsset["spriteSheet"]>) => {
+    if (kind !== "characters" || !asset) return;
+    const character = asset as ManagedCharacterAsset;
+    updateAsset({ spriteSheet: { ...character.spriteSheet, ...patch } });
+  };
+
+  const updateSpriteGrid = (axis: "columns" | "rows", value: number) => {
+    if (kind !== "characters" || !asset) return;
+    const character = asset as ManagedCharacterAsset;
+    const spriteSheet = { ...character.spriteSheet, [axis]: value };
+    spriteSheet.canvas = {
+      width: spriteSheet.frameSize.width * spriteSheet.columns,
+      height: spriteSheet.frameSize.height * spriteSheet.rows,
+    };
+    updateAsset({ spriteSheet });
+  };
+
+  const updateAnimation = (name: string, patch: Partial<CharacterAnimation>) => {
+    if (kind !== "characters" || !asset) return;
+    const character = asset as ManagedCharacterAsset;
+    const previous = character.spriteSheet.animations[name]
+      ?? { frames: [1], frameDurationMs: 170, loop: true };
+    updateSpriteSheet({
+      animations: {
+        ...character.spriteSheet.animations,
+        [name]: { ...previous, ...patch },
+      },
     });
   };
 
@@ -467,7 +548,12 @@ export function AssetManagerDialog({
                   <Field label="Asset ID" htmlFor={idFor("asset-id")} error={issueFor("id")}>
                     <input id={idFor("asset-id")} value={asset.id} aria-invalid={issueFor("id") ? true : undefined} aria-describedby={issueFor("id") ? `${idFor("asset-id")}-error` : undefined} onChange={(event) => updateAsset({ id: event.target.value })} />
                   </Field>
-                  <Field label="表示名" htmlFor={idFor("asset-label")} error={issueFor("label")}>
+                  <Field
+                    label="表示名"
+                    htmlFor={idFor("asset-label")}
+                    error={issueFor("label")}
+                    hint={kind === "characters" ? "Asset名です。ゲーム内の会話名はキャラクター設定で変更します。" : undefined}
+                  >
                     <input id={idFor("asset-label")} value={asset.label} aria-invalid={issueFor("label") ? true : undefined} aria-describedby={issueFor("label") ? `${idFor("asset-label")}-error` : undefined} onChange={(event) => updateAsset({ label: event.target.value })} />
                   </Field>
                   <Field label={kind === "characters" ? "スプライト画像 URL / Data URL" : "画像 URL / Data URL"} htmlFor={idFor("asset-image")} error={issueFor("imageUrl")} className="is-wide">
@@ -487,24 +573,88 @@ export function AssetManagerDialog({
                       <Field label="Portrait の相対 file" htmlFor={idFor("portrait-file")} error={issueFor("portraitFile")}>
                         <input id={idFor("portrait-file")} value={(asset as ManagedCharacterAsset).portraitFile} aria-invalid={issueFor("portraitFile") ? true : undefined} onChange={(event) => updateAsset({ portraitFile: event.target.value })} />
                       </Field>
-                      <Field label="Runtime slot" htmlFor={idFor("runtime-id")} error={issueFor("runtimeId")}>
-                        <select id={idFor("runtime-id")} value={(asset as ManagedCharacterAsset).runtimeId ?? ""} aria-invalid={issueFor("runtimeId") ? true : undefined} onChange={(event) => updateAsset({ runtimeId: event.target.value ? event.target.value as ManagedCharacterAsset["runtimeId"] : undefined })}>
+                      <Field label="互換 Runtime slot" htmlFor={idFor("runtime-id")} error={issueFor("runtimeId")} hint="既存セーブ互換の内部IDです。新しいpackではRoleを正本にします。">
+                        <select
+                          id={idFor("runtime-id")}
+                          value={(asset as ManagedCharacterAsset).runtimeId ?? ""}
+                          aria-invalid={issueFor("runtimeId") ? true : undefined}
+                          onChange={(event) => {
+                            const runtimeId = event.target.value
+                              ? event.target.value as CharacterRuntimeId
+                              : undefined;
+                            updateAsset({
+                              runtimeId,
+                              ...(runtimeId ? { role: RUNTIME_ROLE[runtimeId] } : {}),
+                            });
+                          }}
+                        >
                           <option value="">未割当</option>
-                          <option value="haru">Haru</option>
-                          <option value="aoi">Aoi</option>
-                          <option value="navigator">デコピン</option>
+                          <option value="haru">男性スロット（内部ID haru）</option>
+                          <option value="aoi">女性スロット（内部ID aoi）</option>
+                          <option value="navigator">ナビゲーター（内部ID navigator）</option>
                         </select>
                       </Field>
                       <Field label="Role" htmlFor={idFor("character-role")} error={issueFor("role")}>
-                        <input id={idFor("character-role")} value={(asset as ManagedCharacterAsset).role} aria-invalid={issueFor("role") ? true : undefined} onChange={(event) => updateAsset({ role: event.target.value })} />
+                        <select
+                          id={idFor("character-role")}
+                          value={(asset as ManagedCharacterAsset).role}
+                          aria-invalid={issueFor("role") ? true : undefined}
+                          onChange={(event) => {
+                            const role = event.target.value as CharacterRole;
+                            const character = asset as ManagedCharacterAsset;
+                            const runtimeId = character.runtimeId
+                              ? ({ male: "haru", female: "aoi", navigator: "navigator" } as const)[role]
+                              : undefined;
+                            updateAsset({ role, runtimeId });
+                          }}
+                        >
+                          {CHARACTER_ROLES.map((role) => (
+                            <option key={role} value={role}>{CHARACTER_ROLE_LABELS[role]} ({role})</option>
+                          ))}
+                        </select>
                       </Field>
                       <Field label="Animation preset" htmlFor={idFor("animation-preset")} error={issueFor("animationPreset")}>
                         <input id={idFor("animation-preset")} value={(asset as ManagedCharacterAsset).animationPreset} aria-invalid={issueFor("animationPreset") ? true : undefined} onChange={(event) => updateAsset({ animationPreset: event.target.value })} />
                       </Field>
                     </>
                   )}
+                  {kind === "furniture" && (
+                    <Field
+                      label="アクションタグ（カンマ区切り）"
+                      htmlFor={idFor("anchor-ids")}
+                      error={issueFor("anchorIds")}
+                      hint="イベントの移動先検索にも使う安定IDです（例: kitchen_island, cook）。"
+                      className="is-wide"
+                    >
+                      <input
+                        id={idFor("anchor-ids")}
+                        value={(asset as ManagedFurnitureAsset).anchorIds.join(", ")}
+                        aria-invalid={issueFor("anchorIds") ? true : undefined}
+                        onChange={(event) => updateAsset({
+                          anchorIds: parseCommaSeparatedIds(event.target.value),
+                        })}
+                      />
+                    </Field>
+                  )}
                   <Field label="Pack 内の相対 file" htmlFor={idFor("asset-file")} error={issueFor("file")} hint="JSON 書出後に OSS asset pack へ移す際のパスです。" className="is-wide">
-                    <input id={idFor("asset-file")} value={asset.file} aria-invalid={issueFor("file") ? true : undefined} aria-describedby={issueFor("file") ? `${idFor("asset-file")}-error` : `${idFor("asset-file")}-hint`} onChange={(event) => updateAsset({ file: event.target.value })} />
+                    <input
+                      id={idFor("asset-file")}
+                      value={asset.file}
+                      aria-invalid={issueFor("file") ? true : undefined}
+                      aria-describedby={issueFor("file") ? `${idFor("asset-file")}-error` : `${idFor("asset-file")}-hint`}
+                      onChange={(event) => {
+                        const file = event.target.value;
+                        updateAsset(kind === "characters"
+                          ? {
+                              file,
+                              spriteSheet: {
+                                ...(asset as ManagedCharacterAsset).spriteSheet,
+                                file,
+                              },
+                            }
+                          : { file });
+                      }}
+                    />
                   </Field>
                 </div>
               </section>
@@ -513,10 +663,10 @@ export function AssetManagerDialog({
                 <div className="asset-manager-section-heading"><div><small>GRID STANDARD</small><h3 id={`${fieldPrefix}-scale-title`}>サイズ・向き</h3></div><span className="asset-manager-grid-badge">1 TILE = 1 CHARACTER</span></div>
                 <div className="asset-manager-form-grid is-compact">
                   <Field label="占有 幅 (マス)" htmlFor={idFor("footprint-width")} error={issueFor("footprintTiles.width")}>
-                    <NumberInput id={idFor("footprint-width")} value={asset.footprintTiles.width} min={1} max={24} error={issueFor("footprintTiles.width")} onChange={(width) => updateAsset({ footprintTiles: { ...asset.footprintTiles, width } })} />
+                    <NumberInput id={idFor("footprint-width")} value={asset.footprintTiles.width} min={1} max={kind === "characters" ? 1 : 24} error={issueFor("footprintTiles.width")} onChange={(width) => updateAsset({ footprintTiles: { ...asset.footprintTiles, width: kind === "characters" ? 1 : width } })} />
                   </Field>
                   <Field label="占有 奥行 (マス)" htmlFor={idFor("footprint-depth")} error={issueFor("footprintTiles.depth")}>
-                    <NumberInput id={idFor("footprint-depth")} value={asset.footprintTiles.depth} min={1} max={18} error={issueFor("footprintTiles.depth")} onChange={(depth) => updateAsset({ footprintTiles: { ...asset.footprintTiles, depth } })} />
+                    <NumberInput id={idFor("footprint-depth")} value={asset.footprintTiles.depth} min={1} max={kind === "characters" ? 1 : 18} error={issueFor("footprintTiles.depth")} onChange={(depth) => updateAsset({ footprintTiles: { ...asset.footprintTiles, depth: kind === "characters" ? 1 : depth } })} />
                   </Field>
                   <Field label="Pivot X (px)" htmlFor={idFor("pivot-x")} error={issueFor("render.pivot.x")}>
                     <NumberInput id={idFor("pivot-x")} value={asset.render.pivot.x} min={-8192} max={8192} error={issueFor("render.pivot.x")} onChange={(x) => updateRender({ pivot: { ...asset.render.pivot, x } })} />
@@ -578,6 +728,77 @@ export function AssetManagerDialog({
                     )}
                   </div>
                 </details>
+                {kind === "characters" && (() => {
+                  const character = asset as ManagedCharacterAsset;
+                  const sprite = character.spriteSheet;
+                  const presetName = character.animationPreset;
+                  const idle = sprite.animations.idle
+                    ?? { frames: [], frameDurationMs: 170, loop: true };
+                  const active = sprite.animations[presetName]
+                    ?? { frames: [], frameDurationMs: 170, loop: true };
+                  return (
+                    <details className="asset-manager-advanced">
+                      <summary>キャラクター Sprite Sheet 規格</summary>
+                      <p>1×1キャラクターを同じ形式で差し替えるため、1フレーム寸法・4方向row・アニメーション列を登録します。</p>
+                      <div className="asset-manager-form-grid is-compact">
+                        <Field label="Sheet 幅 (px)" htmlFor={idFor("sheet-width")} error={issueFor("spriteSheet.canvas.width")}>
+                          <NumberInput id={idFor("sheet-width")} value={sprite.canvas.width} min={1} max={8192} error={issueFor("spriteSheet.canvas.width")} onChange={(width) => updateSpriteSheet({ canvas: { ...sprite.canvas, width } })} />
+                        </Field>
+                        <Field label="Sheet 高さ (px)" htmlFor={idFor("sheet-height")} error={issueFor("spriteSheet.canvas.height")}>
+                          <NumberInput id={idFor("sheet-height")} value={sprite.canvas.height} min={1} max={8192} error={issueFor("spriteSheet.canvas.height")} onChange={(height) => updateSpriteSheet({ canvas: { ...sprite.canvas, height } })} />
+                        </Field>
+                        <Field label="Frame 幅 (px)" htmlFor={idFor("frame-width")} error={issueFor("spriteSheet.frameSize.width")}>
+                          <NumberInput id={idFor("frame-width")} value={sprite.frameSize.width} min={1} max={8192} error={issueFor("spriteSheet.frameSize.width")} onChange={(width) => updateCanvasDimension("width", width)} />
+                        </Field>
+                        <Field label="Frame 高さ (px)" htmlFor={idFor("frame-height")} error={issueFor("spriteSheet.frameSize.height")}>
+                          <NumberInput id={idFor("frame-height")} value={sprite.frameSize.height} min={1} max={8192} error={issueFor("spriteSheet.frameSize.height")} onChange={(height) => updateCanvasDimension("height", height)} />
+                        </Field>
+                        <Field label="列数" htmlFor={idFor("sheet-columns")} error={issueFor("spriteSheet.columns")}>
+                          <NumberInput id={idFor("sheet-columns")} value={sprite.columns} min={1} max={128} error={issueFor("spriteSheet.columns")} onChange={(columns) => updateSpriteGrid("columns", columns)} />
+                        </Field>
+                        <Field label="行数" htmlFor={idFor("sheet-rows")} error={issueFor("spriteSheet.rows")}>
+                          <NumberInput id={idFor("sheet-rows")} value={sprite.rows} min={4} max={128} error={issueFor("spriteSheet.rows")} onChange={(rows) => updateSpriteGrid("rows", rows)} />
+                        </Field>
+                        {CARDINAL_DIRECTIONS.map((direction) => (
+                          <Field
+                            key={direction}
+                            label={`${DIRECTION_LABELS[direction]}向き row`}
+                            htmlFor={idFor(`direction-${direction}`)}
+                            error={issueFor(`spriteSheet.directionRows.${direction}`)}
+                          >
+                            <NumberInput
+                              id={idFor(`direction-${direction}`)}
+                              value={sprite.directionRows[direction]}
+                              min={0}
+                              max={Math.max(0, sprite.rows - 1)}
+                              error={issueFor(`spriteSheet.directionRows.${direction}`)}
+                              onChange={(row) => updateSpriteSheet({
+                                directionRows: { ...sprite.directionRows, [direction]: row },
+                              })}
+                            />
+                          </Field>
+                        ))}
+                        <Field label="idle frames" htmlFor={idFor("idle-frames")} error={issueFor("spriteSheet.animations.idle.frames")} hint="column番号をカンマ区切りで指定します。">
+                          <input id={idFor("idle-frames")} value={idle.frames.join(", ")} aria-invalid={issueFor("spriteSheet.animations.idle.frames") ? true : undefined} onChange={(event) => updateAnimation("idle", { frames: parseFrameList(event.target.value) })} />
+                        </Field>
+                        <Field label="idle 間隔 (ms)" htmlFor={idFor("idle-duration")} error={issueFor("spriteSheet.animations.idle.frameDurationMs")}>
+                          <NumberInput id={idFor("idle-duration")} value={idle.frameDurationMs} min={1} max={60_000} error={issueFor("spriteSheet.animations.idle.frameDurationMs")} onChange={(frameDurationMs) => updateAnimation("idle", { frameDurationMs })} />
+                        </Field>
+                        <Field label={`${presetName} frames`} htmlFor={idFor("active-frames")} error={issueFor(`spriteSheet.animations.${presetName}.frames`)} hint="移動中に再生するcolumn番号です。">
+                          <input id={idFor("active-frames")} value={active.frames.join(", ")} aria-invalid={issueFor(`spriteSheet.animations.${presetName}.frames`) ? true : undefined} onChange={(event) => updateAnimation(presetName, { frames: parseFrameList(event.target.value) })} />
+                        </Field>
+                        <Field label={`${presetName} 間隔 (ms)`} htmlFor={idFor("active-duration")} error={issueFor(`spriteSheet.animations.${presetName}.frameDurationMs`)}>
+                          <NumberInput id={idFor("active-duration")} value={active.frameDurationMs} min={1} max={60_000} error={issueFor(`spriteSheet.animations.${presetName}.frameDurationMs`)} onChange={(frameDurationMs) => updateAnimation(presetName, { frameDurationMs })} />
+                        </Field>
+                        <fieldset className="asset-manager-flips">
+                          <legend>Animation loop</legend>
+                          <label><input type="checkbox" checked={idle.loop} onChange={(event) => updateAnimation("idle", { loop: event.target.checked })} /> idle</label>
+                          <label><input type="checkbox" checked={active.loop} onChange={(event) => updateAnimation(presetName, { loop: event.target.checked })} /> {presetName}</label>
+                        </fieldset>
+                      </div>
+                    </details>
+                  );
+                })()}
               </section>
 
               <section className="asset-manager-form-section" aria-labelledby={`${fieldPrefix}-placement-title`}>

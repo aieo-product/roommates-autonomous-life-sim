@@ -20,10 +20,11 @@ function savedEventComment(input: AgentReflectionInput, eventLogId: string): str
 
 function seasonImpression(input: AgentReflectionInput): string {
   const relationship = input.finalRelationship;
+  const otherName = input.otherCharacterIdentity?.displayName ?? "相手";
   if (input.characterId === "haru") {
-    return `7日間を振り返ると、提案を受ける場面でも立ち止まる場面でも、自分のペースで選べたことが心に残っています。共有した出来事を一つずつ重ねて、Aoiとの関係が「${relationship}」になった今も、急がず向き合えた時間だったと思います。`;
+    return `7日間を振り返ると、提案を受ける場面でも立ち止まる場面でも、自分のペースで選べたことが心に残っています。共有した出来事を一つずつ重ねて、${otherName}との関係が「${relationship}」になった今も、急がず向き合えた時間だったと思います。`;
   }
-  return `7日間を振り返ると、一緒に動いた時間も、それぞれで過ごした時間も、自分で選べたことが心に残っています。共有した出来事を一つずつ重ねて、Haruとの関係が「${relationship}」になった今、この生活を素直に振り返れてよかったです。`;
+  return `7日間を振り返ると、一緒に動いた時間も、それぞれで過ごした時間も、自分で選べたことが心に残っています。共有した出来事を一つずつ重ねて、${otherName}との関係が「${relationship}」になった今、この生活を素直に振り返れてよかったです。`;
 }
 
 export class MockReflectionAgent {

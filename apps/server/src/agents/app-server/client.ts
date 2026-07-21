@@ -614,10 +614,8 @@ export class CodexAppServerClient implements AppServerAdapter {
         : role === "navigator"
           ? "デコピン"
           : reflectionCharacter
-            ? `${reflectionCharacter === "haru" ? "Haru" : "Aoi"} Reflection`
-            : role === "haru"
-              ? "Haru"
-              : "Aoi";
+            ? `${reflectionCharacter} reflection`
+            : role;
     void this.request(
       "thread/name/set",
       { threadId: id, name: `ROOMMATES · ${threadName}` },

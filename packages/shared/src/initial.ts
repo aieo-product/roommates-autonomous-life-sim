@@ -1,9 +1,11 @@
 import type { GameState } from "./domain.js";
+import { getDefaultCharacterRoster } from "./personality.js";
 
 export function createInitialGameState(seed = "demo-heart"): GameState {
   return {
     version: 2,
     seed,
+    characterRoster: getDefaultCharacterRoster(),
     agentEpoch: 0,
     revision: 0,
     status: "awaiting_suggestion",
@@ -29,7 +31,7 @@ export function createInitialGameState(seed = "demo-heart"): GameState {
           romanticAwareness: 5,
           mood: "わくわく",
           location: "リビング",
-          currentGoal: "Haruと自然に話せるきっかけを探す",
+          currentGoal: "相手と自然に話せるきっかけを探す",
         },
       },
     },

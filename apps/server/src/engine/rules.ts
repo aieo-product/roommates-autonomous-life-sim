@@ -1,5 +1,6 @@
 import type {
   CharacterId,
+  CharacterRoster,
   CharacterState,
   Ending,
   GameSnapshot,
@@ -7,6 +8,7 @@ import type {
   RelationshipLabel,
   StatDelta,
 } from "@roommates/shared";
+import { characterDisplayName, otherCharacterId } from "@roommates/shared";
 
 const statKeys = ["energy", "stress", "affection", "trust", "romanticAwareness"] as const;
 
@@ -50,7 +52,12 @@ export function confessionEligible(snapshot: GameSnapshot, characters = snapshot
   );
 }
 
-export function decorateCharacterState(state: CharacterState, id: CharacterId, positive: boolean): CharacterState {
+export function decorateCharacterState(
+  state: CharacterState,
+  id: CharacterId,
+  positive: boolean,
+  roster?: CharacterRoster,
+): CharacterState {
   const exhausted = state.energy < 25;
   const tense = state.stress > 70;
   const mood = exhausted ? "くたくた" : tense ? "落ち着かない" : positive ? (id === "haru" ? "穏やか" : "ごきげん") : "考え中";
@@ -60,9 +67,7 @@ export function decorateCharacterState(state: CharacterState, id: CharacterId, p
     currentGoal: exhausted
       ? "少し休んで自分のペースを取り戻す"
       : positive
-        ? id === "haru"
-          ? "Aoiと自然な時間を重ねる"
-          : "Haruの本音をもう少し知る"
+        ? `${characterDisplayName(roster, otherCharacterId(id))}との自然な時間を大切にする`
         : "無理をせず共同生活を続ける",
   };
 }

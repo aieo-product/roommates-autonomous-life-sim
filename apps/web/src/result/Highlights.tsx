@@ -9,8 +9,8 @@ import type {
   ResultProducer,
   ResultStatus,
 } from "./types";
+import { useResultCharacterNames } from "./character-names";
 import {
-  CHARACTER_NAMES,
   DECISION_LABELS,
   METRIC_LABELS,
   decisionFor,
@@ -69,6 +69,7 @@ function AgentMoment({
   reflection?: ResultAgentReflection;
   status: ResultStatus;
 }) {
+  const characterNames = useResultCharacterNames();
   const decision = decisionFor(event, person);
   const comment = reflection?.notableEventComments.find((item) => item.eventLogId === event.id)?.comment;
   const delta = deltasFor(event, person);
@@ -76,7 +77,7 @@ function AgentMoment({
 
   return (
     <div className={`result-agent-moment is-${person}`}>
-      <h4><ResidentPortrait person={person} className="result-character-avatar" />{CHARACTER_NAMES[person]}</h4>
+      <h4><ResidentPortrait person={person} className="result-character-avatar" />{characterNames[person]}</h4>
       {decision ? (
         <>
           <p className="result-decision-kind">{DECISION_LABELS[decision.decision]}</p>
@@ -89,7 +90,7 @@ function AgentMoment({
       )}
 
       {deltaEntries.length > 0 && (
-        <dl className="result-inline-deltas" aria-label={`${CHARACTER_NAMES[person]}の実際の状態変化`}>
+        <dl className="result-inline-deltas" aria-label={`${characterNames[person]}の実際の状態変化`}>
           {deltaEntries.map(([key, value]) => (
             <div key={key}><dt>{METRIC_LABELS[key]}</dt><dd>{metricDeltaLabel(value)}</dd></div>
           ))}

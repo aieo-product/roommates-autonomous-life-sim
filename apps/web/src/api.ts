@@ -205,7 +205,7 @@ const normalizeMemory = (value: unknown, index: number): Memory | undefined => {
     emotionalImpact: Number(source.emotionalImpact ?? source.emotional_impact ?? 0),
     participants: Array.isArray(source.participants)
       ? source.participants.filter((item): item is string => typeof item === "string")
-      : ["Haru", "Aoi"],
+      : ["住人1", "住人2"],
     importance: numeric(source.importance, 5),
   };
 };

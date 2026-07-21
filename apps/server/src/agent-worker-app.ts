@@ -9,6 +9,7 @@ import {
   autonomousActionCandidateSchema,
   characterDecisionSchema,
   characterDefinitionSchema,
+  characterRosterSchema,
   characterStateSchema,
   directorResolvedEventSchema,
   eventDefinitionSchema,
@@ -90,6 +91,7 @@ const gameSnapshotInputSchema = z
   .object({
     seed: z.string().min(1).max(2_000),
     revision: z.number().int().nonnegative(),
+    characterRoster: characterRosterSchema.optional(),
     characters: z
       .object({
         haru: characterStateInputSchema,

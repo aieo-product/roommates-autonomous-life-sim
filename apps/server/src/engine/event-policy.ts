@@ -1,6 +1,7 @@
 import type {
   CharacterDecision,
   CharacterId,
+  CharacterRoster,
   EventConversationLine,
   EventDefinition,
   EventStoryBeat,
@@ -13,6 +14,7 @@ import {
   EVENT_CONVERSATION_TEXT_MAX_LENGTH,
   EVENT_STORY_BEAT_CONTENT_MAX_LENGTH,
   EVENT_STORY_BEAT_LOCATION_MAX_LENGTH,
+  characterDisplayName,
   eventStoryBeatsSchema,
   mutableStatKeys,
 } from "@roommates/shared";
@@ -249,6 +251,7 @@ function safeScene(
   event: ResolvedEvent,
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
   originalLocations?: Partial<Record<CharacterId, string>>,
+  characterRoster?: CharacterRoster,
 ): ResolvedEvent["scene"] {
   const scene = { ...(event.scene ?? {}) };
   for (const id of ["haru", "aoi"] as const) {
@@ -270,7 +273,7 @@ function safeScene(
       original &&
       (!participatingTarget || locationZone(original) !== locationZone(participatingTarget))
         ? original
-        : "自室";
+        : `${characterDisplayName(characterRoster, id)}の自室`;
   }
   for (const id of ["haru", "aoi"] as const) {
     const location = scene[id]?.trim().slice(0, EVENT_STORY_BEAT_LOCATION_MAX_LENGTH).trim();
@@ -288,6 +291,13 @@ function storyText(value: string, fallback: string): string {
 function storyLocation(value: string | undefined, fallback: string): string {
   const normalized = value?.trim().slice(0, EVENT_STORY_BEAT_LOCATION_MAX_LENGTH).trim();
   return normalized || fallback;
+}
+
+function privateRoomLocation(
+  characterId: CharacterId,
+  characterRoster?: CharacterRoster,
+): string {
+  return `${characterDisplayName(characterRoster, characterId)}の自室`;
 }
 
 /**
@@ -314,11 +324,18 @@ function fallbackStoryBeats(
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
   conversation: EventConversationLine[],
   scene: ResolvedEvent["scene"],
+  characterRoster?: CharacterRoster,
 ): EventStoryBeat[] {
   const haruJoins = cooperative.has(decisions.haru.decision);
   const aoiJoins = cooperative.has(decisions.aoi.decision);
-  const haruLocation = storyLocation(scene?.haru, "Haruの自室");
-  const aoiLocation = storyLocation(scene?.aoi, "Aoiの自室");
+  const haruLocation = storyLocation(
+    scene?.haru,
+    privateRoomLocation("haru", characterRoster),
+  );
+  const aoiLocation = storyLocation(
+    scene?.aoi,
+    privateRoomLocation("aoi", characterRoster),
+  );
   const sharedDestination = haruJoins && aoiJoins && haruLocation === aoiLocation;
   const story: EventStoryBeat[] = sharedDestination
     ? [
@@ -430,6 +447,7 @@ function safeStoryBeats(
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
   conversation: EventConversationLine[],
   scene: ResolvedEvent["scene"],
+  characterRoster?: CharacterRoster,
 ): EventStoryBeat[] {
   const haruJoins = cooperative.has(decisions.haru.decision);
   const aoiJoins = cooperative.has(decisions.aoi.decision);
@@ -445,7 +463,12 @@ function safeStoryBeats(
       return [{
         kind: "move",
         actor: beat.actor,
-        location: storyLocation(safeTarget, beat.actor === "aoi" ? "Aoiの自室" : "Haruの自室"),
+        location: storyLocation(
+          safeTarget,
+          beat.actor === "both"
+            ? "共有スペース"
+            : privateRoomLocation(beat.actor, characterRoster),
+        ),
       }];
     }
     if (beat.kind === "dialogue") {
@@ -465,23 +488,29 @@ function safeStoryBeats(
   });
 
   if (dialogueIndex < 3) {
-    return fallbackStoryBeats(event, decisions, conversation, scene);
+    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
   }
 
   const haruMove = lastMoveIndexFor(authored, "haru");
   const aoiMove = lastMoveIndexFor(authored, "aoi");
   if (haruMove < 0 || aoiMove < 0) {
-    return fallbackStoryBeats(event, decisions, conversation, scene);
+    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
   }
-  const haruFinal = storyLocation(scene?.haru, "Haruの自室");
-  const aoiFinal = storyLocation(scene?.aoi, "Aoiの自室");
+  const haruFinal = storyLocation(
+    scene?.haru,
+    privateRoomLocation("haru", characterRoster),
+  );
+  const aoiFinal = storyLocation(
+    scene?.aoi,
+    privateRoomLocation("aoi", characterRoster),
+  );
   const haruBeat = authored[haruMove];
   const aoiBeat = authored[aoiMove];
   if (haruBeat?.kind !== "move" || aoiBeat?.kind !== "move") {
-    return fallbackStoryBeats(event, decisions, conversation, scene);
+    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
   }
   if ((haruBeat.actor === "both" || aoiBeat.actor === "both") && haruFinal !== aoiFinal) {
-    return fallbackStoryBeats(event, decisions, conversation, scene);
+    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
   }
   haruBeat.location = haruFinal;
   aoiBeat.location = aoiFinal;
@@ -490,12 +519,12 @@ function safeStoryBeats(
     ? ensureCooperativeJourney(authored, haruFinal)
     : authored;
   if (!normalized) {
-    return fallbackStoryBeats(event, decisions, conversation, scene);
+    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
   }
   const parsed = eventStoryBeatsSchema.safeParse(normalized);
   return parsed.success
     ? parsed.data
-    : fallbackStoryBeats(event, decisions, conversation, scene);
+    : fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
 }
 
 export function constrainResolvedEvent(
@@ -506,6 +535,7 @@ export function constrainResolvedEvent(
   options: {
     suppressRelationshipEffects?: boolean;
     originalLocations?: Partial<Record<CharacterId, string>>;
+    characterRoster?: CharacterRoster;
   } = {},
 ): ResolvedEvent {
   const branch = branchKey(decisions.haru, decisions.aoi);
@@ -546,7 +576,12 @@ export function constrainResolvedEvent(
       ? event.narration
       : `${definition.branches[branch]} ${event.narration}`.trim();
   const conversation = safeConversation(event, decisions);
-  const scene = safeScene(event, decisions, options.originalLocations);
+  const scene = safeScene(
+    event,
+    decisions,
+    options.originalLocations,
+    options.characterRoster,
+  );
 
   return {
     ...event,
@@ -554,7 +589,13 @@ export function constrainResolvedEvent(
     haruDialogue: decisions.haru.dialogue,
     aoiDialogue: decisions.aoi.dialogue,
     conversation,
-    storyBeats: safeStoryBeats(event, decisions, conversation, scene),
+    storyBeats: safeStoryBeats(
+      event,
+      decisions,
+      conversation,
+      scene,
+      options.characterRoster,
+    ),
     scene,
     effects: { haru: haruEffects, aoi: aoiEffects },
     memory: {

@@ -13,7 +13,7 @@
   "grid": {
     "type": "square",
     "columns": 12,
-    "rows": 8,
+    "rows": 10,
     "tileSize": 1
   },
   "projection": {
@@ -32,7 +32,9 @@
     { "id": "kitchen", "name": "キッチン", "bounds": { "x": 4, "y": 0, "width": 4, "height": 4 } },
     { "id": "bathroom", "name": "浴室", "bounds": { "x": 8, "y": 0, "width": 4, "height": 4 } },
     { "id": "living", "name": "リビング", "bounds": { "x": 0, "y": 4, "width": 8, "height": 4 } },
-    { "id": "balcony", "name": "バルコニー", "bounds": { "x": 8, "y": 4, "width": 4, "height": 4 } }
+    { "id": "balcony", "name": "バルコニー", "bounds": { "x": 8, "y": 4, "width": 4, "height": 4 } },
+    { "id": "male_room", "name": "男性の個室", "bounds": { "x": 0, "y": 8, "width": 6, "height": 2 } },
+    { "id": "female_room", "name": "女性の個室", "bounds": { "x": 6, "y": 8, "width": 6, "height": 2 } }
   ],
   "placements": {
     "assets": [
@@ -44,8 +46,15 @@
       { "instanceId": "rack", "assetId": "sample.drying-rack", "roomId": "balcony", "floorContact": { "x": 11, "y": 7 } }
     ],
     "characters": [
-      { "instanceId": "haru", "assetId": "sample.haru", "roomId": "kitchen", "floorContact": { "x": 5, "y": 2 }, "facing": "east" },
-      { "instanceId": "aoi", "assetId": "sample.aoi", "roomId": "kitchen", "floorContact": { "x": 7, "y": 2 }, "facing": "west" }
+      { "instanceId": "male-character", "assetId": "sample.male", "roomId": "kitchen", "floorContact": { "x": 5, "y": 2 }, "facing": "east" },
+      { "instanceId": "female-character", "assetId": "sample.female", "roomId": "kitchen", "floorContact": { "x": 7, "y": 2 }, "facing": "west" }
     ]
+  },
+  "extensions": {
+    "roommates.room-id-aliases": {
+      "haru_room": "male_room",
+      "aoi_room": "female_room",
+      "famale_room": "female_room"
+    }
   }
 }

@@ -1,7 +1,12 @@
 {
-  "schemaVersion": 2,
-  "layoutId": "roommates-2ldk-grid-v2",
+  "schemaVersion": 3,
+  "layoutId": "roommates-2ldk-grid-v3",
   "name": "ROOMMATES 基本2LDK",
+  "roomIdAliases": {
+    "haru_room": "male_room",
+    "aoi_room": "female_room",
+    "famale_room": "female_room"
+  },
   "orientation": {
     "north": "top",
     "origin": "top-left"
@@ -34,10 +39,10 @@
   },
   "rooms": [
     {
-      "id": "haru_room",
-      "name": "Haruの個室",
+      "id": "male_room",
+      "name": "男性の個室",
       "privacy": "private",
-      "focusId": "haru_room",
+      "focusId": "male_room",
       "bounds": { "x": 0, "y": 0, "width": 8, "height": 6 },
       "capacity": 2,
       "defaultOccupancy": 1,
@@ -52,10 +57,10 @@
       ]
     },
     {
-      "id": "aoi_room",
-      "name": "Aoiの個室",
+      "id": "female_room",
+      "name": "女性の個室",
       "privacy": "private",
-      "focusId": "aoi_room",
+      "focusId": "female_room",
       "bounds": { "x": 8, "y": 0, "width": 8, "height": 6 },
       "capacity": 2,
       "defaultOccupancy": 1,
@@ -197,8 +202,8 @@
   ],
   "connections": [
     { "from": "entry", "to": "hallway", "kind": "open" },
-    { "from": "hallway", "to": "haru_room", "kind": "door" },
-    { "from": "hallway", "to": "aoi_room", "kind": "door" },
+    { "from": "hallway", "to": "male_room", "kind": "door" },
+    { "from": "hallway", "to": "female_room", "kind": "door" },
     { "from": "hallway", "to": "washroom", "kind": "door" },
     { "from": "washroom", "to": "bathroom", "kind": "door" },
     { "from": "hallway", "to": "ldk", "kind": "open" },
@@ -209,8 +214,8 @@
     { "situation": "eat_together", "displayScope": "whole-apartment", "focusId": "dining", "anchorTags": ["pair", "eating"] },
     { "situation": "watch_movie", "displayScope": "whole-apartment", "focusId": "living", "anchorTags": ["pair", "movie"] },
     { "situation": "conversation", "displayScope": "whole-apartment", "focusId": "living", "anchorTags": ["pair", "conversation"] },
-    { "situation": "haru_rest", "displayScope": "whole-apartment", "focusId": "haru_room", "anchorTags": ["solo"] },
-    { "situation": "aoi_rest", "displayScope": "whole-apartment", "focusId": "aoi_room", "anchorTags": ["solo"] },
+    { "situation": "haru_rest", "displayScope": "whole-apartment", "focusId": "male_room", "anchorTags": ["solo"] },
+    { "situation": "aoi_rest", "displayScope": "whole-apartment", "focusId": "female_room", "anchorTags": ["solo"] },
     { "situation": "get_ready", "displayScope": "whole-apartment", "focusId": "washroom", "anchorTags": ["solo"] },
     { "situation": "arrive_or_leave", "displayScope": "whole-apartment", "focusId": "entry", "anchorTags": ["pair"] },
     { "situation": "hang_laundry", "displayScope": "whole-apartment", "focusId": "balcony", "anchorTags": ["laundry"] },

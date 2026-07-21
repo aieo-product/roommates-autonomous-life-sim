@@ -16,6 +16,10 @@ import {
 function completedState(): GameState {
   const state = createInitialGameState("reflection-test");
   state.status = "ended";
+  state.characterRoster = {
+    haru: { id: "haru", displayName: "蓮", role: "male" },
+    aoi: { id: "aoi", displayName: "凛", role: "female" },
+  };
   state.shared.day = 7;
   state.shared.phase = "night";
   state.shared.relationshipLabel = "friends";
@@ -84,6 +88,16 @@ describe("agent reflection boundary", () => {
     const serialized = JSON.stringify(input);
 
     expect(agentReflectionInputSchema.parse(input)).toEqual(input);
+    expect(input.characterIdentity).toEqual({
+      id: "haru",
+      displayName: "蓮",
+      role: "male",
+    });
+    expect(input.otherCharacterIdentity).toEqual({
+      id: "aoi",
+      displayName: "凛",
+      role: "female",
+    });
     expect(input.sharedEvents[0]).toMatchObject({
       selfDecision: "MODIFY",
       selfAction: "短い時間だけ話す",
@@ -178,6 +192,8 @@ describe("agent reflection boundary", () => {
       expect(first).toEqual(second);
       expect(first.reflectionVersion).toBe(REFLECTION_VERSION);
       expect(agentResultReflectionSchemaFor(input).parse(first)).toEqual(first);
+      expect(first.seasonImpression).toContain(characterId === "haru" ? "凛" : "蓮");
+      expect(first.seasonImpression).not.toMatch(/Haru|Aoi/u);
     }
   });
 });

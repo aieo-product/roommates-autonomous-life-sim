@@ -281,6 +281,7 @@ export type ResultScreenGame = {
 
 export type ResultScreenProps = {
   game: ResultScreenGame;
+  characterNames?: Record<ResultCharacterId, string>;
   onRestartSameSeed?: () => void | Promise<void>;
   onRestartNewSeed?: () => void | Promise<void>;
 };

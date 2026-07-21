@@ -6,6 +6,9 @@ import {
   type AssetManagerDocument,
   type AssetOrientation,
   type Bounds,
+  type CharacterRole,
+  type CharacterRuntimeId,
+  type CharacterSpriteSheet,
   type ManagedCharacterAsset,
   type ManagedFurnitureAsset,
   type ManagedPlacement,
@@ -53,6 +56,7 @@ type RawFurnitureManifest = {
 type RawCharacterAsset = {
   id: string;
   name?: string;
+  runtimeId?: string;
   role?: string;
   animationPreset?: string;
   relativeVisualHeight?: number;
@@ -68,12 +72,24 @@ type RawCharacterAsset = {
     flipY?: boolean;
     fitScale?: number;
   };
+  spriteSheet?: CharacterSpriteSheet;
+  placement?: {
+    instanceId?: string;
+    roomId: string;
+    floorContact: Point;
+    orientation?: string;
+    flipX?: boolean;
+    flipY?: boolean;
+  };
 };
 
 type RawCharacterManifest = {
   frameSize?: Size;
   pivot?: Point;
   logicalTileFootprint?: { width: number; height: number };
+  sheet?: { width: number; height: number; columns: number; rows: number };
+  directionOrder?: string[];
+  frameDurationMs?: number;
   characters?: RawCharacterAsset[];
 };
 
@@ -116,13 +132,71 @@ const humanizeAssetId = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
+const canonicalRoomId = (roomId: string): string => {
+  if (roomId === "haru_room") return "male_room";
+  if (roomId === "aoi_room" || roomId === "famale_room") return "female_room";
+  return roomId;
+};
+
 const runtimeIdForCharacter = (
   id: string,
-): ManagedCharacterAsset["runtimeId"] => {
+  explicit?: string,
+): CharacterRuntimeId | undefined => {
+  if (explicit === "haru" || explicit === "aoi" || explicit === "navigator") return explicit;
   if (id === "otani-haru" || id === "haru") return "haru";
   if (id === "mizuhara-aoi" || id === "aoi") return "aoi";
   if (id === "navigator") return "navigator";
   return undefined;
+};
+
+const roleForCharacter = (
+  role: string | undefined,
+  runtimeId: CharacterRuntimeId | undefined,
+): CharacterRole => {
+  if (role === "male" || role === "female" || role === "navigator") return role;
+  if (runtimeId === "aoi") return "female";
+  if (runtimeId === "navigator") return "navigator";
+  return "male";
+};
+
+const createSpriteSheet = (
+  manifest: RawCharacterManifest,
+  asset: RawCharacterAsset,
+  frameSize: Size,
+): CharacterSpriteSheet => {
+  if (asset.spriteSheet) return structuredClone(asset.spriteSheet);
+  const columns = manifest.sheet?.columns ?? 3;
+  const rows = manifest.sheet?.rows ?? 4;
+  const directionOrder = manifest.directionOrder ?? ["south", "east", "north", "west"];
+  const directionRow = (direction: "south" | "east" | "north" | "west", fallback: number) => {
+    const index = directionOrder.indexOf(direction);
+    return index >= 0 ? index : fallback;
+  };
+  const animationPreset = asset.animationPreset ?? "walk";
+  return {
+    file: asset.sheet,
+    canvas: {
+      width: manifest.sheet?.width ?? frameSize.width * columns,
+      height: manifest.sheet?.height ?? frameSize.height * rows,
+    },
+    frameSize: { ...frameSize },
+    columns,
+    rows,
+    directionRows: {
+      south: directionRow("south", 0),
+      east: directionRow("east", 1),
+      north: directionRow("north", 2),
+      west: directionRow("west", 3),
+    },
+    animations: {
+      idle: { frames: [1], frameDurationMs: manifest.frameDurationMs ?? 170, loop: true },
+      [animationPreset]: {
+        frames: [0, 1, 2, 1],
+        frameDurationMs: manifest.frameDurationMs ?? 170,
+        loop: true,
+      },
+    },
+  };
 };
 
 const createFurnitureAssets = (): ManagedFurnitureAsset[] => {
@@ -157,7 +231,7 @@ const createFurniturePlacements = (): ManagedPlacement[] => {
   return (manifest.defaultScene?.instances ?? []).map((placement) => ({
     instanceId: placement.instanceId,
     assetId: placement.assetId,
-    roomId: placement.roomId,
+    roomId: canonicalRoomId(placement.roomId),
     floorContact: { ...placement.floorContact },
     ...(placement.orientation ? { orientation: asOrientation(placement.orientation) } : {}),
     ...(placement.flipX !== undefined ? { flipX: placement.flipX } : {}),
@@ -172,6 +246,7 @@ const createCharacterAssets = (): ManagedCharacterAsset[] => {
   const logicalFootprint = manifest.logicalTileFootprint ?? { width: 1, height: 1 };
 
   return (manifest.characters ?? []).map((asset) => {
+    const runtimeId = runtimeIdForCharacter(asset.id, asset.runtimeId);
     const width = asset.footprintTiles?.width ?? logicalFootprint.width;
     const depth = asset.footprintTiles?.depth
       ?? asset.footprintTiles?.height
@@ -179,8 +254,8 @@ const createCharacterAssets = (): ManagedCharacterAsset[] => {
     return {
       id: asset.id,
       label: asset.name?.trim() || humanizeAssetId(asset.id),
-      runtimeId: runtimeIdForCharacter(asset.id),
-      role: asset.role ?? "resident",
+      runtimeId,
+      role: roleForCharacter(asset.role, runtimeId),
       animationPreset: asset.animationPreset ?? "walk",
       file: asset.sheet,
       imageUrl: characterUrlFor(asset.sheet),
@@ -196,6 +271,7 @@ const createCharacterAssets = (): ManagedCharacterAsset[] => {
         flipY: asset.render?.flipY ?? false,
         fitScale: asset.render?.fitScale ?? asset.relativeVisualHeight ?? 1,
       },
+      spriteSheet: createSpriteSheet(manifest, asset, asset.render?.canvas ?? frameSize),
     };
   });
 };
@@ -205,17 +281,25 @@ const defaultCharacterPlacement = (
   index: number,
 ): ManagedPlacement => {
   const defaults: Record<string, { roomId: string; floorContact: Point }> = {
-    haru: { roomId: "haru_room", floorContact: { x: 4.3, y: 4.8 } },
-    aoi: { roomId: "aoi_room", floorContact: { x: 12.2, y: 4.8 } },
+    haru: { roomId: "male_room", floorContact: { x: 4.3, y: 4.8 } },
+    aoi: { roomId: "female_room", floorContact: { x: 12.2, y: 4.8 } },
     navigator: { roomId: "living", floorContact: { x: 17.5, y: 11.5 } },
   };
   const fallback = { roomId: "living", floorContact: { x: 18 + index, y: 13 } };
-  const placement = asset.runtimeId ? defaults[asset.runtimeId] ?? fallback : fallback;
+  const rawAsset = (characterManifestJson as unknown as RawCharacterManifest).characters
+    ?.find((candidate) => candidate.id === asset.id);
+  const placement = rawAsset?.placement
+    ?? (asset.runtimeId ? defaults[asset.runtimeId] ?? fallback : fallback);
   return {
-    instanceId: `${asset.id}-start`,
+    instanceId: rawAsset?.placement?.instanceId ?? `${asset.id}-start`,
     assetId: asset.id,
-    roomId: placement.roomId,
+    roomId: canonicalRoomId(placement.roomId),
     floorContact: { ...placement.floorContact },
+    ...(rawAsset?.placement?.orientation
+      ? { orientation: asOrientation(rawAsset.placement.orientation) }
+      : {}),
+    ...(rawAsset?.placement?.flipX !== undefined ? { flipX: rawAsset.placement.flipX } : {}),
+    ...(rawAsset?.placement?.flipY !== undefined ? { flipY: rawAsset.placement.flipY } : {}),
   };
 };
 
@@ -236,4 +320,3 @@ export const createDefaultAssetManagerDocument = (): AssetManagerDocument => {
     },
   };
 };
-

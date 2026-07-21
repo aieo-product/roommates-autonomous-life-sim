@@ -12,9 +12,9 @@
   },
   "characters": [
     {
-      "id": "sample.haru",
-      "label": "Sample Haru",
-      "role": "resident",
+      "id": "sample.male",
+      "label": "Sample Male Slot Asset",
+      "role": "male",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
       "render": {
@@ -26,11 +26,11 @@
         "fitScale": 1
       },
       "portrait": {
-        "file": "images/haru-portrait.png",
+        "file": "images/male-portrait.png",
         "canvas": { "width": 256, "height": 256 }
       },
       "spriteSheet": {
-        "file": "images/haru-walk-cycle.png",
+        "file": "images/male-walk-cycle.png",
         "canvas": { "width": 384, "height": 512 },
         "frameSize": { "width": 128, "height": 128 },
         "columns": 3,
@@ -43,9 +43,9 @@
       }
     },
     {
-      "id": "sample.aoi",
-      "label": "Sample Aoi",
-      "role": "resident",
+      "id": "sample.female",
+      "label": "Sample Female Slot Asset",
+      "role": "female",
       "footprintTiles": { "width": 1, "depth": 1 },
       "orientation": "south-west-to-north-east",
       "render": {
@@ -57,11 +57,11 @@
         "fitScale": 1
       },
       "portrait": {
-        "file": "images/aoi-portrait.png",
+        "file": "images/female-portrait.png",
         "canvas": { "width": 256, "height": 256 }
       },
       "spriteSheet": {
-        "file": "images/aoi-walk-cycle.png",
+        "file": "images/female-walk-cycle.png",
         "canvas": { "width": 384, "height": 512 },
         "frameSize": { "width": 128, "height": 128 },
         "columns": 3,

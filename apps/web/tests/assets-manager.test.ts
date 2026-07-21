@@ -3,6 +3,7 @@ import {
   ASSET_MANAGER_STORAGE_KEY,
   AssetManagerValidationError,
   createDefaultAssetManagerDocument,
+  findManagedCharacterAsset,
   loadAssetManagerDocument,
   parseAssetManagerJson,
   resolveCharacterScene,
@@ -34,10 +35,61 @@ describe("asset manager document", () => {
       "aoi",
       "navigator",
     ]);
+    expect(project.assets.characters.map((asset) => asset.role)).toEqual([
+      "male",
+      "female",
+      "navigator",
+    ]);
+    expect(project.assets.characters[0]?.spriteSheet).toMatchObject({
+      canvas: { width: 384, height: 512 },
+      frameSize: { width: 128, height: 128 },
+      columns: 3,
+      rows: 4,
+      directionRows: { south: 0, east: 1, north: 2, west: 3 },
+      animations: { walk: { frames: [0, 1, 2, 1], frameDurationMs: 170 } },
+    });
     expect(project.assets.characters.every((asset) => (
       asset.footprintTiles.width === 1 && asset.footprintTiles.depth === 1
     ))).toBe(true);
     expect(project.placements.furniture.length).toBeGreaterThan(10);
+    expect(project.placements.characters.map((placement) => placement.roomId)).toEqual([
+      "male_room",
+      "female_room",
+      "living",
+    ]);
+  });
+
+  it("migrates legacy resident roles, room aliases, and missing sheet metadata", () => {
+    const legacy = createDefaultAssetManagerDocument() as unknown as {
+      assets: { characters: Array<Record<string, unknown>> };
+      placements: { characters: Array<Record<string, unknown>> };
+    };
+    legacy.assets.characters[0]!.role = "resident";
+    legacy.assets.characters[1]!.role = "resident";
+    legacy.assets.characters[2]!.role = "player-command-agent";
+    legacy.assets.characters[0]!.id = "custom-resident-one";
+    legacy.assets.characters[1]!.id = "custom-resident-two";
+    delete legacy.assets.characters[0]!.runtimeId;
+    delete legacy.assets.characters[1]!.runtimeId;
+    legacy.placements.characters[0]!.assetId = "custom-resident-one";
+    legacy.placements.characters[1]!.assetId = "custom-resident-two";
+    legacy.assets.characters.forEach((character) => { delete character.spriteSheet; });
+    legacy.placements.characters[0]!.roomId = "haru_room";
+    legacy.placements.characters[1]!.roomId = "aoi_room";
+
+    const migrated = parseAssetManagerJson(JSON.stringify(legacy));
+
+    expect(migrated.assets.characters.map((asset) => asset.role)).toEqual([
+      "male",
+      "female",
+      "navigator",
+    ]);
+    expect(migrated.assets.characters.every((asset) => asset.spriteSheet.columns === 3)).toBe(true);
+    expect(migrated.placements.characters.map((placement) => placement.roomId)).toEqual([
+      "male_room",
+      "female_room",
+      "living",
+    ]);
   });
 
   it("round-trips URL and uploaded Data URL image sources", () => {
@@ -65,6 +117,32 @@ describe("asset manager document", () => {
       expect.objectContaining({ path: "assets.furniture.0.imageUrl" }),
       expect.objectContaining({ path: "assets.furniture.1.id" }),
       expect.objectContaining({ path: "placements.furniture.0.floorContact.x" }),
+    ]));
+  });
+
+  it("rejects role/runtime mismatches and invalid sprite sheet contracts", () => {
+    const project = createDefaultAssetManagerDocument();
+    const male = project.assets.characters[0]!;
+    male.role = "female";
+    male.spriteSheet.canvas.width = 385;
+    male.spriteSheet.animations.walk!.frames = [3];
+
+    const issues = validateAssetManagerDocument(project);
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "assets.characters.0.role" }),
+      expect.objectContaining({ path: "assets.characters.0.spriteSheet.canvas" }),
+      expect.objectContaining({ path: "assets.characters.0.spriteSheet.animations.walk.frames.0" }),
+    ]));
+  });
+
+  it("validates action tags as stable, unique IDs", () => {
+    const project = createDefaultAssetManagerDocument();
+    project.assets.furniture[0]!.anchorIds = ["cook", "cook", "not valid"];
+
+    expect(validateAssetManagerDocument(project)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "assets.furniture.0.anchorIds.1" }),
+      expect.objectContaining({ path: "assets.furniture.0.anchorIds.2" }),
     ]));
   });
 
@@ -105,6 +183,15 @@ describe("asset manager persistence", () => {
 });
 
 describe("runtime asset resolution", () => {
+  it("resolves canonical male/female roles while keeping haru/aoi aliases", () => {
+    const project = createDefaultAssetManagerDocument();
+
+    expect(findManagedCharacterAsset(project, "male")?.runtimeId).toBe("haru");
+    expect(findManagedCharacterAsset(project, "female")?.runtimeId).toBe("aoi");
+    expect(findManagedCharacterAsset(project, "haru")?.role).toBe("male");
+    expect(findManagedCharacterAsset(project, "aoi")?.role).toBe("female");
+  });
+
   it("resolves edited furniture configuration and placement without a reload", () => {
     const project = createDefaultAssetManagerDocument();
     const placement = project.placements.furniture[0]!;
@@ -138,4 +225,3 @@ describe("runtime asset resolution", () => {
     });
   });
 });
-

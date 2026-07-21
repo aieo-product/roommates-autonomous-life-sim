@@ -53,6 +53,7 @@ import {
 } from "./dekopin";
 import { getGameControlState, type ActionBusy } from "./game-controls";
 import { resolveSpeechBubblePlacement } from "./speech-bubble";
+import { createAssetInteractionAnchors } from "./asset-interactions";
 import dekopinSpriteUrl from "../../../assets/characters/navigator/walk-cycle.png";
 import type {
   AgentDecision,
@@ -109,11 +110,6 @@ const PHASES: { id: Phase; label: string; short: string; time: string; icon: str
 
 type PersonInfo = { name: string; job: string; age: number };
 type People = Record<CharacterId, PersonInfo>;
-
-const PEOPLE: People = {
-  haru: { name: "Haru", job: "Web Engineer", age: 27 },
-  aoi: { name: "Aoi", job: "Designer", age: 26 },
-};
 
 const DAILY_PLANS: Record<CharacterId, Record<Phase, PlanItem>> = {
   haru: {
@@ -552,12 +548,22 @@ function ApartmentStage({
   );
 }
 
-function ResolutionProgress({ stages, active, message }: { stages: TurnStages; active: boolean; message: string }) {
+function ResolutionProgress({
+  stages,
+  active,
+  message,
+  people,
+}: {
+  stages: TurnStages;
+  active: boolean;
+  message: string;
+  people: People;
+}) {
   if (!active) return null;
   const items = [
     { key: "navigator" as const, name: DEKOPIN_NAME },
-    { key: "haru" as const, name: "Haru" },
-    { key: "aoi" as const, name: "Aoi" },
+    { key: "haru" as const, name: people.haru.name },
+    { key: "aoi" as const, name: people.aoi.name },
     { key: "director" as const, name: "できごと" },
   ];
   return (
@@ -1027,7 +1033,7 @@ function MemoryArticleModal({
   );
 }
 
-function DebugDetails({ game }: { game: GameState }) {
+function DebugDetails({ game, people }: { game: GameState; people: People }) {
   const runtime = game.runtime;
   return (
     <details className="debug-details">
@@ -1035,8 +1041,8 @@ function DebugDetails({ game }: { game: GameState }) {
       <div className="debug-grid">
         <div><span>Revision</span><code>{game.revision}</code></div>
         <div><span>Status</span><code>{game.status}</code></div>
-        <div><span>Haru thread</span><code>{shortId(runtime.haruThreadId)}</code></div>
-        <div><span>Aoi thread</span><code>{shortId(runtime.aoiThreadId)}</code></div>
+        <div><span>{people.haru.name} thread</span><code>{shortId(runtime.haruThreadId)}</code></div>
+        <div><span>{people.aoi.name} thread</span><code>{shortId(runtime.aoiThreadId)}</code></div>
         <div><span>Director</span><code>{shortId(runtime.directorThreadId)}</code></div>
         <div><span>Model</span><code>{runtime.model ?? "server default"}</code></div>
       </div>
@@ -1046,12 +1052,14 @@ function DebugDetails({ game }: { game: GameState }) {
 
 function LogDrawer({
   events,
+  people,
   navigatorResponses,
   filter,
   onFilter,
   onClose,
 }: {
   events: GameEvent[];
+  people: People;
   navigatorResponses: Record<string, string>;
   filter: LogFilter;
   onFilter: (filter: LogFilter) => void;
@@ -1089,7 +1097,7 @@ function LogDrawer({
         <div className="log-filters" role="tablist" aria-label="ログの絞り込み">
           {([[
             "all", "すべて"
-          ], ["haru", "Haru"], ["aoi", "Aoi"], ["event", "できごと"]] as [LogFilter, string][]).map(([id, label]) => (
+          ], ["haru", people.haru.name], ["aoi", people.aoi.name], ["event", "できごと"]] as [LogFilter, string][]).map(([id, label]) => (
             <button type="button" id={`log-filter-${id}`} role="tab" aria-selected={filter === id} aria-controls="life-log-list" tabIndex={filter === id ? 0 : -1} className={filter === id ? "is-active" : ""} onClick={() => onFilter(id)} key={id}>{label}</button>
           ))}
         </div>
@@ -1108,8 +1116,8 @@ function LogDrawer({
               {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>デコピンへの指示</b>{event.suggestion}</p>}
               {filter !== "haru" && filter !== "aoi" && <p>{event.narration}</p>}
               {filter !== "haru" && filter !== "aoi" && navigatorMessage && <blockquote className="quote-dekopin"><b>{DEKOPIN_NAME}</b>「{navigatorMessage}」</blockquote>}
-              {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>Haru</b>「{event.haruDialogue}」</blockquote>}
-              {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>Aoi</b>「{event.aoiDialogue}」</blockquote>}
+              {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>{people.haru.name}</b>「{event.haruDialogue}」</blockquote>}
+              {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>{people.aoi.name}</b>「{event.aoiDialogue}」</blockquote>}
             </div>
           </article>
           );
@@ -1123,9 +1131,9 @@ export default function App() {
   const characterSettings = useCharacterSettings();
   const { document: assetDocument } = useAssetManager();
   const managedNavigator = useManagedCharacterAsset("navigator");
+  const roomIds = useMemo(() => new Set(ROOM_ZONES.map((room) => room.id)), []);
   const furnitureObstacles = useMemo<GridObstacle[]>(() => {
     const assets = new Map(assetDocument.assets.furniture.map((asset) => [asset.id, asset]));
-    const roomIds = new Set(ROOM_ZONES.map((room) => room.id));
     return assetDocument.placements.furniture.flatMap((placement) => {
       const asset = assets.get(placement.assetId);
       if (!asset || !roomIds.has(placement.roomId as GridObstacle["roomId"])) return [];
@@ -1137,7 +1145,11 @@ export default function App() {
         depth: asset.footprintTiles.depth,
       }];
     });
-  }, [assetDocument]);
+  }, [assetDocument, roomIds]);
+  const interactionAnchors = useMemo(
+    () => createAssetInteractionAnchors(assetDocument, roomIds),
+    [assetDocument, roomIds],
+  );
   const people = useMemo<People>(() => ({
     haru: {
       name: characterSettings.savedSettings.characters.haru.profile.name,
@@ -1535,8 +1547,11 @@ export default function App() {
     return game.currentEvent ? [game.currentEvent] : [];
   }, [game.currentEvent, game.eventLog]);
   const memoryArticle = useMemo(
-    () => activeMemory ? buildMemoryArticle(activeMemory, eventLog) : undefined,
-    [activeMemory, eventLog],
+    () => activeMemory ? buildMemoryArticle(activeMemory, eventLog, {
+      haru: people.haru.name,
+      aoi: people.aoi.name,
+    }) : undefined,
+    [activeMemory, eventLog, people],
   );
   const latestEvent = game.currentEvent ?? eventLog[eventLog.length - 1];
   const latestNavigatorMessage = latestEvent
@@ -1589,11 +1604,17 @@ export default function App() {
     if (playedAfterSceneIdsRef.current.has(event.id)) return;
     playedAfterSceneIdsRef.current.add(event.id);
     setAfterScene({
-      plan: createAfterScenePlan(event, game, turnStartStatesRef.current, furnitureObstacles),
+      plan: createAfterScenePlan(
+        event,
+        game,
+        turnStartStatesRef.current,
+        furnitureObstacles,
+        interactionAnchors,
+      ),
       beatIndex: -1,
     });
     turnStartStatesRef.current = undefined;
-  }, [furnitureObstacles, game]);
+  }, [furnitureObstacles, game, interactionAnchors]);
 
   useEffect(() => {
     if (initialLoading) return;
@@ -1692,6 +1713,7 @@ export default function App() {
           )}
           <ResultScreen
             game={game}
+            characterNames={{ haru: people.haru.name, aoi: people.aoi.name }}
             onRestartSameSeed={restartSameSeed}
             onRestartNewSeed={restartNewSeed}
           />
@@ -1757,7 +1779,7 @@ export default function App() {
                 <ResidentChip person="haru" info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
                 <ResidentChip person="aoi" info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
               </div>
-              <ResolutionProgress stages={stages} active={resolving} message={streamMessage} />
+              <ResolutionProgress stages={stages} active={resolving} message={streamMessage} people={people} />
               <EventCard event={latestEvent} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
                 setLogOpen(false);
                 setActiveMemory(undefined);
@@ -1809,7 +1831,7 @@ export default function App() {
             </div>
           </section>
 
-          {logOpen && <LogDrawer events={eventLog} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={closeLog} />}
+          {logOpen && <LogDrawer events={eventLog} people={people} navigatorResponses={navigatorResponses} filter={logFilter} onFilter={setLogFilter} onClose={closeLog} />}
         </section>
 
         <aside className="inspector-panel" aria-label="住人と共同生活の詳細">
@@ -1825,7 +1847,7 @@ export default function App() {
             {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} canUseCue={canSubmitCue} onUseCue={useScheduleCue} />}
             {inspectorTab === "memories" && <MemoryPanel game={game} onOpenMemory={setActiveMemory} />}
           </div>
-          <DebugDetails game={game} />
+          <DebugDetails game={game} people={people} />
         </aside>
       </main>
       {eventAnnouncement && (

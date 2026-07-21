@@ -409,8 +409,43 @@ describe("selectHighlights and buildResultNarrative", () => {
 
     expect(selectHighlights([selfInitiated])[0]).toMatchObject({
       kind: "self_initiated",
-      headline: "Haruから始まった「Haruの朝の一歩」",
+      headline: "住人1から始まった「Haruの朝の一歩」",
     });
+  });
+
+  it("uses configured display names in highlights, score evidence, and narrative", () => {
+    const customRoster = {
+      haru: { id: "haru", displayName: "蓮", role: "male" },
+      aoi: { id: "aoi", displayName: "凛", role: "female" },
+    } as const;
+    const custom = entry(0, {
+      decisions: { haru: publicDecision("INITIATE"), aoi: publicDecision("ACCEPT") },
+      haruDecision: "INITIATE",
+      resolutionBranch: "self_initiated",
+      eventTitle: "朝の一歩",
+    });
+
+    expect(selectHighlights([custom], 4, customRoster)[0]?.headline).toBe(
+      "蓮から始まった「朝の一歩」",
+    );
+    const producer = buildProducerResult([
+      entry(0, {
+        decisions: { haru: publicDecision("MODIFY"), aoi: publicDecision("ACCEPT") },
+        haruDecision: "MODIFY",
+      }),
+      entry(1, {
+        decisions: { haru: publicDecision("ACCEPT"), aoi: publicDecision("INITIATE") },
+        aoiDecision: "INITIATE",
+      }),
+    ], undefined, customRoster);
+    expect(JSON.stringify(producer)).toContain("蓮のMODIFYまたはINITIATE");
+    const narrative = buildResultNarrative(
+      [custom],
+      { kind: "roommates", title: "新しい朝", narration: "二人は歩き出した。" },
+      undefined,
+      customRoster,
+    );
+    expect(JSON.stringify(narrative)).toContain("蓮はINITIATE");
   });
 
   it("builds a stable seven-chapter article that references every turn", () => {
