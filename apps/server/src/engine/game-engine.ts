@@ -58,6 +58,7 @@ import {
 } from "./autonomy/composer.js";
 import { EVENT_DEFINITIONS_BY_ID } from "./event-definitions.js";
 import { constrainResolvedEvent } from "./event-policy.js";
+import { phaseStartLocations } from "./phase-start-locations.js";
 import {
   PUBLIC_PROSE_MAX_LENGTH,
   clipPublicText,
@@ -973,15 +974,42 @@ export class GameEngine {
     if (this.state.status !== "resolved") throw new GameConflictError("現在のターンを先に完了してください");
     const currentIndex = phaseOrder.indexOf(this.state.shared.phase);
     const wraps = currentIndex === phaseOrder.length - 1;
+    const nextDay = wraps ? Math.min(7, this.state.shared.day + 1) : this.state.shared.day;
+    const nextPhase = phaseOrder[(currentIndex + 1) % phaseOrder.length]!;
+    const nextLocations = phaseStartLocations({
+      seed: this.state.seed,
+      day: nextDay,
+      phase: nextPhase,
+      current: {
+        haru: this.state.characters.haru.state.location,
+        aoi: this.state.characters.aoi.state.location,
+      },
+    });
     this.state = {
       ...this.state,
       revision: this.state.revision + 1,
       status: "awaiting_suggestion",
       turnId: undefined,
+      characters: {
+        haru: {
+          ...this.state.characters.haru,
+          state: {
+            ...this.state.characters.haru.state,
+            location: nextLocations.haru,
+          },
+        },
+        aoi: {
+          ...this.state.characters.aoi,
+          state: {
+            ...this.state.characters.aoi.state,
+            location: nextLocations.aoi,
+          },
+        },
+      },
       shared: {
         ...this.state.shared,
-        day: wraps ? Math.min(7, this.state.shared.day + 1) : this.state.shared.day,
-        phase: phaseOrder[(currentIndex + 1) % phaseOrder.length]!,
+        day: nextDay,
+        phase: nextPhase,
       },
     };
     await this.repository.save(this.state);

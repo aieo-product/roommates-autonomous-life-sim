@@ -20,7 +20,7 @@ import {
 } from "./api";
 import {
   ROOM_ZONES,
-  characterAnchor,
+  characterDestinationForLocation,
   focusPointForRoom,
   roomForEvent,
   roomForLocation,
@@ -90,6 +90,14 @@ type TurnStages = {
   director: StageStatus;
 };
 
+type TimePassageStage = "passing" | "reveal" | "leaving";
+
+export type TimePassageTransition = {
+  from: { day: number; phase: Phase };
+  to: { day: number; phase: Phase };
+  stage: TimePassageStage;
+};
+
 type PlanItem = {
   time: string;
   title: string;
@@ -105,11 +113,11 @@ const PRESETS = [
   "ベランダでゆっくり話してみたら？",
 ];
 
-const PHASES: { id: Phase; label: string; short: string; time: string; icon: string }[] = [
-  { id: "morning", label: "朝", short: "朝", time: "07:00", icon: "☀" },
-  { id: "afternoon", label: "昼", short: "昼", time: "12:00", icon: "▤" },
-  { id: "evening", label: "夕方", short: "夕", time: "18:00", icon: "◆" },
-  { id: "night", label: "夜", short: "夜", time: "22:00", icon: "☾" },
+const PHASES: { id: Phase; label: string; short: string; english: string; time: string; icon: string }[] = [
+  { id: "morning", label: "朝", short: "朝", english: "MORNING", time: "07:00", icon: "☀" },
+  { id: "afternoon", label: "昼", short: "昼", english: "AFTERNOON", time: "12:00", icon: "▤" },
+  { id: "evening", label: "夕方", short: "夕", english: "EVENING", time: "18:00", icon: "◆" },
+  { id: "night", label: "夜", short: "夜", english: "NIGHT", time: "22:00", icon: "☾" },
 ];
 
 type PersonInfo = { name: string; job: string; age: number };
@@ -169,6 +177,26 @@ const shortId = (value?: string): string =>
   value ? `${value.slice(0, 7)}…${value.slice(-4)}` : "未発行";
 
 const phaseIndex = (phase: Phase): number => PHASES.findIndex((item) => item.id === phase);
+
+export const nextTimeSlot = (day: number, phase: Phase): { day: number; phase: Phase } => {
+  const index = phaseIndex(phase);
+  const nextPhase = PHASES[index + 1]?.id;
+  return nextPhase
+    ? { day, phase: nextPhase }
+    : { day: Math.min(7, day + 1), phase: "morning" };
+};
+
+export const shouldShowIdleEventDialogue = (
+  status: GameState["status"],
+  day: number,
+  phase: Phase,
+  event?: Pick<GameEvent, "day" | "phase">,
+): boolean => Boolean(
+  event
+  && event.day === day
+  && event.phase === phase
+  && (status === "resolved" || status === "ended"),
+);
 
 const clipText = (value: string, limit = 48): string =>
   value.length > limit ? `${value.slice(0, limit)}…` : value;
@@ -259,6 +287,62 @@ function PhaseRail({ game }: { game: GameState }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+export function TimePassageOverlay({ transition }: { transition: TimePassageTransition }) {
+  const fromPhase = PHASES.find((phase) => phase.id === transition.from.phase) ?? PHASES[0];
+  const toPhase = PHASES.find((phase) => phase.id === transition.to.phase) ?? PHASES[0];
+  const revealed = transition.stage !== "passing";
+  const progress = revealed ? 100 : 68;
+  const status = transition.stage === "passing"
+    ? `DAY ${transition.from.day} ${fromPhase.english}からDAY ${transition.to.day} ${toPhase.english}へ、時間が進んでいます`
+    : `DAY ${transition.to.day} ${toPhase.english}、${toPhase.label}になりました`;
+
+  return (
+    <div
+      className={`time-passage-overlay is-${transition.stage}`}
+      role="status"
+      aria-live="assertive"
+      aria-atomic="true"
+      aria-label={status}
+    >
+      <div className="time-passage-speed-lines" aria-hidden="true"><i /><i /><i /><i /></div>
+      <section className="time-passage-card">
+        <div className="time-passage-clock" aria-hidden="true">
+          <span>{toPhase.icon}</span>
+          <i />
+        </div>
+        <div className="time-passage-copy">
+          <p className="time-passage-kicker">{revealed ? "NEW TIME SLOT" : "TIME IS PASSING..."}</p>
+          <div className="time-passage-heading">
+            <span>DAY</span>
+            <strong>{transition.to.day}</strong>
+          </div>
+          <h2>{toPhase.english}</h2>
+          <p className="time-passage-phase-label">{toPhase.icon} {toPhase.label} · {toPhase.time}</p>
+        </div>
+        <div className="time-passage-progress">
+          <div className="time-passage-route" aria-hidden="true">
+            <span>DAY {transition.from.day} · {fromPhase.short}</span>
+            <b>›››</b>
+            <span>DAY {transition.to.day} · {toPhase.short}</span>
+          </div>
+          <div
+            className="time-passage-track"
+            role="progressbar"
+            aria-label="次の時間帯までの進行"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress}
+          >
+            <span />
+            <i aria-hidden="true">★</i>
+          </div>
+          <p>{revealed ? "新しい時間帯がはじまります" : "ふたりの時間が流れています"}</p>
+        </div>
+      </section>
     </div>
   );
 }
@@ -413,6 +497,7 @@ function ApartmentStage({
   currentEvent,
   afterScene,
   turnStart,
+  furnitureObstacles,
   resolving,
   onSelectPerson,
 }: {
@@ -423,6 +508,7 @@ function ApartmentStage({
   currentEvent?: GameEvent;
   afterScene?: AfterScenePlayback;
   turnStart?: Partial<Record<CharacterId, CharacterState>>;
+  furnitureObstacles: readonly GridObstacle[];
   resolving: boolean;
   onSelectPerson: (person: CharacterId) => void;
 }) {
@@ -456,7 +542,12 @@ function ApartmentStage({
       // Keep the pre-turn pose through React's completion batching. The ref is
       // cleared only when the ordered playback has been installed.
       const state = turnStart?.[person];
-      return characterAnchor(person, state ?? game[person]);
+      const visibleState = state ?? game[person];
+      return characterDestinationForLocation(
+        person,
+        visibleState.location,
+        furnitureObstacles,
+      );
     }
     if (playback.beatIndex < 0) return playback.plan.initialPoints[person];
     return activeBeat?.points[person] ?? playback.plan.finalPoints[person];
@@ -464,6 +555,14 @@ function ApartmentStage({
   const dialogueFor = (person: CharacterId): string | undefined => {
     if (!playback || resolving) {
       if (resolving) return undefined;
+      if (!shouldShowIdleEventDialogue(
+        game.status,
+        game.shared.day,
+        game.shared.phase,
+        currentEvent,
+      )) {
+        return undefined;
+      }
       return game.decisions[person]?.dialogue
         ?? (person === "haru" ? currentEvent?.haruDialogue : currentEvent?.aoiDialogue);
     }
@@ -1221,6 +1320,7 @@ export default function App() {
   const [freshEventId, setFreshEventId] = useState<string | null>(null);
   const [eventSuggestionFallbacks, setEventSuggestionFallbacks] = useState<Record<string, string>>({});
   const [afterScene, setAfterScene] = useState<AfterScenePlayback>();
+  const [timePassage, setTimePassage] = useState<TimePassageTransition>();
   const [reducedMotion, setReducedMotion] = useState(false);
   const [activeMemory, setActiveMemory] = useState<Memory>();
   const [personalityOpen, setPersonalityOpen] = useState(false);
@@ -1232,6 +1332,8 @@ export default function App() {
   const submittedSuggestionRef = useRef<string | null>(null);
   const playedAfterSceneIdsRef = useRef(new Set<string>());
   const turnStartStatesRef = useRef<Partial<Record<CharacterId, CharacterState>> | undefined>(undefined);
+  const timePassageTimersRef = useRef(new Map<number, () => void>());
+  const appUnmountedRef = useRef(false);
 
   const closePersonality = useCallback(() => {
     setPersonalityOpen(false);
@@ -1278,6 +1380,26 @@ export default function App() {
   }, [game.status, initialLoading, refreshGame, resolving]);
 
   useEffect(() => () => turnAbortRef.current?.abort(), []);
+
+  const waitForTimePassage = useCallback((delay: number) => new Promise<void>((resolve) => {
+    const timer = window.setTimeout(() => {
+      timePassageTimersRef.current.delete(timer);
+      resolve();
+    }, delay);
+    timePassageTimersRef.current.set(timer, resolve);
+  }), []);
+
+  useEffect(() => {
+    appUnmountedRef.current = false;
+    return () => {
+      appUnmountedRef.current = true;
+      timePassageTimersRef.current.forEach((resolve, timer) => {
+        window.clearTimeout(timer);
+        resolve();
+      });
+      timePassageTimersRef.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -1543,14 +1665,51 @@ export default function App() {
     if (kind === "fast") setNavigatorMessage("");
     setActionBusy(kind);
     setNotice("");
+    const transitionFrom = { day: game.shared.day, phase: game.shared.phase };
+    const transitionStartedAt = Date.now();
+    if (kind === "advance") {
+      setLogOpen(false);
+      setActiveMemory(undefined);
+      setPersonalityOpen(false);
+      setTimePassage({
+        from: transitionFrom,
+        to: nextTimeSlot(transitionFrom.day, transitionFrom.phase),
+        stage: "passing",
+      });
+    }
     try {
       const payload = await (kind === "advance"
         ? advanceGame()
         : kind === "reset"
           ? resetGame(resetSeed)
           : fastForwardGame(characterSettings.savedSettings));
-      if (payload !== undefined) setGame((previous) => normalizeGameState(payload, kind === "reset" ? INITIAL_GAME_STATE : previous));
-      else await refreshGame();
+      if (appUnmountedRef.current) return;
+      if (kind === "advance") {
+        const authoritativePayload = payload ?? await getGame();
+        const nextGame = normalizeGameState(authoritativePayload, game);
+        const transitionTo = { day: nextGame.shared.day, phase: nextGame.shared.phase };
+        setTimePassage({ from: transitionFrom, to: transitionTo, stage: "passing" });
+        const minimumPassage = reducedMotion ? 180 : 1_350;
+        const elapsed = Date.now() - transitionStartedAt;
+        if (elapsed < minimumPassage) await waitForTimePassage(minimumPassage - elapsed);
+        if (appUnmountedRef.current) return;
+
+        // Commit the authoritative phase and character positions while the
+        // opaque eye-catch is still covering the previous scene. The updated
+        // room is only revealed when the eye-catch leaves.
+        setGame(nextGame);
+        setTimePassage({ from: transitionFrom, to: transitionTo, stage: "reveal" });
+        await waitForTimePassage(reducedMotion ? 650 : 1_050);
+        if (appUnmountedRef.current) return;
+        setTimePassage({ from: transitionFrom, to: transitionTo, stage: "leaving" });
+        await waitForTimePassage(reducedMotion ? 40 : 420);
+        if (appUnmountedRef.current) return;
+        setTimePassage(undefined);
+      } else if (payload !== undefined) {
+        setGame((previous) => normalizeGameState(payload, kind === "reset" ? INITIAL_GAME_STATE : previous));
+      } else {
+        await refreshGame();
+      }
       if (kind === "reset") {
         setSuggestion("");
         setLastSuggestion("");
@@ -1572,9 +1731,11 @@ export default function App() {
       }
       setOffline(false);
     } catch (error) {
+      if (appUnmountedRef.current) return;
+      if (kind === "advance") setTimePassage(undefined);
       setNotice(error instanceof Error ? error.message : "操作に失敗しました");
     } finally {
-      setActionBusy(null);
+      if (!appUnmountedRef.current) setActionBusy(null);
       if (operationRef.current === kind) operationRef.current = null;
     }
   };
@@ -1641,6 +1802,7 @@ export default function App() {
     ? eventLog.find((event) => event.id === eventAnnouncementId)
       ?? (latestEvent?.id === eventAnnouncementId ? latestEvent : undefined)
     : undefined;
+  const interactionBlocked = Boolean(eventAnnouncement || timePassage);
 
   const beginAfterScene = useCallback((event: GameEvent) => {
     if (playedAfterSceneIdsRef.current.has(event.id)) return;
@@ -1781,8 +1943,9 @@ export default function App() {
   }
 
   return (
-    <div className={`app phase-theme-${game.shared.phase}`}>
-      <header className="topbar" aria-label="ゲーム情報とメニュー" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
+    <div className={`app phase-theme-${game.shared.phase} ${timePassage ? "is-time-passing" : ""}`} aria-busy={timePassage ? true : undefined}>
+      {timePassage && <TimePassageOverlay transition={timePassage} />}
+      <header className="topbar" aria-label="ゲーム情報とメニュー" aria-hidden={interactionBlocked ? true : undefined} inert={interactionBlocked ? true : undefined}>
         <a href="#game" className="brand" aria-label="ROOMMATES ホーム"><span className="brand-mark" aria-hidden="true"><img src={managedNavigator?.portraitUrl ?? navigatorCharacterAssets.portraitUrl} alt="" /></span><span><strong>ROOMMATES</strong><small>AUTONOMOUS LIFE SIM</small></span></a>
         <PhaseRail game={game} />
         <div className="header-stat relationship-status"><small>RELATIONSHIP</small><strong><span aria-hidden="true">♥</span>{RELATIONSHIPS[game.shared.relationshipLabel]}</strong></div>
@@ -1796,13 +1959,13 @@ export default function App() {
         </div>
       </header>
 
-      {notice && <div className="notice" role="alert" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}><span>!</span><p>{formatCharacterDisplayText(notice, people, historicalDisplayRosters)}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
+      {notice && <div className="notice" role="alert" aria-hidden={interactionBlocked ? true : undefined} inert={interactionBlocked ? true : undefined}><span>!</span><p>{formatCharacterDisplayText(notice, people, historicalDisplayRosters)}</p><button type="button" onClick={() => setNotice("")} aria-label="閉じる">×</button></div>}
       {initialLoading && <div className="loading-banner"><span /><p>ふたりの生活を読み込んでいます…</p></div>}
 
       {personalityOpen && <PersonalityStudio controller={characterSettings} onClose={closePersonality} />}
       {memoryArticle && <MemoryArticleModal article={memoryArticle} people={people} rosters={historicalDisplayRosters} onClose={() => setActiveMemory(undefined)} />}
 
-      <main id="game" className="game-layout" aria-hidden={eventAnnouncement ? true : undefined} inert={eventAnnouncement ? true : undefined}>
+      <main id="game" className="game-layout" aria-hidden={interactionBlocked ? true : undefined} inert={interactionBlocked ? true : undefined}>
         <section className="world-column" aria-label="ふたりの生活画面">
           <div className={`world-stage-wrap ${mapOverlaysVisible ? "" : "is-map-focus"}`}>
             <button
@@ -1816,7 +1979,7 @@ export default function App() {
               マップ情報
               <span aria-hidden="true">{mapOverlaysVisible ? "ON" : "OFF"}</span>
             </button>
-            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} resolving={resolving} onSelectPerson={selectCharacter} />
+            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} furnitureObstacles={furnitureObstacles} resolving={resolving} onSelectPerson={selectCharacter} />
             <div id="map-overlay-layer" className="map-overlay-layer">
               <div className="resident-hud" aria-label="住人の状態">
                 <ResidentChip person="haru" people={people} roster={game.characterRoster} info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
