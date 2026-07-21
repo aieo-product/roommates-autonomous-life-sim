@@ -123,6 +123,14 @@ describe("mobile map overlay control", () => {
     expect(layer).not.toContain("<EventAnnouncementModal");
   });
 
+  it("keeps resident parameters in the speech-safe lower-right area", () => {
+    expect(desktopStyles).toMatch(/\.resident-hud\s*\{[^}]*top:\s*auto;[^}]*right:\s*12px;[^}]*bottom:\s*12px;[^}]*left:\s*auto;/);
+    expect(mobileStyles).toMatch(/\.resident-hud\s*\{[^}]*top:\s*auto;[^}]*right:\s*8px;[^}]*bottom:\s*120px;[^}]*left:\s*auto;[^}]*width:\s*min\(324px,\s*calc\(100% - 16px\)\);[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    expect(mobileStyles).toMatch(/\.resolution-progress\s*\{[^}]*top:\s*8px;[^}]*left:\s*8px;[^}]*right:\s*124px;/);
+    expect(mobileStyles).toMatch(/\.resolution-progress p\s*\{\s*display:\s*none;/);
+    expect(mobileStyles).toMatch(/\.event-card\s*\{[^}]*height:\s*104px;[^}]*max-height:\s*104px;[^}]*overflow:\s*hidden;/);
+  });
+
   it("is mobile-only, touch sized, and cannot hide desktop overlays", () => {
     expect(desktopStyles).toMatch(/\.map-overlay-layer\s*\{\s*display:\s*contents;/);
     expect(desktopStyles).toMatch(/\.map-overlay-toggle\s*\{[^}]*display:\s*none;/);
