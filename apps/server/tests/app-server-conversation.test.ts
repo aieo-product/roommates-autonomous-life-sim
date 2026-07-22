@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createInitialGameState,
+  directorResolvedEventDraftSchema,
+  directorResolvedEventSchema,
   getDefaultCharacterSettings,
   type CharacterDecision,
   type CharacterDecisionInput,
@@ -12,6 +14,7 @@ import {
   type AppServerAdapter,
   ResilientAgentCoordinator,
 } from "../src/agents/coordinator.js";
+import { ProviderCascadeAdapter } from "../src/agents/provider-cascade.js";
 import {
   directorInstructions,
   directorPrompt,
@@ -35,6 +38,13 @@ const decision: CharacterDecision = {
   expectedEffects: {},
 };
 
+const directorConversation = [
+  { speaker: "aoi" as const, text: "ソファでは、どんな話から始めたい？" },
+  { speaker: "haru" as const, text: "今日あったことを少し聞いてほしいな。" },
+  { speaker: "aoi" as const, text: "うん。急がずに聞かせて。" },
+  { speaker: "haru" as const, text: "ありがとう。落ち着いて話せそう。" },
+] as const;
+
 function directorInput(): DirectorInput {
   const state = createInitialGameState("app-server-conversation");
   const suggestion = sanitizeSuggestion("二人で少し話してみて");
@@ -56,6 +66,38 @@ function directorInput(): DirectorInput {
   };
 }
 
+function directorDraft(includeConversation = true) {
+  return {
+    eventTitle: "ソファで続く会話",
+    narration: "二人はソファに腰掛け、自然に言葉を交わした。",
+    haruDialogue: directorConversation[1].text,
+    aoiDialogue: directorConversation[0].text,
+    ...(includeConversation
+      ? {
+          conversation: directorConversation,
+        }
+      : {}),
+    // Shape-valid provider draft, but the third agreement is misplaced after
+    // the action. The event policy must repair this before commit.
+    storyBeats: [
+      { kind: "move" as const, actor: "both" as const, location: "リビング" },
+      { kind: "dialogue" as const, actor: "aoi" as const, text: directorConversation[0].text },
+      { kind: "dialogue" as const, actor: "haru" as const, text: directorConversation[1].text },
+      { kind: "action" as const, actor: "both" as const, action: "ソファに腰掛けて話す" },
+      { kind: "dialogue" as const, actor: "aoi" as const, text: directorConversation[2].text },
+      { kind: "dialogue" as const, actor: "haru" as const, text: directorConversation[3].text },
+    ],
+    effects: { haru: {}, aoi: {} },
+    memory: {
+      title: "ソファで続く会話",
+      summary: "二人が自分たちのペースで話した",
+      emotionalImpact: 2,
+      importance: 3,
+    },
+    scene: { haru: "リビング", aoi: "リビング" },
+  };
+}
+
 function appServerAdapter(includeConversation = true): AppServerAdapter {
   return {
     navigate: vi.fn(async (_input: NavigatorInput) => ({
@@ -67,38 +109,7 @@ function appServerAdapter(includeConversation = true): AppServerAdapter {
       threadId: "character-app-server-thread",
     })),
     resolve: vi.fn(async (_input: DirectorInput) => ({
-      value: {
-        eventTitle: "ソファで続く会話",
-        narration: "二人はソファに腰掛け、自然に言葉を交わした。",
-        haruDialogue: decision.dialogue,
-        aoiDialogue: decision.dialogue,
-        ...(includeConversation
-          ? {
-              conversation: [
-                { speaker: "haru", text: decision.dialogue },
-                { speaker: "aoi", text: decision.dialogue },
-                { speaker: "haru", text: "APP_SERVER_CONVERSATION_HARU" },
-                { speaker: "aoi", text: "APP_SERVER_CONVERSATION_AOI" },
-              ],
-            }
-          : {}),
-        storyBeats: [
-          { kind: "move", actor: "both", location: "リビング" },
-          { kind: "dialogue", actor: "haru", text: decision.dialogue },
-          { kind: "dialogue", actor: "aoi", text: decision.dialogue },
-          { kind: "action", actor: "both", action: "ソファに腰掛けて話す" },
-          { kind: "dialogue", actor: "haru", text: "APP_SERVER_CONVERSATION_HARU" },
-          { kind: "dialogue", actor: "aoi", text: "APP_SERVER_CONVERSATION_AOI" },
-        ],
-        effects: { haru: {}, aoi: {} },
-        memory: {
-          title: "ソファで続く会話",
-          summary: "二人が自分たちのペースで話した",
-          emotionalImpact: 2,
-          importance: 3,
-        },
-        scene: { haru: "リビング", aoi: "リビング" },
-      },
+      value: directorDraft(includeConversation),
       threadId: "director-app-server-thread",
     })),
     shutdown: vi.fn(async () => undefined),
@@ -140,14 +151,23 @@ describe("App Server Director conversation contract", () => {
     expect(haruDialogue).toMatchObject({ minLength: 1, maxLength: 160 });
     expect(aoiDialogue).toMatchObject({ minLength: 1, maxLength: 160 });
     expect(conversation).toMatchObject({ minItems: 3, maxItems: 6 });
-    expect(storyBeats).toMatchObject({ minItems: 4, maxItems: 8 });
+    expect(storyBeats).toMatchObject({ minItems: 6, maxItems: 10 });
     expect(storyBeats.items?.anyOf).toHaveLength(3);
     expect(storyBeats.items?.anyOf?.[0]?.properties?.location?.maxLength).toBe(48);
     expect(storyBeats.items?.anyOf?.[1]?.properties?.actor?.enum).toEqual(["haru", "aoi"]);
     expect(storyBeats.items?.anyOf?.[1]?.properties?.text?.maxLength).toBe(160);
     expect(storyBeats.items?.anyOf?.[2]?.properties?.action?.maxLength).toBe(160);
     expect(directorInstructions).toContain("3〜6発話");
-    expect(directorInstructions).toContain("moveは必ず2個以上");
+    expect(directorInstructions).toContain("質問または誘い→相手の直接の返答");
+    expect(directorInstructions).toContain("各1回だけ");
+    expect(directorInstructions).toContain("moveは2個以上");
+    expect(directorInstructions).toContain("共同イベントでは");
+    expect(directorInstructions).toContain("非共同イベントでは");
+    expect(directorInstructions).toContain("最初の3発話");
+    expect(directorInstructions).toContain("基本のconversationを4発話");
+    expect(directorInstructions).toContain(
+      "二人分の個別moveは同時の移動段階として連続してよい",
+    );
     expect(directorInstructions).toContain("DECLINEやIGNORE");
     expect(directorInstructions).toContain("internalSummary");
     expect(directorInstructions).toContain("eventDefinition");
@@ -158,10 +178,13 @@ describe("App Server Director conversation contract", () => {
 
   it("keeps App Server conversation in the committed and public event", async () => {
     const adapter = appServerAdapter();
+    const cascade = new ProviderCascadeAdapter([
+      { source: "app_server", adapter },
+    ]);
     const agents = new ResilientAgentCoordinator(
       "app-server",
       1_000,
-      adapter,
+      cascade,
     );
     const engine = new GameEngine(new MemoryGameRepository(), agents);
     await engine.initialize();
@@ -178,26 +201,35 @@ describe("App Server Director conversation contract", () => {
     );
     const publicState = toPublicGameState(state);
 
+    expect(directorResolvedEventDraftSchema.safeParse(directorDraft()).success).toBe(true);
+    expect(directorResolvedEventSchema.safeParse(directorDraft()).success).toBe(false);
     expect(state.runtime.director).toMatchObject({
       source: "app_server",
       threadId: "director-app-server-thread",
     });
-    expect(publicState.lastEvent?.conversation?.slice(2)).toEqual([
-      { speaker: "haru", text: "APP_SERVER_CONVERSATION_HARU" },
-      { speaker: "aoi", text: "APP_SERVER_CONVERSATION_AOI" },
-    ]);
+    expect(publicState.lastEvent?.conversation).toEqual(directorConversation);
+    expect(publicState.lastEvent?.conversation).not.toContainEqual({
+      speaker: "haru",
+      text: decision.dialogue,
+    });
     expect(publicState.eventLog.at(-1)?.conversation).toEqual(
       publicState.lastEvent?.conversation,
     );
     expect(publicState.lastEvent?.storyBeats).toEqual([
       { kind: "move", actor: "both", location: "ダイニングの食卓" },
-      { kind: "dialogue", actor: "haru", text: decision.dialogue },
-      { kind: "dialogue", actor: "aoi", text: decision.dialogue },
+      { kind: "dialogue", actor: "aoi", text: directorConversation[0].text },
+      { kind: "dialogue", actor: "haru", text: directorConversation[1].text },
+      { kind: "dialogue", actor: "aoi", text: directorConversation[2].text },
       { kind: "move", actor: "both", location: "リビング" },
-      { kind: "action", actor: "both", action: "ソファに腰掛けて話す" },
-      { kind: "dialogue", actor: "haru", text: "APP_SERVER_CONVERSATION_HARU" },
-      { kind: "dialogue", actor: "aoi", text: "APP_SERVER_CONVERSATION_AOI" },
+      {
+        kind: "action",
+        actor: "both",
+        action: "リビングで少し話す。リビングで少し話す",
+      },
+      { kind: "dialogue", actor: "haru", text: directorConversation[3].text },
     ]);
+    expect(directorResolvedEventSchema.safeParse(state.lastEvent).success).toBe(true);
+    expect(adapter.resolve).toHaveBeenCalledTimes(1);
     expect(publicState.eventLog.at(-1)?.storyBeats).toEqual(
       publicState.lastEvent?.storyBeats,
     );

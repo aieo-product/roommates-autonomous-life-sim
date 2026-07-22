@@ -14,7 +14,9 @@ import {
   EVENT_CONVERSATION_TEXT_MAX_LENGTH,
   EVENT_STORY_BEAT_CONTENT_MAX_LENGTH,
   EVENT_STORY_BEAT_LOCATION_MAX_LENGTH,
+  EVENT_STORY_BEATS_MAX_LENGTH,
   characterDisplayName,
+  directorResolvedEventSchema,
   eventStoryBeatsSchema,
   mutableStatKeys,
 } from "@roommates/shared";
@@ -184,50 +186,133 @@ function conversationText(value: string, fallback: string): string {
   return normalized || fallback;
 }
 
+function shortIntent(value: string, fallback: string): string {
+  const normalized = value.trim().replace(/\s+/gu, " ").slice(0, 72).trim();
+  return normalized || fallback;
+}
+
+function cooperativeFallbackConversation(
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+): EventConversationLine[] {
+  const haruAction = shortIntent(decisions.haru.action, "無理のないところから始める");
+  const aoiAction = shortIntent(decisions.aoi.action, "できることから始める");
+  return [
+    { speaker: "haru", text: "このあと、どう進めたい？" },
+    {
+      speaker: "aoi",
+      text: conversationText(
+        `「${aoiAction}」がいいな。そっちは？`,
+        "できることから始めたいな。そっちは？",
+      ),
+    },
+    {
+      speaker: "haru",
+      text: conversationText(
+        `じゃあ、こちらは「${haruAction}」で合わせよう。`,
+        "じゃあ、無理のないところから合わせよう。",
+      ),
+    },
+    { speaker: "aoi", text: "うん。二人のペースで進められたね。" },
+  ];
+}
+
+function refusalConversation(
+  event: ResolvedEvent,
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+): EventConversationLine[] {
+  const refusalText = (decision: CharacterDecision): string =>
+    decision.decision === "IGNORE"
+      ? "今はその提案には加わらず、自分のことをしているね。"
+      : "今回は参加せず、自分の時間を過ごすね。";
+  const haruJoins = cooperative.has(decisions.haru.decision);
+  const aoiJoins = cooperative.has(decisions.aoi.decision);
+  if (haruJoins && !aoiJoins) {
+    return [
+      {
+        speaker: "haru",
+        text: conversationText(
+          `このあと「${shortIntent(decisions.haru.action, event.eventTitle)}」を一緒にどうかな？`,
+          "このあと、一緒にどうかな？",
+        ),
+      },
+      {
+        speaker: "aoi",
+        text: refusalText(decisions.aoi),
+      },
+      { speaker: "haru", text: "わかった。今日はそれぞれのペースで過ごそう。" },
+      { speaker: "haru", text: "ひとりでも、無理なく少し進められた。" },
+    ];
+  }
+  if (!haruJoins && aoiJoins) {
+    return [
+      {
+        speaker: "aoi",
+        text: conversationText(
+          `このあと「${shortIntent(decisions.aoi.action, event.eventTitle)}」を一緒にどう？`,
+          "このあと、一緒にどう？",
+        ),
+      },
+      {
+        speaker: "haru",
+        text: refusalText(decisions.haru),
+      },
+      { speaker: "aoi", text: "わかった。今日はそれぞれのペースで過ごそう。" },
+      { speaker: "aoi", text: "ひとりでも、無理なく少し進められた。" },
+    ];
+  }
+  return [
+    {
+      speaker: "haru",
+      text: `${refusalText(decisions.haru)} そっちはどうしたい？`,
+    },
+    {
+      speaker: "aoi",
+      text: refusalText(decisions.aoi),
+    },
+    { speaker: "haru", text: "うん。今日はそれぞれの時間を大切にしよう。" },
+    { speaker: "haru", text: "少し落ち着けた。今はこのまま休もう。" },
+  ];
+}
+
+function safeNonCooperativeAction(
+  definition: EventDefinition,
+  decisions: { haru: CharacterDecision; aoi: CharacterDecision },
+): string {
+  const oneJoins =
+    cooperative.has(decisions.haru.decision) || cooperative.has(decisions.aoi.decision);
+  return storyText(
+    oneJoins ? definition.branches.oneParticipates : definition.branches.bothDecline,
+    oneJoins
+      ? "参加を選んだ側だけが、自分のペースで小さく試す"
+      : "提案を実行せず、それぞれの時間を過ごす",
+  );
+}
+
 function safeConversation(
   event: ResolvedEvent,
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
 ): EventConversationLine[] {
   const haruJoins = cooperative.has(decisions.haru.decision);
   const aoiJoins = cooperative.has(decisions.aoi.decision);
-  const opening: EventConversationLine[] = [
-    {
-      speaker: "haru",
-      text: conversationText(decisions.haru.dialogue, "今は自分のペースで過ごすね。"),
-    },
-    {
-      speaker: "aoi",
-      text: conversationText(decisions.aoi.dialogue, "私も自分のペースで過ごすね。"),
-    },
-  ];
 
   // Director prose must never turn a refusal or IGNORE into participation.
   if (!haruJoins || !aoiJoins) {
-    const acknowledgement: EventConversationLine = haruJoins
-      ? { speaker: "haru", text: "わかった。今日はそれぞれのペースで過ごそう。" }
-      : aoiJoins
-        ? { speaker: "aoi", text: "わかった。今日はそれぞれのペースで過ごそう。" }
-        : { speaker: "haru", text: "うん。今日はそれぞれの時間を大切にしよう。" };
-    return [...opening, acknowledgement];
+    return refusalConversation(event, decisions);
   }
 
-  const continuation = (event.conversation ?? [])
-    .slice(2)
+  const authored = (event.conversation ?? [])
+    .slice(0, EVENT_CONVERSATION_MAX_LINES)
     .map((line) => ({
       speaker: line.speaker,
       text: conversationText(line.text, "少しずつ進めよう。"),
     }));
-  const conversation = [...opening, ...continuation].slice(
-    0,
-    EVENT_CONVERSATION_MAX_LINES,
-  );
-  if (conversation.length < 3) {
-    conversation.push({
-      speaker: "haru",
-      text: "それじゃ、二人のペースで始めよう。",
-    });
-  }
-  return conversation;
+  const opensAsExchange =
+    authored.length >= 4 &&
+    authored[0]?.speaker !== authored[1]?.speaker;
+  const speakers = new Set(authored.map((line) => line.speaker));
+  return opensAsExchange && speakers.has("haru") && speakers.has("aoi")
+    ? authored
+    : cooperativeFallbackConversation(decisions);
 }
 
 function locationZone(location: string): string {
@@ -320,6 +405,7 @@ function storyStagingLocation(finalLocation: string): string {
 }
 
 function fallbackStoryBeats(
+  definition: EventDefinition,
   event: ResolvedEvent,
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
   conversation: EventConversationLine[],
@@ -337,18 +423,27 @@ function fallbackStoryBeats(
     privateRoomLocation("aoi", characterRoster),
   );
   const sharedDestination = haruJoins && aoiJoins && haruLocation === aoiLocation;
+  const openingLineCount = 3;
+  const openingExchange = conversation.slice(0, openingLineCount);
+  const followUp = conversation.slice(openingLineCount);
   const story: EventStoryBeat[] = sharedDestination
     ? [
         { kind: "move", actor: "both", location: storyStagingLocation(haruLocation) },
-        { kind: "dialogue", actor: conversation[0]!.speaker, text: conversation[0]!.text },
-        { kind: "dialogue", actor: conversation[1]!.speaker, text: conversation[1]!.text },
+        ...openingExchange.map((line): EventStoryBeat => ({
+          kind: "dialogue",
+          actor: line.speaker,
+          text: line.text,
+        })),
         { kind: "move", actor: "both", location: haruLocation },
       ]
     : [
+        ...openingExchange.map((line): EventStoryBeat => ({
+          kind: "dialogue",
+          actor: line.speaker,
+          text: line.text,
+        })),
         { kind: "move", actor: "haru", location: haruLocation },
         { kind: "move", actor: "aoi", location: aoiLocation },
-        { kind: "dialogue", actor: conversation[0]!.speaker, text: conversation[0]!.text },
-        { kind: "dialogue", actor: conversation[1]!.speaker, text: conversation[1]!.text },
       ];
   const actionActor = haruJoins && aoiJoins
     ? "both"
@@ -359,17 +454,17 @@ function fallbackStoryBeats(
         : "haru";
   const actionText = actionActor === "both"
     ? `${decisions.haru.action}。${decisions.aoi.action}`
-    : decisions[actionActor].action;
+    : safeNonCooperativeAction(definition, decisions);
   story.push({
     kind: "action",
     actor: actionActor,
     action: storyText(actionText, storyText(event.narration, "それぞれの時間を過ごす")),
   });
-  const remainingSlots = 8 - story.length;
-  for (const line of conversation.slice(2, 2 + remainingSlots)) {
+  const remainingSlots = EVENT_STORY_BEATS_MAX_LENGTH - story.length;
+  for (const line of followUp.slice(0, remainingSlots)) {
     story.push({ kind: "dialogue", actor: line.speaker, text: line.text });
   }
-  return story.slice(0, 8);
+  return story.slice(0, EVENT_STORY_BEATS_MAX_LENGTH);
 }
 
 /**
@@ -385,7 +480,7 @@ function ensureCooperativeJourney(
   // A malformed multi-move draft is safer to replace than to guess which
   // destination should own each existing action or line.
   if (beats.filter((beat) => beat.kind === "move").length !== 1) return undefined;
-  if (beats.length >= 8) return undefined;
+  if (beats.length >= EVENT_STORY_BEATS_MAX_LENGTH) return undefined;
 
   const actionIndex = beats.findIndex((beat) => beat.kind === "action");
   if (actionIndex < 0) return undefined;
@@ -443,6 +538,7 @@ function lastMoveIndexFor(beats: EventStoryBeat[], id: CharacterId): number {
 }
 
 function safeStoryBeats(
+  definition: EventDefinition,
   event: ResolvedEvent,
   decisions: { haru: CharacterDecision; aoi: CharacterDecision },
   conversation: EventConversationLine[],
@@ -452,6 +548,19 @@ function safeStoryBeats(
   const haruJoins = cooperative.has(decisions.haru.decision);
   const aoiJoins = cooperative.has(decisions.aoi.decision);
   const bothJoin = haruJoins && aoiJoins;
+  if (!bothJoin) {
+    // A non-participant's model-authored dialogue, narration, and actions may
+    // contradict the structured decision. Rebuild the whole choreography from
+    // the server-owned branch instead of trying to repair individual phrases.
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
+  }
   let dialogueIndex = 0;
   const authored = (event.storyBeats ?? []).flatMap((beat): EventStoryBeat[] => {
     if (beat.kind === "move") {
@@ -487,30 +596,113 @@ function safeStoryBeats(
     }];
   });
 
-  if (dialogueIndex < 3) {
-    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
+  if (dialogueIndex !== conversation.length) {
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
+  }
+
+  const firstActionIndex = authored.findIndex((beat) => beat.kind === "action");
+  const speakersBeforeAction = new Set(
+    authored
+      .slice(0, firstActionIndex < 0 ? 0 : firstActionIndex)
+      .flatMap((beat) => beat.kind === "dialogue" ? [beat.actor] : []),
+  );
+  if (
+    firstActionIndex < 0 ||
+    !speakersBeforeAction.has("haru") ||
+    !speakersBeforeAction.has("aoi") ||
+    authored
+      .slice(0, firstActionIndex)
+      .filter((beat) => beat.kind === "dialogue")
+      .length < 3
+  ) {
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
+  }
+
+  // When the residents will separate, their intent exchange belongs before
+  // either one leaves for the final room. Otherwise the animation depicts a
+  // question and reply spoken across unrelated rooms.
+  const finalHaruLocation = storyLocation(
+    scene?.haru,
+    privateRoomLocation("haru", characterRoster),
+  );
+  const finalAoiLocation = storyLocation(
+    scene?.aoi,
+    privateRoomLocation("aoi", characterRoster),
+  );
+  const separatesAfterConversation =
+    !bothJoin || locationZone(finalHaruLocation) !== locationZone(finalAoiLocation);
+  if (separatesAfterConversation) {
+    const firstMoveIndex = authored.findIndex((beat) => beat.kind === "move");
+    const speakersBeforeMove = new Set(
+      authored
+        .slice(0, firstMoveIndex < 0 ? 0 : firstMoveIndex)
+        .flatMap((beat) => beat.kind === "dialogue" ? [beat.actor] : []),
+    );
+    if (
+      firstMoveIndex < 0 ||
+      !speakersBeforeMove.has("haru") ||
+      !speakersBeforeMove.has("aoi")
+    ) {
+      return fallbackStoryBeats(
+        definition,
+        event,
+        decisions,
+        conversation,
+        scene,
+        characterRoster,
+      );
+    }
   }
 
   const haruMove = lastMoveIndexFor(authored, "haru");
   const aoiMove = lastMoveIndexFor(authored, "aoi");
   if (haruMove < 0 || aoiMove < 0) {
-    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
   }
-  const haruFinal = storyLocation(
-    scene?.haru,
-    privateRoomLocation("haru", characterRoster),
-  );
-  const aoiFinal = storyLocation(
-    scene?.aoi,
-    privateRoomLocation("aoi", characterRoster),
-  );
+  const haruFinal = finalHaruLocation;
+  const aoiFinal = finalAoiLocation;
   const haruBeat = authored[haruMove];
   const aoiBeat = authored[aoiMove];
   if (haruBeat?.kind !== "move" || aoiBeat?.kind !== "move") {
-    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
   }
   if ((haruBeat.actor === "both" || aoiBeat.actor === "both") && haruFinal !== aoiFinal) {
-    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
   }
   haruBeat.location = haruFinal;
   aoiBeat.location = aoiFinal;
@@ -519,12 +711,26 @@ function safeStoryBeats(
     ? ensureCooperativeJourney(authored, haruFinal)
     : authored;
   if (!normalized) {
-    return fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
+    return fallbackStoryBeats(
+      definition,
+      event,
+      decisions,
+      conversation,
+      scene,
+      characterRoster,
+    );
   }
   const parsed = eventStoryBeatsSchema.safeParse(normalized);
   return parsed.success
     ? parsed.data
-    : fallbackStoryBeats(event, decisions, conversation, scene, characterRoster);
+    : fallbackStoryBeats(
+        definition,
+        event,
+        decisions,
+        conversation,
+        scene,
+        characterRoster,
+      );
 }
 
 export function constrainResolvedEvent(
@@ -571,10 +777,12 @@ export function constrainResolvedEvent(
     .filter((value) => value.trim() && !unresolvedConflicts.includes(value))
     .slice(0, 1);
 
-  const narration =
-    branch === "bothParticipate"
+  const bothJoin = haruJoins && aoiJoins;
+  const narration = bothJoin
+    ? branch === "bothParticipate"
       ? event.narration
-      : `${definition.branches[branch]} ${event.narration}`.trim();
+      : `${definition.branches[branch]} ${event.narration}`.trim()
+    : definition.branches[branch];
   const conversation = safeConversation(event, decisions);
   const scene = safeScene(
     event,
@@ -582,14 +790,19 @@ export function constrainResolvedEvent(
     options.originalLocations,
     options.characterRoster,
   );
+  const haruDialogue = conversation.find((line) => line.speaker === "haru")?.text
+    ?? conversationText(decisions.haru.dialogue, "今は自分のペースで過ごすね。");
+  const aoiDialogue = conversation.find((line) => line.speaker === "aoi")?.text
+    ?? conversationText(decisions.aoi.dialogue, "私も自分のペースで過ごすね。");
 
-  return {
+  return directorResolvedEventSchema.parse({
     ...event,
     narration,
-    haruDialogue: decisions.haru.dialogue,
-    aoiDialogue: decisions.aoi.dialogue,
+    haruDialogue,
+    aoiDialogue,
     conversation,
     storyBeats: safeStoryBeats(
+      definition,
       event,
       decisions,
       conversation,
@@ -600,6 +813,7 @@ export function constrainResolvedEvent(
     effects: { haru: haruEffects, aoi: aoiEffects },
     memory: {
       ...event.memory,
+      summary: bothJoin ? event.memory.summary : definition.branches[branch],
       emotionalImpact:
         branch === "bothDecline" ? 0 : event.memory.emotionalImpact,
       importance:
@@ -609,5 +823,5 @@ export function constrainResolvedEvent(
       resolve?.length || add.length
         ? { ...(resolve?.length ? { resolve } : {}), ...(add.length ? { add } : {}) }
         : undefined,
-  };
+  });
 }

@@ -1,4 +1,5 @@
 import { roomForEvent, type RoomId } from "./room-layout.js";
+import { conversationForEvent } from "./after-scene.js";
 import type { DecisionType, GameEvent, Memory, Phase } from "./types.js";
 
 const PHASES: Phase[] = ["morning", "afternoon", "evening", "night"];
@@ -92,6 +93,9 @@ export function buildMemoryArticle(
         : "リビング";
   const haruLocation = event?.scene?.haru ?? inferredLocation;
   const aoiLocation = event?.scene?.aoi ?? inferredLocation;
+  const conversation = event ? conversationForEvent(event) : [];
+  const haruDialogue = conversation.find((turn) => turn.speaker === "haru")?.text;
+  const aoiDialogue = conversation.find((turn) => turn.speaker === "aoi")?.text;
 
   return {
     memory,
@@ -104,14 +108,14 @@ export function buildMemoryArticle(
     captureIsExact: Boolean(event?.scene?.haru && event.scene.aoi),
     haru: {
       action: event?.haruAction,
-      dialogue: event?.haruDialogue,
+      dialogue: haruDialogue,
       publicReason: event?.haruPublicReason,
       decision: event?.haruDecision,
       location: haruLocation,
     },
     aoi: {
       action: event?.aoiAction,
-      dialogue: event?.aoiDialogue,
+      dialogue: aoiDialogue,
       publicReason: event?.aoiPublicReason,
       decision: event?.aoiDecision,
       location: aoiLocation,

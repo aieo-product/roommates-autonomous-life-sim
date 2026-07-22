@@ -88,6 +88,11 @@ describe("resolved event announcement", () => {
     "    const latestId = latestEvent?.id ?? null;",
     ["\n  const selectCharacter"],
   );
+  const logDrawer = sourceBetween(
+    app,
+    "function LogDrawer",
+    ["export default function App"],
+  );
 
   it("is a labelled, focus-contained modal with responsive scrolling", () => {
     expect(modal).toContain('role="dialog"');
@@ -110,7 +115,20 @@ describe("resolved event announcement", () => {
     expect(modal).toContain("{displayText(navigatorMessage)}");
     expect(modal).toContain("formatCharacterDisplayText(value, people, event.characterRoster ?? roster)");
     expect(modal).toMatch(/const displayedSuggestion\s*=\s*(?:suggestion\s*\|\|\s*event\.suggestion|event\.suggestion\s*\|\|\s*suggestion)/);
+    expect(modal).toContain("const conversation = conversationForEvent(event)");
+    expect(modal).toContain('className="event-announcement-conversation"');
+    expect(modal).toContain("conversation.map((turn, index)");
+    expect(modal).not.toContain("resident.dialogue");
+    expect(css).toMatch(/\.event-announcement-conversation\s*\{[\s\S]*?margin-top:\s*13px;/);
     expect(modal).not.toContain("clipText(");
+  });
+
+  it("shows the complete authored conversation in archive order", () => {
+    expect(logDrawer).toContain("conversationForEvent(event)");
+    expect(logDrawer).toContain(".map((turn, index) =>");
+    expect(logDrawer).toContain("people[turn.speaker].name");
+    expect(logDrawer).not.toContain("event.haruDialogue &&");
+    expect(logDrawer).not.toContain("event.aoiDialogue &&");
   });
 
   it("pops a fresh resolved event in the stage and opens details only on request", () => {

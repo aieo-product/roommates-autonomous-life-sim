@@ -29,6 +29,7 @@ import type {
   ResultTurnSnapshot,
 } from "./result/types.js";
 import {
+  EVENT_STORY_BEATS_MAX_LENGTH,
   characterRosterSchema,
   type CharacterRoster,
   type CharacterSettings,
@@ -137,7 +138,7 @@ const normalizeStoryBeats = (value: unknown): GameEvent["storyBeats"] => {
         : [];
     }
     return [];
-  }).slice(0, 8);
+  }).slice(0, EVENT_STORY_BEATS_MAX_LENGTH);
   return beats.length ? beats : undefined;
 };
 
@@ -345,6 +346,11 @@ const normalizeEvent = (
   const cueSafetyFlags = stringArray(first(merged.cueSafetyFlags, cue.safetyFlags));
   const relationshipBefore = normalizeRelationshipOptional(merged.relationshipBefore);
   const relationshipAfter = normalizeRelationshipOptional(merged.relationshipAfter);
+  const conversation = normalizeConversation(
+    first(merged.conversation, merged.eventConversation, merged.event_conversation),
+  );
+  const firstConversationLine = (speaker: "haru" | "aoi"): string | undefined =>
+    conversation?.find((turn) => turn.speaker === speaker)?.text;
   return {
     id: text(merged.id, `event-${day}-${phase}-${index}-${eventTitle}`),
     characterRoster: normalizeCharacterRoster(
@@ -388,11 +394,19 @@ const normalizeEvent = (
     haruAction: optionalText(first(haruDecision?.action, merged.haruAction)),
     aoiAction: optionalText(first(aoiDecision?.action, merged.aoiAction)),
     haruDialogue:
-      optionalText(first(haruDecision?.dialogue, merged.haruDialogue, merged.haru_dialogue)),
-    aoiDialogue: optionalText(first(aoiDecision?.dialogue, merged.aoiDialogue, merged.aoi_dialogue)),
-    conversation: normalizeConversation(
-      first(merged.conversation, merged.eventConversation, merged.event_conversation),
-    ),
+      optionalText(first(
+        firstConversationLine("haru"),
+        merged.haruDialogue,
+        merged.haru_dialogue,
+        haruDecision?.dialogue,
+      )),
+    aoiDialogue: optionalText(first(
+      firstConversationLine("aoi"),
+      merged.aoiDialogue,
+      merged.aoi_dialogue,
+      aoiDecision?.dialogue,
+    )),
+    conversation,
     storyBeats: normalizeStoryBeats(
       first(merged.storyBeats, merged.story_beats, merged.choreography),
     ),

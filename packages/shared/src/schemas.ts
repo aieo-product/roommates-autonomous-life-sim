@@ -380,10 +380,13 @@ export const eventStoryBeatSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
-export const eventStoryBeatsSchema = z
+/** Provider draft boundary: validates bounded beat shapes, not chronology. */
+export const eventStoryBeatsDraftSchema = z
   .array(eventStoryBeatSchema)
   .min(EVENT_STORY_BEATS_MIN_LENGTH)
-  .max(EVENT_STORY_BEATS_MAX_LENGTH)
+  .max(EVENT_STORY_BEATS_MAX_LENGTH);
+
+export const eventStoryBeatsSchema = eventStoryBeatsDraftSchema
   .superRefine((beats, context) => {
     const stagedAction = beats.findIndex((beat, index) => {
       if (beat.kind !== "action") return false;
@@ -436,11 +439,71 @@ export const resolvedEventSchema = z
   })
   .strict();
 
-/** AI Director output requires the new exchange; persisted legacy events do not. */
-export const directorResolvedEventSchema = resolvedEventSchema.extend({
+/**
+ * Raw provider output. Cross-field chronology is intentionally repaired by
+ * the authoritative event policy before the strict Director contract runs.
+ */
+export const directorResolvedEventDraftSchema = resolvedEventSchema.extend({
   conversation: eventConversationSchema,
-  storyBeats: eventStoryBeatsSchema,
+  storyBeats: eventStoryBeatsDraftSchema,
 });
+
+/** AI Director output requires the new exchange; persisted legacy events do not. */
+export const directorResolvedEventSchema = resolvedEventSchema
+  .extend({
+    conversation: eventConversationSchema,
+    storyBeats: eventStoryBeatsSchema,
+  })
+  .superRefine((event, context) => {
+    const dialogueBeats = event.storyBeats.flatMap((beat) =>
+      beat.kind === "dialogue"
+        ? [{ speaker: beat.actor, text: beat.text }]
+        : [],
+    );
+    const conversationMatches =
+      dialogueBeats.length === event.conversation.length &&
+      dialogueBeats.every((line, index) => {
+        const expected = event.conversation[index];
+        return line.speaker === expected?.speaker && line.text === expected.text;
+      });
+    if (!conversationMatches) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "storyBeats must replay every conversation line once in the same order",
+        path: ["storyBeats"],
+      });
+    }
+
+    const firstActionIndex = event.storyBeats.findIndex((beat) => beat.kind === "action");
+    const speakersBeforeAction = new Set(
+      event.storyBeats
+        .slice(0, firstActionIndex < 0 ? 0 : firstActionIndex)
+        .flatMap((beat) => beat.kind === "dialogue" ? [beat.actor] : []),
+    );
+    if (
+      firstActionIndex < 0 ||
+      !speakersBeforeAction.has("haru") ||
+      !speakersBeforeAction.has("aoi")
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "both characters must state their intent before the first action",
+        path: ["storyBeats"],
+      });
+    }
+
+    const dialogueCountBeforeAction = event.storyBeats
+      .slice(0, firstActionIndex < 0 ? 0 : firstActionIndex)
+      .filter((beat) => beat.kind === "dialogue")
+      .length;
+    if (dialogueCountBeforeAction < 3) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "the first three conversation lines must precede the first action",
+        path: ["storyBeats"],
+      });
+    }
+  });
 
 export const characterStateSchema = z.object({
   energy: z.number().min(0).max(100),

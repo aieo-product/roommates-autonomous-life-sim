@@ -86,9 +86,10 @@ describe("GameEngine", () => {
     expect(result.lastEvent?.eventTitle).toBe(resolvedEvent.eventTitle);
     expect(result.lastEvent?.navigatorMessage).toBe("デコピンが二人へきっかけを届けるね。");
     expect(result.lastEvent?.conversation).toEqual([
-      { speaker: "haru", text: acceptedDecision.dialogue },
-      { speaker: "aoi", text: acceptedDecision.dialogue },
-      { speaker: "haru", text: "それじゃ、二人のペースで始めよう。" },
+      { speaker: "haru", text: "このあと、どう進めたい？" },
+      { speaker: "aoi", text: "「一緒に過ごす」がいいな。そっちは？" },
+      { speaker: "haru", text: "じゃあ、こちらは「一緒に過ごす」で合わせよう。" },
+      { speaker: "aoi", text: "うん。二人のペースで進められたね。" },
     ]);
     expect(result.eventLog[0]?.conversation).toEqual(result.lastEvent?.conversation);
     expect(result.navigator).toMatchObject({

@@ -720,50 +720,49 @@ a:focus-visible,
 .scene-haru .scene-nameplate { background: #377f9a; }
 .scene-aoi .scene-nameplate { background: #b95970; }
 
-.character-running-object { overflow: visible; }
-
-.character-running-indicator {
-  width: 116px;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 7px 9px;
-  color: #fff;
-  background: #274c68;
-  border: 3px solid var(--ink);
-  border-radius: 18px;
-  box-shadow: 3px 3px 0 rgba(33,48,72,.28);
-  font-size: 10px;
-  font-weight: 1000;
-  line-height: 1;
+.character-thinking-progress {
+  pointer-events: none;
+  filter: drop-shadow(3px 3px 0 rgba(33,48,72,.28));
 }
 
-.indicator-aoi { background: #934f68; }
+.thinking-progress-panel {
+  fill: #274c68;
+  stroke: var(--ink);
+  stroke-width: 3px;
+}
 
-.running-signal {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  background: #78f0b2;
-  border: 1px solid rgba(0,0,0,.32);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px rgba(120,240,178,.18);
+.indicator-aoi .thinking-progress-panel { fill: #934f68; }
+
+.thinking-progress-signal {
+  fill: #78f0b2;
+  stroke: rgba(0,0,0,.42);
+  stroke-width: 1px;
+  transform-box: fill-box;
+  transform-origin: center;
   animation: livePulse 1s ease-in-out infinite;
 }
 
-.running-dots { display: flex; align-items: center; gap: 2px; }
-.running-dots i {
-  width: 3px;
-  height: 3px;
-  display: block;
-  background: currentColor;
-  border-radius: 50%;
-  animation: agentRunningDot 1s ease-in-out infinite;
+.thinking-progress-label {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: .8px;
 }
-.running-dots i:nth-child(2) { animation-delay: .14s; }
-.running-dots i:nth-child(3) { animation-delay: .28s; }
+
+.thinking-progress-track,
+.thinking-progress-fill {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 6px;
+}
+
+.thinking-progress-track { stroke: rgba(255,255,255,.28); }
+
+.thinking-progress-fill {
+  stroke: #ffe15d;
+  stroke-dasharray: 32 68;
+  animation: characterThinkingProgress 1.2s linear infinite;
+}
 
 .speech-object,
 .scene-speech {
@@ -1564,9 +1563,39 @@ a:focus-visible,
 .event-announcement-person header small { color: #687b88; font-size: 7px; font-weight: 1000; }
 .event-announcement-person h3 { margin: 1px 0 0; font-size: 15px; }
 .event-announcement-person > strong { display: block; margin-top: 9px; font-size: 12px; line-height: 1.55; }
-.event-announcement-person blockquote { margin: 8px 0 0; padding: 8px 10px; background: #edf2ed; border-left: 5px solid var(--cyan); font-size: 11px; font-weight: 800; line-height: 1.6; overflow-wrap: anywhere; }
 .event-announcement-person > p { margin: 8px 0 0; color: #566a78; font-size: 10px; line-height: 1.55; }
 .event-announcement-person > p small { display: block; color: #7b8992; font-size: 7px; font-weight: 1000; }
+
+.event-announcement-conversation {
+  margin-top: 13px;
+  padding: 12px 14px;
+  background: #f5f0e4;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 rgba(31,48,64,.14);
+}
+.event-announcement-conversation > small { color: #5b7180; font-size: 8px; font-weight: 1000; letter-spacing: .8px; }
+.event-announcement-conversation > div { display: grid; gap: 7px; margin-top: 8px; }
+.event-announcement-conversation blockquote {
+  max-width: min(88%, 680px);
+  margin: 0;
+  padding: 8px 10px;
+  background: #dfeff1;
+  border: 2px solid #7295a0;
+  border-left: 6px solid var(--haru);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.event-announcement-conversation blockquote.quote-aoi {
+  justify-self: end;
+  background: #f7e3e3;
+  border-color: #b88089;
+  border-right: 6px solid var(--aoi);
+  border-left-width: 2px;
+}
+.event-announcement-conversation blockquote b { display: block; margin-bottom: 2px; color: #426b7d; font-size: 8px; }
+.event-announcement-conversation blockquote.quote-aoi b { color: #9b5062; }
+.event-announcement-conversation blockquote span { font-weight: 850; }
 
 .event-announcement-details { display: grid; gap: 2px; margin: 13px 0 0; background: #98aaac; border: 2px solid #74898e; }
 .event-announcement-details > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; padding: 8px 10px; background: #f1f2e9; }
@@ -2460,9 +2489,9 @@ a:focus-visible,
   50% { transform: translateY(-5px); }
 }
 
-@keyframes agentRunningDot {
-  0%, 60%, 100% { opacity: .35; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-2px); }
+@keyframes characterThinkingProgress {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
 }
 
 @keyframes ringRotate {
@@ -2580,6 +2609,8 @@ a:focus-visible,
   .event-announcement-person { padding: 9px; border-width: 2px; }
   .event-announcement-person.person-haru,
   .event-announcement-person.person-aoi { border-top-width: 5px; }
+  .event-announcement-conversation { margin-top: 10px; padding: 9px; border-width: 2px; }
+  .event-announcement-conversation blockquote { max-width: 94%; padding: 7px 8px; font-size: 10px; }
   .event-announcement-details > div { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 8px; }
   .event-announcement-footer {
     min-height: 0;
@@ -2626,6 +2657,16 @@ a:focus-visible,
   .scene-character.is-acting .character-sprite {
     animation: none !important;
     transform: none !important;
+  }
+
+  .thinking-progress-signal,
+  .thinking-progress-fill {
+    animation: none !important;
+  }
+
+  .thinking-progress-fill {
+    stroke-dasharray: 68 32;
+    stroke-dashoffset: 0;
   }
 
   .dekopin-guide .dekopin-sprite-sheet {

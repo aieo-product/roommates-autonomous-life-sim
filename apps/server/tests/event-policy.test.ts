@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createInitialGameState,
+  directorResolvedEventSchema,
   mutableStatKeys,
   type CharacterDecision,
   type EventDefinition,
@@ -199,9 +200,15 @@ describe("constrainResolvedEvent", () => {
     "replaces Director conversation when Aoi chooses %s",
     (choice) => {
       const haru = decision("ACCEPT");
-      const aoi = decision(choice);
+      const aoi: CharacterDecision = {
+        ...decision(choice),
+        action: "Haruと二人で料理を始める",
+        dialogue: "やっぱり参加するよ。",
+      };
+      const cooking = definition("shared-cooking");
       const unsafeConversation: ResolvedEvent = {
         ...structuredClone(resolvedEvent),
+        narration: "二人は合意して、一緒に料理を始めた。",
         scene: { haru: "キッチン", aoi: "キッチン" },
         conversation: [
           { speaker: "haru", text: "一緒にやろう。" },
@@ -214,10 +221,14 @@ describe("constrainResolvedEvent", () => {
           { kind: "action", actor: "both", action: "二人で料理を始める" },
           { kind: "dialogue", actor: "haru", text: "説得できてよかった。" },
         ],
+        memory: {
+          ...resolvedEvent.memory,
+          summary: "二人が一緒に料理へ参加した",
+        },
       };
 
       const constrained = constrainResolvedEvent(
-        definition("shared-cooking"),
+        cooking,
         unsafeConversation,
         { haru, aoi },
         [],
@@ -227,15 +238,28 @@ describe("constrainResolvedEvent", () => {
       );
 
       expect(constrained.conversation).toEqual([
-        { speaker: "haru", text: haru.dialogue },
-        { speaker: "aoi", text: aoi.dialogue },
+        { speaker: "haru", text: "このあと「一緒に過ごす」を一緒にどうかな？" },
+        {
+          speaker: "aoi",
+          text: choice === "IGNORE"
+            ? "今はその提案には加わらず、自分のことをしているね。"
+            : "今回は参加せず、自分の時間を過ごすね。",
+        },
         {
           speaker: "haru",
           text: "わかった。今日はそれぞれのペースで過ごそう。",
         },
+        {
+          speaker: "haru",
+          text: "ひとりでも、無理なく少し進められた。",
+        },
       ]);
       expect(JSON.stringify(constrained.conversation)).not.toContain("参加することにした");
       expect(JSON.stringify(constrained.conversation)).not.toContain("説得できて");
+      expect(JSON.stringify(constrained)).not.toContain("やっぱり参加するよ");
+      expect(JSON.stringify(constrained)).not.toContain("二人は合意して");
+      expect(constrained.narration).toBe(cooking.branches.oneParticipates);
+      expect(constrained.memory.summary).toBe(cooking.branches.oneParticipates);
       expect(constrained.scene).toEqual({
         haru: "キッチン",
         aoi: "Aoiの自室",
@@ -247,11 +271,71 @@ describe("constrainResolvedEvent", () => {
       expect(constrained.storyBeats).toEqual(
         expect.arrayContaining([
           { kind: "move", actor: "aoi", location: "Aoiの自室" },
-          { kind: "action", actor: "haru", action: haru.action },
+          {
+            kind: "action",
+            actor: "haru",
+            action: cooking.branches.oneParticipates,
+          },
         ]),
       );
+      const storyKinds = constrained.storyBeats?.map((beat) => beat.kind);
+      expect(storyKinds?.slice(0, 5)).toEqual([
+        "dialogue",
+        "dialogue",
+        "dialogue",
+        "move",
+        "move",
+      ]);
+      expect(constrained.storyBeats?.at(-2)).toMatchObject({
+        kind: "action",
+        actor: "haru",
+      });
+      expect(constrained.storyBeats?.at(-1)).toEqual({
+        kind: "dialogue",
+        actor: "haru",
+        text: "ひとりでも、無理なく少し進められた。",
+      });
+      expect(directorResolvedEventSchema.safeParse(constrained).success).toBe(true);
     },
   );
+
+  it("places both-decline acceptance before movement and Haru's follow-up after the action", () => {
+    const constrained = constrainResolvedEvent(
+      definition("shared-cooking"),
+      {
+        ...structuredClone(resolvedEvent),
+        scene: { haru: "キッチン", aoi: "キッチン" },
+      },
+      { haru: decision("DECLINE"), aoi: decision("IGNORE") },
+      [],
+      { originalLocations: { haru: "リビング", aoi: "ダイニング" } },
+    );
+
+    expect(constrained.conversation).toEqual([
+      {
+        speaker: "haru",
+        text: "今回は参加せず、自分の時間を過ごすね。 そっちはどうしたい？",
+      },
+      {
+        speaker: "aoi",
+        text: "今はその提案には加わらず、自分のことをしているね。",
+      },
+      { speaker: "haru", text: "うん。今日はそれぞれの時間を大切にしよう。" },
+      { speaker: "haru", text: "少し落ち着けた。今はこのまま休もう。" },
+    ]);
+    expect(constrained.storyBeats?.map((beat) => beat.kind)).toEqual([
+      "dialogue",
+      "dialogue",
+      "dialogue",
+      "move",
+      "move",
+      "action",
+      "dialogue",
+    ]);
+    expect(constrained.storyBeats?.at(-2)).toMatchObject({ kind: "action", actor: "haru" });
+    expect(constrained.storyBeats?.at(-1)).toMatchObject({ kind: "dialogue", actor: "haru" });
+    expect(directorResolvedEventSchema.safeParse(constrained).success).toBe(true);
+  });
 
   it("moves a non-participant out of a shared event room when already there", () => {
     const constrained = constrainResolvedEvent(
@@ -271,7 +355,7 @@ describe("constrainResolvedEvent", () => {
     });
   });
 
-  it("normalizes cooperative conversation to public decision openings and bounded text", () => {
+  it("keeps the Director-authored speaker order instead of forcing decision dialogue openings", () => {
     const haru = decision("ACCEPT");
     const aoi = decision("MODIFY");
     const event: ResolvedEvent = {
@@ -295,10 +379,12 @@ describe("constrainResolvedEvent", () => {
 
     expect(constrained.conversation).toHaveLength(6);
     expect(constrained.conversation?.slice(0, 3)).toEqual([
-      { speaker: "haru", text: haru.dialogue },
-      { speaker: "aoi", text: aoi.dialogue },
+      { speaker: "aoi", text: "置き換えられる冒頭" },
+      { speaker: "haru", text: "置き換えられる冒頭" },
       { speaker: "haru", text: "続きの会話" },
     ]);
+    expect(constrained.haruDialogue).toBe("置き換えられる冒頭");
+    expect(constrained.aoiDialogue).toBe("置き換えられる冒頭");
     expect(constrained.conversation?.[3]?.text).toHaveLength(160);
   });
 
@@ -319,9 +405,9 @@ describe("constrainResolvedEvent", () => {
         { kind: "move", actor: "aoi", location: "キッチン" },
         { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
         { kind: "dialogue", actor: "haru", text: "置き換えられる" },
+        { kind: "dialogue", actor: "haru", text: "いい香りになってきたね。" },
         { kind: "action", actor: "both", action: "鍋を混ぜて味を調える" },
         { kind: "move", actor: "both", location: "ダイニングテーブル" },
-        { kind: "dialogue", actor: "haru", text: "いい香りになってきたね。" },
         { kind: "dialogue", actor: "aoi", text: "食卓で続きを話そう。" },
       ],
     };
@@ -336,14 +422,65 @@ describe("constrainResolvedEvent", () => {
     expect(constrained.storyBeats).toEqual([
       { kind: "move", actor: "haru", location: "キッチン" },
       { kind: "move", actor: "aoi", location: "キッチン" },
-      { kind: "dialogue", actor: "haru", text: haru.dialogue },
-      { kind: "dialogue", actor: "aoi", text: aoi.dialogue },
+      { kind: "dialogue", actor: "haru", text: "置き換えられる" },
+      { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
+      { kind: "dialogue", actor: "haru", text: "いい香りになってきたね。" },
       { kind: "action", actor: "both", action: "鍋を混ぜて味を調える" },
       { kind: "move", actor: "both", location: "ダイニング" },
-      { kind: "dialogue", actor: "haru", text: "いい香りになってきたね。" },
       { kind: "dialogue", actor: "aoi", text: "食卓で続きを話そう。" },
     ]);
     expect(constrained.scene).toEqual({ haru: "ダイニング", aoi: "ダイニング" });
+  });
+
+  it("replays all six conversation lines once and confirms both intents before acting", () => {
+    const conversation = [
+      { speaker: "aoi" as const, text: "夕食は何から作ろうか？" },
+      { speaker: "haru" as const, text: "スープから始めたいな。" },
+      { speaker: "aoi" as const, text: "じゃあ野菜を切るね。" },
+      { speaker: "haru" as const, text: "こちらは鍋を温めるよ。" },
+      { speaker: "aoi" as const, text: "いい香りになってきたね。" },
+      { speaker: "haru" as const, text: "食卓で一緒に味わおう。" },
+    ];
+    const event: ResolvedEvent = {
+      ...structuredClone(resolvedEvent),
+      scene: { haru: "ダイニング", aoi: "ダイニング" },
+      conversation,
+      storyBeats: [
+        { kind: "move", actor: "both", location: "キッチン" },
+        ...conversation.slice(0, 3).map((line) => ({
+          kind: "dialogue" as const,
+          actor: line.speaker,
+          text: line.text,
+        })),
+        { kind: "action", actor: "both", action: "スープを作る" },
+        { kind: "move", actor: "both", location: "ダイニング" },
+        ...conversation.slice(3).map((line) => ({
+          kind: "dialogue" as const,
+          actor: line.speaker,
+          text: line.text,
+        })),
+      ],
+    };
+
+    const constrained = constrainResolvedEvent(
+      definition("shared-cooking"),
+      event,
+      { haru: decision("ACCEPT"), aoi: decision("MODIFY") },
+      [],
+    );
+    const beats = constrained.storyBeats ?? [];
+    const dialogue = beats.flatMap((beat) =>
+      beat.kind === "dialogue" ? [{ speaker: beat.actor, text: beat.text }] : [],
+    );
+    const firstAction = beats.findIndex((beat) => beat.kind === "action");
+    const speakersBeforeAction = new Set(
+      beats.slice(0, firstAction).flatMap((beat) =>
+        beat.kind === "dialogue" ? [beat.actor] : []),
+    );
+
+    expect(dialogue).toEqual(conversation);
+    expect(beats).toHaveLength(9);
+    expect(speakersBeforeAction).toEqual(new Set(["haru", "aoi"]));
   });
 
   it("expands a one-location cooperative story into a staged two-location journey", () => {
@@ -355,14 +492,16 @@ describe("constrainResolvedEvent", () => {
       conversation: [
         { speaker: "haru", text: "置き換えられる" },
         { speaker: "aoi", text: "置き換えられる" },
-        { speaker: "haru", text: "ここまで片付くと気持ちいいね。" },
+        { speaker: "haru", text: "一緒に片付けよう。" },
+        { speaker: "aoi", text: "ここまで片付くと気持ちいいね。" },
       ],
       storyBeats: [
         { kind: "move", actor: "both", location: "リビング" },
         { kind: "dialogue", actor: "haru", text: "置き換えられる" },
         { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
+        { kind: "dialogue", actor: "haru", text: "一緒に片付けよう。" },
         { kind: "action", actor: "both", action: "二人で散らかったものを片付ける" },
-        { kind: "dialogue", actor: "haru", text: "ここまで片付くと気持ちいいね。" },
+        { kind: "dialogue", actor: "aoi", text: "ここまで片付くと気持ちいいね。" },
       ],
     };
 
@@ -379,7 +518,7 @@ describe("constrainResolvedEvent", () => {
       { kind: "move", actor: "both", location: "リビングのソファ" },
     ]);
     expect(constrained.storyBeats?.map((beat) => beat.kind)).toEqual([
-      "move", "dialogue", "dialogue", "move", "action", "dialogue",
+      "move", "dialogue", "dialogue", "dialogue", "move", "action", "dialogue",
     ]);
     expect(new Set(moves.map((beat) => beat.location)).size).toBe(2);
   });
@@ -393,15 +532,17 @@ describe("constrainResolvedEvent", () => {
       conversation: [
         { speaker: "haru", text: "置き換えられる" },
         { speaker: "aoi", text: "置き換えられる" },
-        { speaker: "haru", text: "片付いたね。" },
+        { speaker: "haru", text: "一緒に片付けよう。" },
+        { speaker: "aoi", text: "片付いたね。" },
       ],
       storyBeats: [
         { kind: "move", actor: "both", location: "キッチン" },
         { kind: "move", actor: "both", location: "リビング" },
         { kind: "dialogue", actor: "haru", text: "置き換えられる" },
         { kind: "dialogue", actor: "aoi", text: "置き換えられる" },
+        { kind: "dialogue", actor: "haru", text: "一緒に片付けよう。" },
         { kind: "action", actor: "both", action: "部屋を片付ける" },
-        { kind: "dialogue", actor: "haru", text: "片付いたね。" },
+        { kind: "dialogue", actor: "aoi", text: "片付いたね。" },
       ],
     };
 

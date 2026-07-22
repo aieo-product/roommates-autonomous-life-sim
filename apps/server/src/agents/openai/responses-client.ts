@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   characterDecisionSchema,
-  directorResolvedEventSchema,
+  directorResolvedEventDraftSchema,
   navigatorAgentOutputSchema,
   type CharacterDecisionInput,
   type CharacterId,
@@ -394,7 +394,7 @@ export class OpenAIResponsesClient implements AppServerAdapter {
       prompt: directorPrompt(input),
       formatName: "director_output",
       schema: directorOutputSchema,
-      validate: (value) => directorResolvedEventSchema.safeParse(value),
+      validate: (value) => directorResolvedEventDraftSchema.safeParse(value),
     });
   }
 

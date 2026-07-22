@@ -79,13 +79,19 @@ describe("Dekopin web presentation", () => {
     const sceneEnd = app.indexOf("function ApartmentStage", sceneStart);
     const scene = app.slice(sceneStart, sceneEnd);
 
-    expect(scene).toContain("character-running-indicator");
+    expect(scene).toContain("character-thinking-progress");
+    expect(scene).toContain("thinking-progress-track");
+    expect(scene).toContain("thinking-progress-fill");
     expect(scene).toContain("、判断中。選択");
     expect(scene).toContain("aria-busy={thinking ? true : undefined}");
-    expect(scene).toContain('className="character-running-object" aria-hidden="true"');
-    expect(scene).toContain("<strong>判断中</strong>");
+    expect(scene).toContain('transform="translate(0 -106)" aria-hidden="true"');
+    expect(scene).toContain(">判断中</text>");
     expect(scene).not.toContain("DECISION_LABELS[decision.decision]");
-    expect(css).toContain("@keyframes agentRunningDot");
+    expect(css).toContain("@keyframes characterThinkingProgress");
+    expect(css).toMatch(/\.thinking-progress-fill\s*\{[\s\S]*?animation:\s*characterThinkingProgress/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.thinking-progress-fill[\s\S]*?animation:\s*none !important/);
+    expect(app.match(/setStages\(\{ navigator: "active", haru: "active", aoi: "active", director: "waiting" \}\)/g))
+      .toHaveLength(2);
     expect(css).not.toContain(".scene-speech span");
   });
 });

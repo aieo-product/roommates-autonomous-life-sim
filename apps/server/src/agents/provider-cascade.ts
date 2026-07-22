@@ -6,7 +6,7 @@ import type {
 } from "@roommates/shared";
 import {
   characterDecisionSchema,
-  directorResolvedEventSchema,
+  directorResolvedEventDraftSchema,
   navigatorAgentOutputSchema,
 } from "@roommates/shared";
 import {
@@ -83,7 +83,7 @@ export class ProviderCascadeAdapter implements AppServerAdapter {
   resolve(input: DirectorInput): Promise<AppServerAdapterResult> {
     return this.invoke(
       (adapter) => adapter.resolve(input),
-      directorResolvedEventSchema,
+      directorResolvedEventDraftSchema,
     );
   }
 

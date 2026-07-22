@@ -111,6 +111,128 @@ const trimmedTurn = (turn: EventConversationTurn): EventConversationTurn | undef
   return text ? { speaker: turn.speaker, text } : undefined;
 };
 
+const dialogueTurnsFromBeats = (
+  beats: readonly EventStoryBeat[],
+): EventConversationTurn[] => beats.flatMap((beat) => beat.kind === "dialogue"
+  ? [{ speaker: beat.actor, text: beat.text.trim() }]
+  : []);
+
+/**
+ * Return the authored opening prefix, ending as soon as both residents have
+ * spoken. Keeping a prefix (rather than selecting one line per resident)
+ * preserves exchanges such as Aoi question -> Aoi clarification -> Haru
+ * response without silently changing the Director's speaker order.
+ */
+const mutualOpeningTurns = (
+  event: GameEvent,
+  beats: readonly EventStoryBeat[] = [],
+): EventConversationTurn[] => {
+  const preferred = conversationForEvent(event);
+  const candidates = preferred.length ? preferred : dialogueTurnsFromBeats(beats);
+  const result: EventConversationTurn[] = [];
+  const speakers = new Set<CharacterId>();
+
+  for (const candidate of candidates) {
+    const turn = trimmedTurn(candidate);
+    if (!turn) continue;
+    result.push(turn);
+    speakers.add(turn.speaker);
+    if (PEOPLE.every((person) => speakers.has(person))) break;
+  }
+
+  return PEOPLE.every((person) => speakers.has(person)) ? result : [];
+};
+
+/**
+ * `conversation` is the public Director-authored script. Story beats control
+ * staging, but must not be allowed to reorder or duplicate that script. Map
+ * the authored turns onto the existing dialogue slots and append any missing
+ * slots so tolerant/older payloads still play the whole exchange.
+ */
+const alignStoryDialogueWithConversation = (
+  event: GameEvent,
+  beats: readonly EventStoryBeat[],
+): EventStoryBeat[] => {
+  const authoredPayload = event.conversation
+    ?.map(trimmedTurn)
+    .filter((turn): turn is EventConversationTurn => Boolean(turn));
+  if (!authoredPayload?.length) return [...beats];
+  // `conversationForEvent` keeps the authored lines unchanged and only adds a
+  // missing resident from legacy/story data. Use that repaired exchange here
+  // so an otherwise valid tolerant payload cannot erase the other speaker.
+  const authored = conversationForEvent(event);
+
+  let dialogueIndex = 0;
+  const aligned = beats.flatMap((beat): EventStoryBeat[] => {
+    if (beat.kind !== "dialogue") return [beat];
+    const turn = authored[dialogueIndex];
+    dialogueIndex += 1;
+    return turn
+      ? [{ kind: "dialogue", actor: turn.speaker, text: turn.text }]
+      : [];
+  });
+
+  for (const turn of authored.slice(dialogueIndex)) {
+    aligned.push({ kind: "dialogue", actor: turn.speaker, text: turn.text });
+  }
+  return aligned;
+};
+
+/**
+ * An action must not start while one resident still has not heard the other's
+ * public intention. Move the complete authored opening prefix in front of the
+ * first action, retaining its original Aoi/Haru order and leaving every later
+ * turn in the same sequence without replaying an opening line.
+ */
+const synchronizeOpeningDialogue = (
+  event: GameEvent,
+  beats: readonly EventStoryBeat[],
+  residentsEndInSeparateRooms: boolean,
+): EventStoryBeat[] => {
+  const firstActionIndex = beats.findIndex((beat) => beat.kind === "action");
+  const firstMoveIndex = beats.findIndex((beat) => beat.kind === "move");
+  if (firstActionIndex < 0 && (!residentsEndInSeparateRooms || firstMoveIndex < 0)) {
+    return [...beats];
+  }
+
+  const openings = mutualOpeningTurns(event, beats);
+  if (!openings.length) return [...beats];
+
+  const claimedIndexes = new Set<number>();
+  let searchFrom = 0;
+  for (const opening of openings) {
+    const index = beats.findIndex((beat, candidateIndex) =>
+      candidateIndex >= searchFrom
+      && !claimedIndexes.has(candidateIndex)
+      && beat.kind === "dialogue"
+      && beat.actor === opening.speaker
+      && beat.text.trim() === opening.text);
+    if (index < 0) return [...beats];
+    claimedIndexes.add(index);
+    searchFrom = index + 1;
+  }
+
+  const withoutOpenings = beats.filter((_, index) => !claimedIndexes.has(index));
+  // When the resolved scene separates the residents, they must exchange
+  // intentions before either one leaves. Otherwise the room UI depicts a
+  // face-to-face exchange as dialogue shouted between unrelated rooms.
+  const insertionIndex = residentsEndInSeparateRooms
+    ? 0
+    : withoutOpenings.findIndex((beat) =>
+        beat.kind === "dialogue" || beat.kind === "action");
+  if (insertionIndex < 0) return [...beats];
+
+  return [
+    ...withoutOpenings.slice(0, insertionIndex),
+    ...openings.map((turn): EventStoryBeat => ({
+      kind: "dialogue",
+      actor: turn.speaker,
+      text: turn.text,
+    })),
+    ...withoutOpenings.slice(insertionIndex),
+  ];
+};
+
 /**
  * Prefer the Director-authored exchange. Old saves only have one decision
  * line per resident, so keep those lines as a short, deterministic fallback.
@@ -119,14 +241,31 @@ export const conversationForEvent = (event: GameEvent): EventConversationTurn[] 
   const authored = event.conversation
     ?.map(trimmedTurn)
     .filter((turn): turn is EventConversationTurn => Boolean(turn));
-  if (authored?.length) return authored;
-
-  const fallback: EventConversationTurn[] = [];
+  const legacy: EventConversationTurn[] = [];
   if (event.haruDialogue?.trim()) {
-    fallback.push({ speaker: "haru", text: event.haruDialogue.trim() });
+    legacy.push({ speaker: "haru", text: event.haruDialogue.trim() });
   }
   if (event.aoiDialogue?.trim()) {
-    fallback.push({ speaker: "aoi", text: event.aoiDialogue.trim() });
+    legacy.push({ speaker: "aoi", text: event.aoiDialogue.trim() });
+  }
+  const story = dialogueTurnsFromBeats(event.storyBeats ?? [])
+    .map(trimmedTurn)
+    .filter((turn): turn is EventConversationTurn => Boolean(turn));
+  const fallback = authored?.length
+    ? [...authored]
+    : legacy.length
+      ? [...legacy]
+      : [...story];
+
+  // Web normalization deliberately accepts older/partial payloads. Preserve
+  // every authored turn in place, but repair a missing participant from the
+  // legacy decision line or the first matching story beat. Only the missing
+  // speaker is appended, so complete Director conversations remain untouched.
+  for (const person of PEOPLE) {
+    if (fallback.some((turn) => turn.speaker === person)) continue;
+    const supplement = legacy.find((turn) => turn.speaker === person)
+      ?? story.find((turn) => turn.speaker === person);
+    if (supplement) fallback.push(supplement);
   }
   return fallback;
 };
@@ -199,22 +338,22 @@ const legacyBeatsForEvent = (
   }
 
   const conversation = conversationForEvent(event);
-  const actionAdded: Partial<Record<CharacterId, boolean>> = {};
-  for (const line of conversation) {
-    if (!actionAdded[line.speaker]) {
-      const action = line.speaker === "haru" ? event.haruAction : event.aoiAction;
-      if (action?.trim()) result.push({ kind: "action", actor: line.speaker, action: action.trim() });
-      actionAdded[line.speaker] = true;
-    }
+  const openingTurns = mutualOpeningTurns(event);
+  const openingCount = openingTurns.length || conversation.length;
+  for (const line of conversation.slice(0, openingCount)) {
     result.push({ kind: "dialogue", actor: line.speaker, text: line.text });
   }
 
-  // A legacy event can have actions without dialogue. Do not lose those beats.
+  // Legacy payloads had no Director timeline. Make both public intentions
+  // audible before either resident acts, then play the remaining exchange.
   for (const person of PEOPLE) {
     const action = person === "haru" ? event.haruAction : event.aoiAction;
-    if (action?.trim() && !actionAdded[person]) {
+    if (action?.trim()) {
       result.push({ kind: "action", actor: person, action: action.trim() });
     }
+  }
+  for (const line of conversation.slice(openingCount)) {
+    result.push({ kind: "dialogue", actor: line.speaker, text: line.text });
   }
   return result.length ? result : [
     { kind: "move", actor: "haru", location: game.haru.location },
@@ -245,9 +384,15 @@ export const createAfterScenePlan = (
   const locations = { ...startingLocations };
   const directions: Record<CharacterId, SpriteDirection> = { haru: "south", aoi: "south" };
   const lastTravelDirections: Partial<Record<CharacterId, SpriteDirection>> = {};
-  const sourceBeats = event.storyBeats?.length
+  const authoredBeats = event.storyBeats?.length
     ? event.storyBeats
     : legacyBeatsForEvent(event, game, endingLocations);
+  const sourceBeats = synchronizeOpeningDialogue(
+    event,
+    alignStoryDialogueWithConversation(event, authoredBeats),
+    roomForLocation(endingLocations.haru, "haru")
+      !== roomForLocation(endingLocations.aoi, "aoi"),
+  );
   const beats: AfterSceneBeat[] = [];
 
   sourceBeats.forEach((beat) => {

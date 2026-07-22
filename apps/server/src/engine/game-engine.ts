@@ -26,6 +26,7 @@ import {
   characterDisplayName,
   createCharacterRoster,
   createInitialGameState,
+  directorResolvedEventSchema,
   gameStateSchema,
   mutableStatKeys,
 } from "@roommates/shared";
@@ -490,12 +491,12 @@ export class GameEngine {
             characterRoster,
           },
         );
-      let resolved = normalizeResolvedEventCharacterNames({
+      let resolved = directorResolvedEventSchema.parse(normalizeResolvedEventCharacterNames({
         ...(autonomousPlan
           ? finalizeAutonomousResolvedEvent(autonomousPlan, policyResolved)
           : policyResolved),
         navigatorMessage: navigatorResponse.message,
-      }, characterRoster);
+      }, characterRoster));
       emit({ type: "director.completed", agent: "director", message: resolved.eventTitle, data: resolved });
 
       const nextCharacters = {
@@ -513,12 +514,12 @@ export class GameEngine {
       const independentYes = cooperative.has(haruDecision.decision) && cooperative.has(aoiDecision.decision);
       if (activeEventDefinition.category === "confession" && independentYes && confessionEligible(snapshot)) {
         relationship = "couple";
-        resolved = normalizeResolvedEventCharacterNames({
+        resolved = directorResolvedEventSchema.parse(normalizeResolvedEventCharacterNames({
           ...resolved,
           eventTitle: "二人が選んだ告白",
           narration: `${resolved.narration} きっかけに急かされるのではなく、二人はそれぞれの意志で気持ちを伝え、受け止めた。`,
           memory: { ...resolved.memory, title: "二人が選んだ告白" },
-        }, characterRoster);
+        }, characterRoster));
         memory.title = "二人が選んだ告白";
       }
 

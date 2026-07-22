@@ -86,6 +86,28 @@ describe("memory article presentation", () => {
     });
   });
 
+  it("quotes the final Director conversation instead of independent dialogue drafts", () => {
+    const article = buildMemoryArticle(
+      memory({ sourceEventId: "log-turn-1" }),
+      [
+        event({
+          haruDialogue: "独立推論のHaru台詞",
+          aoiDialogue: "独立推論のAoi台詞",
+          conversation: [
+            { speaker: "aoi", text: "味付けはどうしようか？" },
+            { speaker: "haru", text: "少し甘めにして、一緒に味見しよう。" },
+            { speaker: "aoi", text: "賛成。じゃあ私が少しずつ足すね。" },
+          ],
+        }),
+      ],
+    );
+
+    expect(article.haru.dialogue).toBe("少し甘めにして、一緒に味見しよう。");
+    expect(article.aoi.dialogue).toBe("味付けはどうしようか？");
+    expect(article.haru.dialogue).not.toContain("独立推論");
+    expect(article.aoi.dialogue).not.toContain("独立推論");
+  });
+
   it("does not borrow current dialogue when an old memory has no matching log", () => {
     const article = buildMemoryArticle(
       memory({ id: "external-memory", day: 1, phase: "morning" }),

@@ -490,45 +490,50 @@ function buildParallelPresentation(
   const aoi = plan.selections.find(
     (selection) => selection.characterId === "aoi",
   )!;
-  const openings = {
-    haru: boundedStoryText(haru.dialogue, "自分のペースで始めよう。"),
-    aoi: boundedStoryText(aoi.dialogue, "私も自分のペースでやってみよう。"),
-  };
-  const followUps = {
-    haru: "こちらはこのまま自分のペースで続けよう。",
-    aoi: "私もこちらを自分のペースで続けよう。",
-  };
   const conversation: EventConversationLine[] = [
-    { speaker: "haru", text: openings.haru },
-    { speaker: "aoi", text: openings.aoi },
-    { speaker: "haru", text: followUps.haru },
-    { speaker: "aoi", text: followUps.aoi },
+    {
+      speaker: "haru",
+      text: boundedStoryText(
+        `今日は「${haru.candidate.title}」をして過ごそうと思う。そっちは？`,
+        "今日は自分のペースで過ごそうと思う。そっちは？",
+      ),
+    },
+    {
+      speaker: "aoi",
+      text: boundedStoryText(
+        `私は「${aoi.candidate.title}」にするね。`,
+        "私は別のことをして過ごすね。",
+      ),
+    },
+    { speaker: "haru", text: "わかった。お互い、それぞれのペースでやろう。" },
+    { speaker: "aoi", text: "うん。こちらも自分のペースで過ごせた。" },
   ];
-  const beats: EventStoryBeat[] = [];
-  for (const characterId of CHARACTER_IDS) {
-    const selection = plan.selections.find(
-      (item) => item.characterId === characterId,
-    );
-    if (!selection) continue;
-
-    beats.push(
-      {
-        kind: "move",
-        actor: characterId,
-        location: boundedStoryLocation(selection.candidate.location),
-      },
-      { kind: "dialogue", actor: characterId, text: openings[characterId] },
-      {
-        kind: "action",
-        actor: characterId,
-        action: boundedStoryText(
-          selection.candidate.publicIntent,
-          selection.candidate.title,
-        ),
-      },
-      { kind: "dialogue", actor: characterId, text: followUps[characterId] },
-    );
-  }
+  const beats: EventStoryBeat[] = [
+    { kind: "dialogue", actor: conversation[0]!.speaker, text: conversation[0]!.text },
+    { kind: "dialogue", actor: conversation[1]!.speaker, text: conversation[1]!.text },
+    { kind: "dialogue", actor: conversation[2]!.speaker, text: conversation[2]!.text },
+    {
+      kind: "move",
+      actor: "haru",
+      location: boundedStoryLocation(haru.candidate.location),
+    },
+    {
+      kind: "move",
+      actor: "aoi",
+      location: boundedStoryLocation(aoi.candidate.location),
+    },
+    {
+      kind: "action",
+      actor: "haru",
+      action: boundedStoryText(haru.candidate.publicIntent, haru.candidate.title),
+    },
+    {
+      kind: "action",
+      actor: "aoi",
+      action: boundedStoryText(aoi.candidate.publicIntent, aoi.candidate.title),
+    },
+    { kind: "dialogue", actor: conversation[3]!.speaker, text: conversation[3]!.text },
+  ];
   const narration = boundedEventText(
     characterDisplayName(plan.characterRoster, "haru") +
       "は「" +
@@ -546,8 +551,8 @@ function buildParallelPresentation(
   );
   return {
     narration,
-    haruDialogue: openings.haru,
-    aoiDialogue: openings.aoi,
+    haruDialogue: conversation[0]!.text,
+    aoiDialogue: conversation[1]!.text,
     conversation,
     storyBeats: beats,
   };

@@ -235,13 +235,15 @@ describe("GameState v2 persistence contracts", () => {
       { speaker: "haru" as const, text: "おはよう。" },
       { speaker: "aoi" as const, text: "おはよう。よく眠れた？" },
       { speaker: "haru" as const, text: "うん。今日はゆっくり始めよう。" },
+      { speaker: "aoi" as const, text: "朝食のあとで、また話そう。" },
     ];
     const storyBeats = [
       { kind: "move" as const, actor: "both" as const, location: "ダイニング" },
       { kind: "dialogue" as const, actor: "haru" as const, text: "おはよう。" },
       { kind: "dialogue" as const, actor: "aoi" as const, text: "おはよう。よく眠れた？" },
-      { kind: "action" as const, actor: "both" as const, action: "朝食の席につく" },
       { kind: "dialogue" as const, actor: "haru" as const, text: "うん。今日はゆっくり始めよう。" },
+      { kind: "action" as const, actor: "both" as const, action: "朝食の席につく" },
+      { kind: "dialogue" as const, actor: "aoi" as const, text: "朝食のあとで、また話そう。" },
     ];
 
     expect(resolvedEventSchema.parse(legacyEvent)).toEqual(legacyEvent);
@@ -275,6 +277,30 @@ describe("GameState v2 persistence contracts", () => {
         conversation,
         storyBeats: storyBeats.map((beat) =>
           beat.kind === "action" ? { ...beat, kind: "move", location: "リビング" } : beat),
+      }).success,
+    ).toBe(false);
+    expect(
+      directorResolvedEventSchema.safeParse({
+        ...legacyEvent,
+        conversation,
+        storyBeats: storyBeats.map((beat) =>
+          beat.kind === "dialogue" && beat.actor === "aoi"
+            ? { ...beat, text: "会話にはない発言" }
+            : beat),
+      }).success,
+    ).toBe(false);
+    expect(
+      directorResolvedEventSchema.safeParse({
+        ...legacyEvent,
+        conversation,
+        storyBeats: [
+          storyBeats[0]!,
+          storyBeats[1]!,
+          storyBeats[2]!,
+          storyBeats[4]!,
+          storyBeats[3]!,
+          storyBeats[5]!,
+        ],
       }).success,
     ).toBe(false);
   });

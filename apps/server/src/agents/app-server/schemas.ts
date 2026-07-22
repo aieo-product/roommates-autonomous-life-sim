@@ -149,8 +149,8 @@ export const directorOutputSchema = {
     },
     storyBeats: {
       type: "array",
-      minItems: 4,
-      maxItems: 8,
+      minItems: 6,
+      maxItems: 10,
       items: storyBeat,
     },
     effects: {

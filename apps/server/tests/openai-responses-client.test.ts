@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CHARACTER_SETTINGS,
   createInitialGameState,
+  directorResolvedEventDraftSchema,
+  directorResolvedEventSchema,
   type CharacterDecision,
   type CharacterDecisionInput,
   type CharacterId,
@@ -307,6 +309,8 @@ describe("OpenAIResponsesClient", () => {
     expect(navigator.value).toEqual({ message: "二人へ届けるね。" });
     expect(haru.value).toMatchObject({ decision: "ACCEPT", action: decisionOutput.action });
     expect(aoi.value).toMatchObject({ decision: "ACCEPT", action: decisionOutput.action });
+    expect(directorResolvedEventDraftSchema.safeParse(directorOutput).success).toBe(true);
+    expect(directorResolvedEventSchema.safeParse(directorOutput).success).toBe(false);
     expect(director.value).toEqual(directorOutput);
     expect(reflection.value).toEqual(reflectionOutput);
     expect([navigator, haru, aoi, director, reflection].map((item) => item.threadId)).toEqual([

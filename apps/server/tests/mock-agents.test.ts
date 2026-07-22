@@ -199,20 +199,24 @@ describe("MockDirectorAgent", () => {
     expect(event.narration).toContain("無理に同じ行動をすることはなかった");
     expect(event.effects.aoi.energy).toBeGreaterThan(0);
     expect(event.memory.summary).toContain("無理に従わず");
-    expect(event.conversation).toHaveLength(3);
+    expect(event.conversation).toHaveLength(4);
     expect(event.conversation?.[1]).toEqual({
       speaker: "aoi",
-      text: "今日はやめておくね。",
+      text: "今回は参加せず、自分の時間を過ごすね。",
     });
+    expect(event.conversation?.[0]?.text).toContain("一緒にどうかな");
     expect(directorResolvedEventSchema.safeParse(event).success).toBe(true);
     expect(event.storyBeats?.map((beat) => beat.kind)).toEqual([
-      "move",
+      "dialogue",
+      "dialogue",
       "dialogue",
       "move",
-      "dialogue",
+      "move",
       "action",
       "dialogue",
     ]);
+    expect(event.storyBeats?.at(-2)).toMatchObject({ kind: "action", actor: "haru" });
+    expect(event.storyBeats?.at(-1)).toMatchObject({ kind: "dialogue", actor: "haru" });
     expect(event.storyBeats?.some((beat) => beat.actor === "both")).toBe(false);
   });
 
@@ -238,6 +242,12 @@ describe("MockDirectorAgent", () => {
     expect(new Set(event.conversation?.map((line) => line.speaker))).toEqual(
       new Set(["haru", "aoi"]),
     );
+    expect(event.conversation?.[0]?.text).toContain("どう進めたい");
+    expect(event.conversation?.[1]?.text).toContain(directorInput.aoiDecision.action);
+    expect(event.conversation).not.toContainEqual({
+      speaker: "haru",
+      text: directorInput.haruDecision.dialogue,
+    });
     expect(directorResolvedEventSchema.safeParse(event).success).toBe(true);
     expect(event.storyBeats?.filter((beat) => beat.kind === "move")).toEqual([
       { kind: "move", actor: "both", location: "キッチンの調理台" },

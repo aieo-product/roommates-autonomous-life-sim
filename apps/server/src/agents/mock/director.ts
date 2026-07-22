@@ -1,4 +1,12 @@
-import type { DirectorAgent, DirectorInput, ProposalTag, ResolvedEvent, StatDelta } from "@roommates/shared";
+import type {
+  CharacterId,
+  DirectorAgent,
+  DirectorInput,
+  EventConversationLine,
+  ProposalTag,
+  ResolvedEvent,
+  StatDelta,
+} from "@roommates/shared";
 import { characterDisplayName } from "@roommates/shared";
 
 const cooperative = new Set(["ACCEPT", "MODIFY", "INITIATE"]);
@@ -54,6 +62,83 @@ const sharedRoutes: Record<ProposalTag, readonly [string, string]> = {
   other: ["廊下", "リビングのローテーブル"],
 };
 
+function shortAction(value: string, fallback: string): string {
+  const normalized = value.trim().replace(/\s+/gu, " ").slice(0, 72).trim();
+  return normalized || fallback;
+}
+
+function firstLineFor(
+  conversation: EventConversationLine[],
+  characterId: CharacterId,
+  fallback: string,
+): string {
+  return conversation.find((line) => line.speaker === characterId)?.text ?? fallback;
+}
+
+function cooperativeConversation(
+  input: DirectorInput,
+  eventTitle: string,
+  haruName: string,
+  aoiName: string,
+): EventConversationLine[] {
+  const haruAction = shortAction(input.haruDecision.action, "無理のないところから始める");
+  const aoiAction = shortAction(input.aoiDecision.action, "できることから始める");
+  return [
+    { speaker: "haru", text: `${aoiName}、「${eventTitle}」はどう進めたい？` },
+    { speaker: "aoi", text: `「${aoiAction}」がいいな。${haruName}は？` },
+    { speaker: "haru", text: `じゃあ「${haruAction}」で合わせよう。` },
+    { speaker: "aoi", text: "うん。二人のペースで進められたね。" },
+  ];
+}
+
+function nonCooperativeConversation(
+  input: DirectorInput,
+  eventTitle: string,
+  haruName: string,
+  aoiName: string,
+  haruJoins: boolean,
+  aoiJoins: boolean,
+): EventConversationLine[] {
+  const refusalText = (decision: DirectorInput["haruDecision"]): string =>
+    decision.decision === "IGNORE"
+      ? "今はその提案には加わらず、自分のことをしているね。"
+      : "今回は参加せず、自分の時間を過ごすね。";
+  if (haruJoins && !aoiJoins) {
+    return [
+      { speaker: "haru", text: `${aoiName}、「${eventTitle}」を一緒にどうかな？` },
+      {
+        speaker: "aoi",
+        text: refusalText(input.aoiDecision),
+      },
+      { speaker: "haru", text: "わかった。今日はそれぞれのペースで過ごそう。" },
+      { speaker: "haru", text: "ひとりでも、無理なく少し進められた。" },
+    ];
+  }
+  if (!haruJoins && aoiJoins) {
+    return [
+      { speaker: "aoi", text: `${haruName}、「${eventTitle}」を一緒にどう？` },
+      {
+        speaker: "haru",
+        text: refusalText(input.haruDecision),
+      },
+      { speaker: "aoi", text: "わかった。今日はそれぞれのペースで過ごそう。" },
+      { speaker: "aoi", text: "ひとりでも、無理なく少し進められた。" },
+    ];
+  }
+  return [
+    {
+      speaker: "haru",
+      text: `${refusalText(input.haruDecision)} ${aoiName}はどうしたい？`,
+    },
+    {
+      speaker: "aoi",
+      text: refusalText(input.aoiDecision),
+    },
+    { speaker: "haru", text: "うん。お互いの時間を大切にしよう。" },
+    { speaker: "haru", text: "少し落ち着けた。今はこのまま休もう。" },
+  ];
+}
+
 export class MockDirectorAgent implements DirectorAgent {
   async resolve(input: DirectorInput): Promise<ResolvedEvent> {
     const tag = input.suggestion.tags.find((value) => value !== "pressure") ?? "other";
@@ -69,31 +154,44 @@ export class MockDirectorAgent implements DirectorAgent {
     if (!together) {
       const oneJoins = haruJoins || aoiJoins;
       const base = pressure ? effects.pressure : effects.rest;
-      const acknowledgement = haruJoins
-        ? { speaker: "haru" as const, text: "わかった。今日はそれぞれのペースで過ごそう。" }
-        : aoiJoins
-          ? { speaker: "aoi" as const, text: "わかった。今日はそれぞれのペースで過ごそう。" }
-          : { speaker: "haru" as const, text: "うん。今日はそれぞれの時間を大切にしよう。" };
-      const haruDialogue = input.haruDecision.dialogue || "今は自分の時間を過ごすね。";
-      const aoiDialogue = input.aoiDecision.dialogue || "私も自分のペースで過ごすね。";
+      const eventTitle = oneJoins ? "すれ違ったタイミング" : "それぞれの静かな時間";
+      const conversation = nonCooperativeConversation(
+        input,
+        eventTitle,
+        haruName,
+        aoiName,
+        haruJoins,
+        aoiJoins,
+      );
+      const haruDialogue = firstLineFor(
+        conversation,
+        "haru",
+        input.haruDecision.dialogue || "今は自分の時間を過ごすね。",
+      );
+      const aoiDialogue = firstLineFor(
+        conversation,
+        "aoi",
+        input.aoiDecision.dialogue || "私も自分のペースで過ごすね。",
+      );
       const independentActor = haruJoins ? "haru" : aoiJoins ? "aoi" : "haru";
+      const preActionConversation = conversation.slice(0, -1);
+      const acknowledgement = conversation.at(-1)!;
       return {
-        eventTitle: oneJoins ? "すれ違ったタイミング" : "それぞれの静かな時間",
+        eventTitle,
         narration: oneJoins
           ? "片方は提案に心を向けたが、もう片方は今の自分のペースを選んだ。無理に同じ行動をすることはなかった。"
           : "二人は同じ部屋にいながら、それぞれの時間を過ごした。何も起こさないことも、ひとつの選択だった。",
-        haruDialogue: input.haruDecision.dialogue,
-        aoiDialogue: input.aoiDecision.dialogue,
-        conversation: [
-          { speaker: "haru", text: haruDialogue },
-          { speaker: "aoi", text: aoiDialogue },
-          acknowledgement,
-        ],
+        haruDialogue,
+        aoiDialogue,
+        conversation,
         storyBeats: [
+          ...preActionConversation.map((line) => ({
+            kind: "dialogue" as const,
+            actor: line.speaker,
+            text: line.text,
+          })),
           { kind: "move", actor: "haru", location: "自室" },
-          { kind: "dialogue", actor: "haru", text: haruDialogue },
           { kind: "move", actor: "aoi", location: "リビング" },
-          { kind: "dialogue", actor: "aoi", text: aoiDialogue },
           {
             kind: "action",
             actor: independentActor,
@@ -129,35 +227,37 @@ export class MockDirectorAgent implements DirectorAgent {
       other: "二人なりの小さな挑戦",
     };
     const eventTitle = openActivity ? "二人で試す小さな提案" : titles[tag];
-    const haruDialogue = input.haruDecision.dialogue || "一緒にやってみようか。";
-    const aoiDialogue = input.aoiDecision.dialogue || "うん、やってみよう。";
+    const conversation = cooperativeConversation(input, eventTitle, haruName, aoiName);
+    const haruDialogue = firstLineFor(
+      conversation,
+      "haru",
+      input.haruDecision.dialogue || "一緒にやってみようか。",
+    );
+    const aoiDialogue = firstLineFor(
+      conversation,
+      "aoi",
+      input.aoiDecision.dialogue || "うん、やってみよう。",
+    );
     const [openingLocation, destination] = openActivity
       ? ["安全確認済みの共有スペース", "安全確認済みの共有スペース"]
       : sharedRoutes[tag];
     const sharedAction = openActivity
       ? `「${input.suggestion.text}」を20分以内の安全な形へ整えて試す`
       : sharedActions[tag];
-    const haruFollowUp = "それじゃ、できるところから始めよう。";
-    const aoiFollowUp = "うん。二人のペースで進めよう。";
     return {
       eventTitle,
       narration: `二人は提案をそのまま命令としてではなく、自分たちなりのきっかけとして選び取った。${haruName}は${input.haruDecision.action}。${aoiName}は${input.aoiDecision.action}。二人の間に、少しだけ自然な空気が流れた。`,
-      haruDialogue: input.haruDecision.dialogue,
-      aoiDialogue: input.aoiDecision.dialogue,
-      conversation: [
-        { speaker: "haru", text: haruDialogue },
-        { speaker: "aoi", text: aoiDialogue },
-        { speaker: "haru", text: haruFollowUp },
-        { speaker: "aoi", text: aoiFollowUp },
-      ],
+      haruDialogue,
+      aoiDialogue,
+      conversation,
       storyBeats: [
         { kind: "move", actor: "both", location: openingLocation },
         { kind: "dialogue", actor: "haru", text: haruDialogue },
         { kind: "dialogue", actor: "aoi", text: aoiDialogue },
+        { kind: "dialogue", actor: conversation[2]!.speaker, text: conversation[2]!.text },
         { kind: "action", actor: "both", action: sharedAction },
         { kind: "move", actor: "both", location: destination },
-        { kind: "dialogue", actor: "haru", text: haruFollowUp },
-        { kind: "dialogue", actor: "aoi", text: aoiFollowUp },
+        { kind: "dialogue", actor: conversation[3]!.speaker, text: conversation[3]!.text },
       ],
       effects: { haru: base, aoi: scale(base, tag === "cook" ? 1.1 : 1) },
       memory: {

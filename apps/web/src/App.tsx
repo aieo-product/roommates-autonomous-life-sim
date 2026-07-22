@@ -34,6 +34,7 @@ import {
   navigatorCharacterAssets,
 } from "./character-assets";
 import {
+  conversationForEvent,
   createAfterScenePlan,
   type AfterScenePlan,
   type SpriteDirection,
@@ -83,7 +84,7 @@ type AfterScenePlayback = {
   beatIndex: number;
 };
 
-type TurnStages = {
+export type TurnStages = {
   navigator: StageStatus;
   haru: StageStatus;
   aoi: StageStatus;
@@ -162,6 +163,58 @@ const WAITING_STAGES: TurnStages = {
   aoi: "waiting",
   director: "waiting",
 };
+
+const RECOVERED_ACTIVE_STAGES: TurnStages = {
+  navigator: "active",
+  haru: "active",
+  aoi: "active",
+  director: "active",
+};
+
+export function getResolutionUiState(
+  status: GameState["status"],
+  localResolving: boolean,
+  stages: TurnStages,
+): {
+  serverResolving: boolean;
+  resolving: boolean;
+  activeStages: TurnStages;
+} {
+  const serverResolving = status === "resolving";
+  return {
+    serverResolving,
+    resolving: localResolving || serverResolving,
+    // A refreshed page or another tab has no SSE history. Keep every worker
+    // visibly active until polling observes the committed turn.
+    activeStages: serverResolving && !localResolving
+      ? RECOVERED_ACTIVE_STAGES
+      : stages,
+  };
+}
+
+export async function refreshTurnAfterStreamFailure(
+  aborted: boolean,
+  refresh: () => Promise<void>,
+): Promise<boolean> {
+  if (aborted) return false;
+  try {
+    await refresh();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isRecoveredTurnEvent(
+  baselineEventId: string | null | undefined,
+  latestEventId: string | null,
+  status: GameState["status"],
+): boolean {
+  return baselineEventId !== undefined
+    && latestEventId !== null
+    && latestEventId !== baselineEventId
+    && (status === "resolved" || status === "ended");
+}
 
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -463,13 +516,13 @@ function SceneCharacter({
         <div className="scene-nameplate">{name}</div>
       </foreignObject>
       {thinking && (
-        <foreignObject x="-62" y="-130" width="124" height="48" className="character-running-object" aria-hidden="true">
-          <div className={`character-running-indicator indicator-${person}`}>
-            <span className="running-signal" aria-hidden="true" />
-            <strong>判断中</strong>
-            <span className="running-dots" aria-hidden="true"><i /><i /><i /></span>
-          </div>
-        </foreignObject>
+        <g className={`character-thinking-progress indicator-${person}`} transform="translate(0 -106)" aria-hidden="true">
+          <rect className="thinking-progress-panel" x="-64" y="0" width="128" height="43" rx="20" />
+          <circle className="thinking-progress-signal" cx="-48" cy="15" r="5" />
+          <text className="thinking-progress-label" x="5" y="19" textAnchor="middle">判断中</text>
+          <line className="thinking-progress-track" x1="-48" y1="31" x2="48" y2="31" pathLength="100" />
+          <line className="thinking-progress-fill" x1="-48" y1="31" x2="48" y2="31" pathLength="100" />
+        </g>
       )}
       {!thinking && (dialogue || action) && (
         <foreignObject
@@ -489,7 +542,7 @@ function SceneCharacter({
   );
 }
 
-function ApartmentStage({
+export function ApartmentStage({
   game,
   people,
   stages,
@@ -563,8 +616,10 @@ function ApartmentStage({
       )) {
         return undefined;
       }
-      return game.decisions[person]?.dialogue
-        ?? (person === "haru" ? currentEvent?.haruDialogue : currentEvent?.aoiDialogue);
+      const finalTurn = currentEvent
+        ? conversationForEvent(currentEvent).at(-1)
+        : undefined;
+      return finalTurn?.speaker === person ? finalTurn.text : undefined;
     }
     return activeBeat?.kind === "dialogue" && activeBeat.actor === person
       ? activeBeat.text
@@ -655,7 +710,7 @@ function ApartmentStage({
   );
 }
 
-function ResolutionProgress({
+export function ResolutionProgress({
   stages,
   active,
   message,
@@ -773,17 +828,16 @@ function EventAnnouncementModal({
       id: "haru" as const,
       decision: event.haruDecision,
       action: event.haruAction,
-      dialogue: event.haruDialogue,
       reason: event.haruPublicReason,
     },
     {
       id: "aoi" as const,
       decision: event.aoiDecision,
       action: event.aoiAction,
-      dialogue: event.aoiDialogue,
       reason: event.aoiPublicReason,
     },
   ];
+  const conversation = conversationForEvent(event);
   const safetyFlags = event.cueResolution?.cue?.safetyFlags ?? event.cueSafetyFlags ?? [];
   const displayedSuggestion = suggestion || event.suggestion;
   const displayText = (value: string | undefined): string | undefined =>
@@ -893,11 +947,24 @@ function EventAnnouncementModal({
                   {resident.decision && <span className={`decision-chip chip-${resident.decision.toLowerCase()}`}>{DECISION_LABELS[resident.decision]}</span>}
                 </header>
                 <strong>{displayText(resident.action) || "自分のペースで過ごしました"}</strong>
-                {resident.dialogue && <blockquote>「{displayText(resident.dialogue)}」</blockquote>}
                 {resident.reason && <p><small>そうした理由</small>{displayText(resident.reason)}</p>}
               </article>
             ))}
           </section>
+
+          {conversation.length > 0 && (
+            <section className="event-announcement-conversation" aria-label="ふたりの会話">
+              <small>ふたりの会話</small>
+              <div>
+                {conversation.map((turn, index) => (
+                  <blockquote className={`quote-${turn.speaker}`} key={`${turn.speaker}-${index}-${turn.text}`}>
+                    <b>{people[turn.speaker].name}</b>
+                    <span>「{displayText(turn.text)}」</span>
+                  </blockquote>
+                ))}
+              </div>
+            </section>
+          )}
 
           {(event.cueResolution?.outcome || event.cueResolution?.lock?.reason || safetyFlags.length > 0 || event.memory?.title) && (
             <dl className="event-announcement-details">
@@ -1203,8 +1270,9 @@ function LogDrawer({
 }) {
   const drawerRef = useRef<HTMLElement>(null);
   const visible = events.filter((event) => {
-    if (filter === "haru") return Boolean(event.haruDialogue);
-    if (filter === "aoi") return Boolean(event.aoiDialogue);
+    if (filter === "haru" || filter === "aoi") {
+      return conversationForEvent(event).some((turn) => turn.speaker === filter);
+    }
     return true;
   }).slice().reverse();
 
@@ -1252,8 +1320,14 @@ function LogDrawer({
               {filter !== "haru" && filter !== "aoi" && event.suggestion && <p className="log-cue"><b>デコピンへの指示</b>{event.suggestion}</p>}
               {filter !== "haru" && filter !== "aoi" && <p>{formatCharacterDisplayText(event.narration, people, event.characterRoster ?? roster)}</p>}
               {filter !== "haru" && filter !== "aoi" && navigatorMessage && <blockquote className="quote-dekopin"><b>{DEKOPIN_NAME}</b>「{formatCharacterDisplayText(navigatorMessage, people, event.characterRoster ?? roster)}」</blockquote>}
-              {filter !== "event" && event.haruDialogue && <blockquote className="quote-haru"><b>{people.haru.name}</b>「{formatCharacterDisplayText(event.haruDialogue, people, event.characterRoster ?? roster)}」</blockquote>}
-              {filter !== "event" && event.aoiDialogue && <blockquote className="quote-aoi"><b>{people.aoi.name}</b>「{formatCharacterDisplayText(event.aoiDialogue, people, event.characterRoster ?? roster)}」</blockquote>}
+              {filter !== "event" && conversationForEvent(event)
+                .filter((turn) => filter === "all" || turn.speaker === filter)
+                .map((turn, index) => (
+                  <blockquote className={`quote-${turn.speaker}`} key={`${event.id}-${turn.speaker}-${index}`}>
+                    <b>{people[turn.speaker].name}</b>
+                    「{formatCharacterDisplayText(turn.text, people, event.characterRoster ?? roster)}」
+                  </blockquote>
+                ))}
             </div>
           </article>
           );
@@ -1303,6 +1377,11 @@ export default function App() {
   const [lastSuggestion, setLastSuggestion] = useState("");
   const [stages, setStages] = useState<TurnStages>(WAITING_STAGES);
   const [resolving, setResolving] = useState(false);
+  const {
+    serverResolving,
+    resolving: isResolving,
+    activeStages,
+  } = getResolutionUiState(game.status, resolving, stages);
   const [initialLoading, setInitialLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [openaiApiConfigured, setOpenaiApiConfigured] = useState(false);
@@ -1329,6 +1408,7 @@ export default function App() {
   const turnAbortRef = useRef<AbortController | null>(null);
   const operationRef = useRef<"turn" | Exclude<ActionBusy, null> | null>(null);
   const presentedEventIdRef = useRef<string | null | undefined>(undefined);
+  const recoveringTurnBaseEventIdRef = useRef<string | null | undefined>(undefined);
   const submittedSuggestionRef = useRef<string | null>(null);
   const playedAfterSceneIdsRef = useRef(new Set<string>());
   const turnStartStatesRef = useRef<Partial<Record<CharacterId, CharacterState>> | undefined>(undefined);
@@ -1364,7 +1444,7 @@ export default function App() {
   }, [refreshGame]);
 
   useEffect(() => {
-    if (initialLoading || resolving || game.status !== "resolving") return;
+    if (initialLoading || resolving || !serverResolving) return;
     let cancelled = false;
     const pollPersistedTurn = () => {
       void refreshGame().catch(() => {
@@ -1377,7 +1457,7 @@ export default function App() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [game.status, initialLoading, refreshGame, resolving]);
+  }, [initialLoading, refreshGame, resolving, serverResolving]);
 
   useEffect(() => () => turnAbortRef.current?.abort(), []);
 
@@ -1416,7 +1496,7 @@ export default function App() {
       || logOpen
       || personalityOpen
       || activeMemory
-      || resolving
+      || isResolving
       || actionBusy
     ) return;
     if (game.status === "ended" || game.completed) {
@@ -1464,7 +1544,7 @@ export default function App() {
     logOpen,
     personalityOpen,
     reducedMotion,
-    resolving,
+    isResolving,
   ]);
 
   const applyStreamMessage = useCallback((message: StreamMessage) => {
@@ -1501,7 +1581,10 @@ export default function App() {
 
     if (normalizedType === "turn.started") {
       setNavigatorMessage("");
-      setStages({ navigator: "active", haru: "waiting", aoi: "waiting", director: "waiting" });
+      // All three inference requests begin together. Mark both residents as
+      // active immediately so a buffered SSE connection cannot hide their
+      // head-up progress indicators until the first chunk arrives.
+      setStages({ navigator: "active", haru: "active", aoi: "active", director: "waiting" });
       const safeSuggestion = record(payload);
       const lock = record(safeSuggestion.lock);
       const cue = record(safeSuggestion.cue);
@@ -1606,7 +1689,7 @@ export default function App() {
     setNavigatorMessage("");
     setResolving(true);
     setStreamMessage("同じ瞬間のスナップショットを準備しています…");
-    setStages({ navigator: "active", haru: "waiting", aoi: "waiting", director: "waiting" });
+    setStages({ navigator: "active", haru: "active", aoi: "active", director: "waiting" });
     turnAbortRef.current = new AbortController();
     try {
       await runTurn(
@@ -1619,8 +1702,17 @@ export default function App() {
       await refreshGame();
       setSuggestion("");
     } catch (error) {
-      if (turnAbortRef.current.signal.aborted) return;
+      const aborted = turnAbortRef.current?.signal.aborted === true;
+      if (aborted) return;
+      // A Worker keeps resolving through a disconnected SSE response. Remember
+      // the event visible before the failed stream, then refresh persisted
+      // state so `status=resolving` immediately hands off to the polling path.
+      recoveringTurnBaseEventIdRef.current = game.currentEvent?.id
+        ?? game.eventLog.at(-1)?.id
+        ?? null;
       setNotice(error instanceof Error ? error.message : "ターンの処理に失敗しました");
+      const refreshed = await refreshTurnAfterStreamFailure(false, refreshGame);
+      if (!refreshed) setOffline(true);
     } finally {
       setResolving(false);
       turnAbortRef.current = null;
@@ -1763,7 +1855,7 @@ export default function App() {
     : navigatorMessage;
   const dekopinPresentation = useMemo(
     () => getDekopinPresentation({
-      resolving,
+      resolving: isResolving,
       offline,
       draft: suggestion,
       streamMessage: formatCharacterDisplayText(navigatorMessage || streamMessage, people, latestEvent?.characterRoster ?? game.characterRoster),
@@ -1783,7 +1875,7 @@ export default function App() {
       offline,
       game.characterRoster,
       people,
-      resolving,
+      isResolving,
       streamMessage,
       suggestion,
     ],
@@ -1793,7 +1885,7 @@ export default function App() {
     completed: game.completed,
     loading: initialLoading,
     offline,
-    resolving,
+    resolving: isResolving,
     actionBusy,
   });
   const { canSubmitCue, canAdvance, canFastForward } = controls;
@@ -1826,17 +1918,36 @@ export default function App() {
     if (presentedEventIdRef.current === undefined) {
       // Existing saves should not reopen their latest historical event on load.
       presentedEventIdRef.current = latestId;
+      if (serverResolving) recoveringTurnBaseEventIdRef.current = latestId;
       return;
     }
     if (!latestId) {
-      if (game.status === "awaiting_suggestion") presentedEventIdRef.current = null;
+      if (game.status === "awaiting_suggestion") {
+        presentedEventIdRef.current = null;
+        recoveringTurnBaseEventIdRef.current = undefined;
+      }
       return;
+    }
+    if (
+      game.status === "awaiting_suggestion"
+      && !resolving
+      && recoveringTurnBaseEventIdRef.current !== undefined
+    ) {
+      // The persisted turn failed and the server rolled back to the previous
+      // event. Do not mistake the next independently submitted turn for the
+      // interrupted one.
+      recoveringTurnBaseEventIdRef.current = undefined;
     }
     // Intermediate acknowledgements arrive before the committed event. Once
     // turn.completed supplies it, install the initial pose while `resolving`
     // still blocks playback so the final position never flashes first.
     if (game.status !== "resolved" && game.status !== "ended") return;
     if (presentedEventIdRef.current === latestId) return;
+    const recoveredTurn = isRecoveredTurnEvent(
+      recoveringTurnBaseEventIdRef.current,
+      latestId,
+      game.status,
+    );
     presentedEventIdRef.current = latestId;
     const submittedSuggestion = submittedSuggestionRef.current;
     if (submittedSuggestion) {
@@ -1844,6 +1955,7 @@ export default function App() {
       submittedSuggestionRef.current = null;
     }
     if (game.status === "ended") {
+      recoveringTurnBaseEventIdRef.current = undefined;
       setFreshEventId(null);
       setLogOpen(false);
       setActiveMemory(undefined);
@@ -1851,14 +1963,15 @@ export default function App() {
       setEventAnnouncementId(latestId);
       return;
     }
-    if (submittedSuggestion) {
+    if (submittedSuggestion || recoveredTurn) {
+      recoveringTurnBaseEventIdRef.current = undefined;
       setFreshEventId(latestId);
       setLogOpen(false);
       setActiveMemory(undefined);
       setPersonalityOpen(false);
       if (latestEvent) beginAfterScene(latestEvent);
     }
-  }, [beginAfterScene, game.status, initialLoading, latestEvent, resolving]);
+  }, [beginAfterScene, game.status, initialLoading, latestEvent, resolving, serverResolving]);
 
   const selectCharacter = (person: CharacterId) => {
     setSelectedPerson(person);
@@ -1955,7 +2068,7 @@ export default function App() {
           <AssetManagerLauncher />
           <button ref={personalityButtonRef} className="personality-open-button" type="button" aria-haspopup="dialog" aria-expanded={personalityOpen} onClick={() => setPersonalityOpen(true)}><span aria-hidden="true">◆</span>個性設定</button>
           <button className={`header-log-button ${logOpen ? "is-open" : ""}`} type="button" aria-controls="life-log-drawer" aria-expanded={logOpen} onClick={() => setLogOpen((open) => !open)}><span aria-hidden="true">▤</span>生活ログ</button>
-          <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={initialLoading || Boolean(actionBusy) || resolving} title="ゲームを最初からやり直す" aria-label="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
+          <button className="reset-button" type="button" onClick={() => void runAction("reset")} disabled={initialLoading || Boolean(actionBusy) || isResolving} title="ゲームを最初からやり直す" aria-label="ゲームを最初からやり直す"><span aria-hidden="true">↻</span></button>
         </div>
       </header>
 
@@ -1979,14 +2092,14 @@ export default function App() {
               マップ情報
               <span aria-hidden="true">{mapOverlaysVisible ? "ON" : "OFF"}</span>
             </button>
-            <ApartmentStage game={game} people={people} stages={stages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} furnitureObstacles={furnitureObstacles} resolving={resolving} onSelectPerson={selectCharacter} />
+            <ApartmentStage game={game} people={people} stages={activeStages} selectedPerson={selectedPerson} currentEvent={latestEvent} afterScene={afterScene} turnStart={turnStartStatesRef.current} furnitureObstacles={furnitureObstacles} resolving={isResolving} onSelectPerson={selectCharacter} />
             <div id="map-overlay-layer" className="map-overlay-layer">
               <div className="resident-hud" aria-label="住人の状態">
-                <ResidentChip person="haru" people={people} roster={game.characterRoster} info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={resolving && stages.haru === "active"} onSelect={() => selectCharacter("haru")} />
-                <ResidentChip person="aoi" people={people} roster={game.characterRoster} info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={resolving && stages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
+                <ResidentChip person="haru" people={people} roster={game.characterRoster} info={people.haru} state={game.haru} selected={selectedPerson === "haru"} thinking={isResolving && activeStages.haru === "active"} onSelect={() => selectCharacter("haru")} />
+                <ResidentChip person="aoi" people={people} roster={game.characterRoster} info={people.aoi} state={game.aoi} selected={selectedPerson === "aoi"} thinking={isResolving && activeStages.aoi === "active"} onSelect={() => selectCharacter("aoi")} />
               </div>
-              <ResolutionProgress stages={stages} active={resolving} message={streamMessage} people={people} rosters={historicalDisplayRosters} />
-              <EventCard event={latestEvent} people={people} roster={game.characterRoster} resolving={resolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
+              <ResolutionProgress stages={activeStages} active={isResolving} message={streamMessage} people={people} rosters={historicalDisplayRosters} />
+              <EventCard event={latestEvent} people={people} roster={game.characterRoster} resolving={isResolving} fresh={freshEventId === latestEvent?.id} lastSuggestion={lastSuggestion} navigatorMessage={latestNavigatorMessage || undefined} onOpen={latestEvent ? () => {
                 setLogOpen(false);
                 setActiveMemory(undefined);
                 setPersonalityOpen(false);
@@ -2003,7 +2116,7 @@ export default function App() {
           <section className="interaction-dock" aria-labelledby="dekopin-title">
             <button type="button" className="latest-log-strip" aria-controls="life-log-drawer" aria-expanded={logOpen} onClick={() => setLogOpen(true)}>
               <span className="log-clock">{activePhase.time}</span><span className="log-star">★</span>
-              <span className="latest-log-copy"><small>最新の生活ログ</small><b>{formatCharacterDisplayText(latestEvent?.eventTitle, people, latestEvent?.characterRoster ?? game.characterRoster) ?? "共同生活がはじまりました"}</b><em>{latestEvent?.haruDialogue ? `「${clipText(formatCharacterDisplayText(latestEvent.haruDialogue, people, latestEvent.characterRoster ?? game.characterRoster), 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
+              <span className="latest-log-copy"><small>最新の生活ログ</small><b>{formatCharacterDisplayText(latestEvent?.eventTitle, people, latestEvent?.characterRoster ?? game.characterRoster) ?? "共同生活がはじまりました"}</b><em>{latestEvent && conversationForEvent(latestEvent).length ? `「${clipText(formatCharacterDisplayText(conversationForEvent(latestEvent).at(-1)?.text, people, latestEvent.characterRoster ?? game.characterRoster) ?? "", 28)}」` : "ふたりは、それぞれの朝を迎えています。"}</em></span>
               <span className="open-log-label">振り返る <b>⌃</b></span>
             </button>
             <div className="producer-row">
@@ -2025,7 +2138,7 @@ export default function App() {
                   <label htmlFor="suggestion" className="sr-only">デコピンへの指示</label>
                   <textarea ref={suggestionInputRef} id="suggestion" name="suggestion" rows={1} maxLength={240} value={suggestion} onChange={(event) => setSuggestion(event.target.value)} onKeyDown={handleInputKeyDown} disabled={!canSubmitCue} aria-describedby={openaiApiConfigured ? "game-control-status openai-api-data-notice" : "game-control-status"} enterKeyHint="send" autoCapitalize="sentences" placeholder="例：今日は一緒に夕食を作ってみたら？" />
                   <span className="character-count">{suggestion.length}/240</span>
-                  <button className="submit-cue" type="submit" disabled={!canSubmitCue || !suggestion.trim()}><span>{resolving || game.status === "resolving" ? "反映中…" : game.status === "resolved" ? "先に時間を進める" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
+                  <button className="submit-cue" type="submit" disabled={!canSubmitCue || !suggestion.trim()}><span>{isResolving ? "反映中…" : game.status === "resolved" ? "先に時間を進める" : "デコピンに頼む"}</span><b aria-hidden="true">▶</b></button>
                 </form>
               </div>
               <div className="dock-actions">
@@ -2049,7 +2162,7 @@ export default function App() {
             ))}
           </div>
           <div id="inspector-panel" className="inspector-body" role="tabpanel" aria-labelledby={`inspector-tab-${inspectorTab}`} tabIndex={0}>
-            {inspectorTab === "status" && <CharacterInspector person={selectedPerson} people={people} roster={game.characterRoster} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={resolving && stages[selectedPerson] === "active"} />}
+            {inspectorTab === "status" && <CharacterInspector person={selectedPerson} people={people} roster={game.characterRoster} info={people[selectedPerson]} state={game[selectedPerson]} decision={game.decisions[selectedPerson]} thinking={isResolving && activeStages[selectedPerson] === "active"} />}
             {inspectorTab === "schedule" && <SchedulePanel game={game} people={people} canUseCue={canSubmitCue} onUseCue={useScheduleCue} />}
             {inspectorTab === "memories" && <MemoryPanel game={game} people={people} onOpenMemory={setActiveMemory} />}
           </div>

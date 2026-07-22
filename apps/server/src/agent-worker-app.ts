@@ -11,7 +11,7 @@ import {
   characterDefinitionSchema,
   characterRosterSchema,
   characterStateSchema,
-  directorResolvedEventSchema,
+  directorResolvedEventDraftSchema,
   eventDefinitionSchema,
   memorySchema,
   navigatorAgentOutputSchema,
@@ -287,7 +287,7 @@ async function invokeScoped(
   }
   if (request.operation === "resolve") {
     const result = await scoped.resolve(request.input as DirectorInput);
-    return validateResult(result, directorResolvedEventSchema);
+    return validateResult(result, directorResolvedEventDraftSchema);
   }
   if (request.characterId !== request.input.characterId) {
     throw new PublicGatewayError(

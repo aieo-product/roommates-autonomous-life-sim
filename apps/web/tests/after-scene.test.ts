@@ -50,6 +50,139 @@ describe("post-event room scene", () => {
     ]);
   });
 
+  it("supplements only a missing authored speaker from legacy dialogue", () => {
+    const partial = event({
+      conversation: [
+        { speaker: "aoi", text: "夕飯はどうする？" },
+      ],
+      haruDialogue: "一緒にスープを作ろう。",
+      aoiDialogue: "この古いAoi発話は重ねない。",
+      haruAction: "鍋を用意する",
+      aoiAction: "野菜を洗う",
+    });
+
+    expect(conversationForEvent(partial)).toEqual([
+      { speaker: "aoi", text: "夕飯はどうする？" },
+      { speaker: "haru", text: "一緒にスープを作ろう。" },
+    ]);
+    const plan = createAfterScenePlan(partial, INITIAL_GAME_STATE);
+    expect(plan.beats.slice(1, 3)).toMatchObject([
+      { kind: "dialogue", actor: "aoi", text: "夕飯はどうする？" },
+      { kind: "dialogue", actor: "haru", text: "一緒にスープを作ろう。" },
+    ]);
+    expect(plan.beats.findIndex((beat) => beat.kind === "action")).toBe(3);
+  });
+
+  it("repairs a partial conversation from the missing speaker's story beat", () => {
+    const partial = event({
+      conversation: [
+        { speaker: "aoi", text: "先に相談してもいい？" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "both", location: "リビング" },
+        { kind: "dialogue", actor: "aoi", text: "古いAoi発話" },
+        { kind: "action", actor: "both", action: "片付けを始める" },
+        { kind: "dialogue", actor: "haru", text: "もちろん。役割を決めよう。" },
+      ],
+    });
+
+    expect(conversationForEvent(partial)).toEqual([
+      { speaker: "aoi", text: "先に相談してもいい？" },
+      { speaker: "haru", text: "もちろん。役割を決めよう。" },
+    ]);
+    const plan = createAfterScenePlan(partial, INITIAL_GAME_STATE);
+    expect(plan.beats.map((beat) => beat.kind)).toEqual([
+      "move", "dialogue", "dialogue", "action",
+    ]);
+    expect(plan.beats.slice(1, 3)).toMatchObject([
+      { actor: "aoi", text: "先に相談してもいい？" },
+      { actor: "haru", text: "もちろん。役割を決めよう。" },
+    ]);
+  });
+
+  it("plays both legacy intentions before either resident starts acting", () => {
+    const plan = createAfterScenePlan(event({
+      haruDialogue: "僕は朝食を作りたい。",
+      aoiDialogue: "私は盛り付けを手伝うね。",
+      haruAction: "フライパンを温める",
+      aoiAction: "皿を二枚並べる",
+    }), INITIAL_GAME_STATE);
+
+    expect(plan.beats.map((beat) => beat.kind)).toEqual([
+      "move", "dialogue", "dialogue", "action", "action",
+    ]);
+    expect(plan.beats.slice(1, 3)).toMatchObject([
+      { kind: "dialogue", actor: "haru", text: "僕は朝食を作りたい。" },
+      { kind: "dialogue", actor: "aoi", text: "私は盛り付けを手伝うね。" },
+    ]);
+  });
+
+  it("keeps an Aoi question before Haru's answer and does not replay either opening", () => {
+    const plan = createAfterScenePlan(event({
+      conversation: [
+        { speaker: "aoi", text: "夕飯は何を作ろうか？" },
+        { speaker: "haru", text: "温かいスープにしよう。" },
+        { speaker: "aoi", text: "じゃあ野菜を切るね。" },
+        { speaker: "haru", text: "いい香りになってきたね。" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "both", location: "アイランドキッチン" },
+        { kind: "dialogue", actor: "haru", text: "順番が逆の古い返答" },
+        { kind: "action", actor: "both", action: "夕飯を作る" },
+        { kind: "dialogue", actor: "aoi", text: "順番が逆の古い質問" },
+        { kind: "dialogue", actor: "haru", text: "古い経過報告" },
+        { kind: "dialogue", actor: "aoi", text: "古い締めの言葉" },
+      ],
+    }), INITIAL_GAME_STATE);
+
+    const dialogue = plan.beats.filter((beat) => beat.kind === "dialogue");
+    expect(dialogue.map(({ actor, text }) => ({ actor, text }))).toEqual([
+      { actor: "aoi", text: "夕飯は何を作ろうか？" },
+      { actor: "haru", text: "温かいスープにしよう。" },
+      { actor: "aoi", text: "じゃあ野菜を切るね。" },
+      { actor: "haru", text: "いい香りになってきたね。" },
+    ]);
+    expect(plan.beats.findIndex((beat) => beat.kind === "action")).toBe(3);
+    expect(new Set(dialogue.map((beat) => `${beat.actor}\u0000${beat.text}`)).size)
+      .toBe(dialogue.length);
+  });
+
+  it("finishes the mutual opening before residents move into separate rooms", () => {
+    const game: GameState = {
+      ...INITIAL_GAME_STATE,
+      haru: { ...INITIAL_GAME_STATE.haru, location: "キッチン" },
+      aoi: { ...INITIAL_GAME_STATE.aoi, location: "ベランダ" },
+    };
+    const plan = createAfterScenePlan(event({
+      scene: { haru: "キッチン", aoi: "ベランダ" },
+      conversation: [
+        { speaker: "aoi", text: "私はベランダを片付けてくるね。" },
+        { speaker: "haru", text: "わかった。僕はキッチンを任せて。" },
+        { speaker: "aoi", text: "終わったらリビングで合流しよう。" },
+      ],
+      storyBeats: [
+        { kind: "move", actor: "haru", location: "キッチン" },
+        { kind: "move", actor: "aoi", location: "ベランダ" },
+        { kind: "dialogue", actor: "aoi", text: "古い意思表示" },
+        { kind: "action", actor: "haru", action: "夕飯の下ごしらえをする" },
+        { kind: "dialogue", actor: "haru", text: "古い返答" },
+        { kind: "dialogue", actor: "aoi", text: "古い続き" },
+      ],
+    }), game);
+
+    expect(plan.beats.slice(0, 2)).toMatchObject([
+      { kind: "dialogue", actor: "aoi", text: "私はベランダを片付けてくるね。" },
+      { kind: "dialogue", actor: "haru", text: "わかった。僕はキッチンを任せて。" },
+    ]);
+    expect(plan.beats.findIndex((beat) => beat.kind === "move")).toBe(2);
+    expect(plan.beats.filter((beat) => beat.kind === "dialogue").map((beat) => beat.text))
+      .toEqual([
+        "私はベランダを片付けてくるね。",
+        "わかった。僕はキッチンを任せて。",
+        "終わったらリビングで合流しよう。",
+      ]);
+  });
+
   it("builds routes from the previous snapshot to the committed state", () => {
     const game: GameState = {
       ...INITIAL_GAME_STATE,
@@ -146,7 +279,7 @@ describe("post-event room scene", () => {
     expect(dialogue?.directions).toEqual({ haru: "east", aoi: "west" });
   });
 
-  it("preserves a Director story as ordered movement, dialogue, and action beats", () => {
+  it("preserves Director routes while synchronizing both speakers before action", () => {
     const game: GameState = {
       ...INITIAL_GAME_STATE,
       haru: { ...INITIAL_GAME_STATE.haru, location: "ベランダ" },
@@ -166,14 +299,19 @@ describe("post-event room scene", () => {
     });
 
     expect(plan.beats.map((beat) => beat.kind)).toEqual([
-      "move", "dialogue", "action", "move", "dialogue",
+      "dialogue", "dialogue", "move", "action", "move",
     ]);
-    expect(plan.beats[1]).toMatchObject({
+    expect(plan.beats[0]).toMatchObject({
       kind: "dialogue",
       actor: "haru",
       text: "まずスープを温めよう。",
     });
-    expect(plan.beats[2]).toMatchObject({
+    expect(plan.beats[1]).toMatchObject({
+      kind: "dialogue",
+      actor: "aoi",
+      text: "いい匂いがしてきたね。",
+    });
+    expect(plan.beats[3]).toMatchObject({
       kind: "action",
       actor: "haru",
       action: "鍋を弱火にかける",

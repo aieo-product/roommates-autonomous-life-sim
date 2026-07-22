@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createInitialGameState,
+  directorResolvedEventSchema,
   eventDefinitionSchema,
   eventStoryBeatsSchema,
   safeSuggestionSchema,
@@ -284,15 +285,31 @@ describe("autonomous event composer", () => {
     expect(constrained.narration).toContain("それぞれのペースで別々に");
     expect(constrained.memory.summary).toBe(constrained.narration);
     expect(constrained.conversation).toEqual([
-      { speaker: "haru", text: initiate(haruCandidate).dialogue },
-      { speaker: "aoi", text: initiate(aoiCandidate).dialogue },
-      { speaker: "haru", text: "こちらはこのまま自分のペースで続けよう。" },
-      { speaker: "aoi", text: "私もこちらを自分のペースで続けよう。" },
+      {
+        speaker: "haru",
+        text: `今日は「${haruCandidate.title}」をして過ごそうと思う。そっちは？`,
+      },
+      { speaker: "aoi", text: `私は「${aoiCandidate.title}」にするね。` },
+      { speaker: "haru", text: "わかった。お互い、それぞれのペースでやろう。" },
+      { speaker: "aoi", text: "うん。こちらも自分のペースで過ごせた。" },
     ]);
+    expect(directorResolvedEventSchema.parse(constrained)).toEqual(constrained);
     expect(eventStoryBeatsSchema.parse(constrained.storyBeats)).toEqual(
       constrained.storyBeats,
     );
     expect(constrained.storyBeats).toHaveLength(8);
+    expect(constrained.storyBeats?.slice(0, 3)).toEqual(
+      constrained.conversation?.slice(0, 3).map((line) => ({
+        kind: "dialogue",
+        actor: line.speaker,
+        text: line.text,
+      })),
+    );
+    expect(constrained.storyBeats?.at(-1)).toEqual({
+      kind: "dialogue",
+      actor: constrained.conversation?.at(-1)?.speaker,
+      text: constrained.conversation?.at(-1)?.text,
+    });
     expect(constrained.storyBeats?.some((beat) => beat.actor === "both")).toBe(
       false,
     );

@@ -26,7 +26,10 @@ export type EventConversationLine = {
 export const storyBeatActors = ["haru", "aoi", "both"] as const;
 export const storyBeatKinds = ["move", "dialogue", "action"] as const;
 export const EVENT_STORY_BEATS_MIN_LENGTH = 4;
-export const EVENT_STORY_BEATS_MAX_LENGTH = 8;
+// A complete scene can contain every one of the six public conversation lines,
+// two movement stages, and an action. Keep enough room for that full timeline
+// so the renderer never has to drop dialogue to satisfy the choreography cap.
+export const EVENT_STORY_BEATS_MAX_LENGTH = 10;
 export const EVENT_STORY_BEAT_LOCATION_MAX_LENGTH = 48;
 export const EVENT_STORY_BEAT_CONTENT_MAX_LENGTH = 160;
 export type EventStoryBeat =
